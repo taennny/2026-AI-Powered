@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: roame-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-roame}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-roame1234}
+      POSTGRES_DB: ${DB_NAME:-roame}
+    ports:
+      - "5432:5432"
+    volumes:
+      - roame-db-data:/var/lib/postgresql/data
+  minio:
+    image: minio/minio:latest
+    container_name: roame-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin123}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - roame-minio-data:/data
+    command: server /data --console-address ":9001"
+  backend:
+    build: .
+    container_name: roame-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-roame}:${DB_PASSWORD:-roame1234}@db:5432/${DB_NAME:-roame}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin123}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/code/app
+    depends_on:
+      - db
+      - minio
+
+volumes:
+  roame-db-data:
+  roame-minio-data:
