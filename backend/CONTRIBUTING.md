@@ -40,3 +40,21 @@ chore: 설정, 빌드 등 기타
 ```
 
 예시: `feat: 블로그 생성 API 추가`, `fix: GPS 로그 저장 오류 수정`
+
+## 코딩 컨벤션
+
+### 네이밍
+
+- 변수/함수: `snake_case` (예: `user_name`, `get_blog`)
+- 클래스: `PascalCase` (예: `BlogPost`, `UserSchema`)
+- 상수: `UPPER_SNAKE_CASE` (예: `MAX_UPLOAD_SIZE`)
+
+### 도구
+
+- **포맷터**: Black (코드 스타일 자동 정리)
+- **린터**: Ruff (오류 자동 체크)
+- **import 정렬**: isort
+
+### VS Code 설정
+
+VS Code 확장 설치: `Black Formatter`, `Ruff`
