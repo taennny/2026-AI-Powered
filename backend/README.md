@@ -71,3 +71,12 @@ backend/
 ## API 문서
 
 서버 실행 후 http://localhost:8000/docs 에서 Swagger UI 확인
+
+## DB 마이그레이션
+
+# 컨테이너 실행 후
+docker compose exec backend alembic upgrade head
+
+# 모델 추가 후 새 마이그레이션 생성
+docker compose exec backend alembic revision --autogenerate -m "설명"
+docker compose exec backend alembic upgrade head
