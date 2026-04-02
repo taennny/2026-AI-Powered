@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.13 세팅
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      - name: Ruff 린트 검사
+        run: ruff check .
+
+      - name: Black 포맷 검사
+        run: black --check .
+
+      - name: Pytest 실행
+        run: pytest
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///./test.db
