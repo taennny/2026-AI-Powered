@@ -64,3 +64,52 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> dict:
         "refresh_token": refresh_token,
         "token_type": "Bearer"
     }
+async def kakao_login(db: AsyncSession, code: str) -> dict:
+    from app.services.kakao import get_kakao_token, get_kakao_user_info
+
+    # 1. 인가 코드로 카카오 액세스 토큰 받기
+    kakao_token_data = await get_kakao_token(code)
+    kakao_access_token = kakao_token_data.get("access_token")
+
+    # 2. 카카오 액세스 토큰으로 유저 정보 받기
+    kakao_user_info = await get_kakao_user_info(kakao_access_token)
+    kakao_id = str(kakao_user_info.get("id"))
+    kakao_account = kakao_user_info.get("kakao_account", {})
+    email = kakao_account.get("email", f"{kakao_id}@kakao.com")
+    nickname = kakao_user_info.get("properties", {}).get("nickname", f"카카오유저{kakao_id[:4]}")
+
+    # 3. 기존 유저인지 확인
+    result = await db.execute(select(User).where(User.social_id == kakao_id))
+    user = result.scalar_one_or_none()
+    is_new_user = False
+
+    # 4. 신규 유저면 자동 회원가입
+    if not user:
+        is_new_user = True
+        user = User(
+            id=uuid.uuid4(),
+            email=email,
+            password_hash=None,
+            nickname=nickname,
+            auth_provider="kakao",
+            social_id=kakao_id,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    # 5. JWT 발급
+    access_token = create_access_token(str(user.id))
+    refresh_token = create_refresh_token(str(user.id))
+
+    # 6. refresh_token DB에 저장
+    user.refresh_token = refresh_token
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "Bearer",
+        "is_new_user": is_new_user
+    }

@@ -49,3 +49,15 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
+
+# 카카오 로그인 요청
+class KakaoLoginRequest(BaseModel):
+    code: str
+
+
+# 카카오 로그인 응답
+class KakaoLoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "Bearer"
+    is_new_user: bool

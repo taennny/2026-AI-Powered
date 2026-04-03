@@ -19,5 +19,8 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
 
+    # Kakao
+        KAKAO_REST_API_KEY: str = ""
+        KAKAO_REDIRECT_URI: str = ""
 
 settings = Settings()

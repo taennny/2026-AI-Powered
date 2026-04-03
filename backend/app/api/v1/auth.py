@@ -6,9 +6,10 @@ from app.schemas.auth import (
     RegisterRequest, RegisterResponse,
     LoginRequest, LoginResponse,
     RefreshRequest, RefreshResponse,
-    PasswordResetRequest, PasswordResetConfirm
+    PasswordResetRequest, PasswordResetConfirm,
+    KakaoLoginRequest, KakaoLoginResponse
 )
-from app.services.auth import register_user, login_user
+from app.services.auth import register_user, login_user, kakao_login
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -79,3 +80,12 @@ async def password_reset_confirm(request: PasswordResetConfirm):
     """새 비밀번호 설정"""
     # Sprint 1에서는 토큰 검증 없이 성공 응답만 반환
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
+
+@router.post("/kakao", response_model=KakaoLoginResponse)
+async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_db)):
+    """카카오 로그인"""
+    try:
+        result = await kakao_login(db, request.code)
+        return KakaoLoginResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
