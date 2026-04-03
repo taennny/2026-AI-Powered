@@ -9,4 +9,9 @@ httpx==0.28.1
 python-multipart==0.0.20
 boto3==1.38.12
 passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
 python-jose[cryptography]==3.4.0
+pydantic[email]==2.10.6
+pytest==8.3.5
+pytest-asyncio==0.25.3
+httpx==0.28.1
