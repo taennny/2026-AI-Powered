@@ -55,13 +55,15 @@ backend/
 ├── app/
 │   ├── main.py              # FastAPI 앱 진입점
 │   ├── config.py            # 환경변수 설정
-│   ├── database.py          # DB 연결
+│   ├── database.py          # DB 연결 + Base
 │   ├── models/              # SQLAlchemy 모델 (DB 테이블 정의)
 │   ├── schemas/             # Pydantic 스키마 (요청/응답 형식)
 │   ├── api/
 │   │   └── v1/              # API v1 라우터
 │   ├── services/            # 비즈니스 로직
 │   └── utils/               # 유틸리티
+├── migrations/              # Alembic 마이그레이션
+├── alembic.ini
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
@@ -71,3 +73,13 @@ backend/
 ## API 문서
 
 서버 실행 후 http://localhost:8000/docs 에서 Swagger UI 확인
+
+## DB 마이그레이션
+```bash
+# 컨테이너 실행 후 테이블 생성
+docker compose exec backend alembic upgrade head
+
+# 모델 추가 후 새 마이그레이션 생성
+docker compose exec backend alembic revision --autogenerate -m "설명"
+docker compose exec backend alembic upgrade head
+```
