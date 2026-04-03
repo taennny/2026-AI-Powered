@@ -2,11 +2,9 @@
  * @file components/home/SectionTabs.tsx
  * @description 홈 네비게이션 탭 컴포넌트
  * - Index(home) / Journal List 탭 전환
- * - 선택된 탭이 위로 올라오는 spring 애니메이션 (수정 필요)
- * - 배경색: #D8E6E8 / 선택된 탭: #FFFFFF (수정 필요, 색 변경되지 않음)
- *
- * ## 다음 연결 작업
- * - [ ] 탭 추가 시 Tab 타입과 handleTabPress 분기 확장
+ * - Index 탭: 항상 #FFFFFF 고정 / Journal List 탭: 항상 #D8E6E8 고정
+ * - 활성 탭이 위로 올라오는 spring 애니메이션 + shadow로 앞에 뜨는 카드 효과
+ * - 비활성 탭은 활성 탭 뒤에 깔리는 구조 (zIndex로 레이어 제어)
  */
 
 import {View, Text, TouchableOpacity, Animated} from 'react-native';
@@ -47,16 +45,28 @@ export default function SectionTabs() {
   };
 
   return (
-    <View style={{backgroundColor: '#D8E6E8'}} className="flex-row px-4 pt-2">
-      {/* Index 탭 */}
-      <Animated.View style={{transform: [{translateY: homeAnim}]}}>
+    <View style={{backgroundColor: 'transparent', flexDirection: 'row', paddingHorizontal: 16, paddingTop: 8}}>
+      {/* Index 탭 — 항상 흰색, 활성 시 앞으로 올라옴 */}
+      <Animated.View
+        style={{
+          flex: 1,
+          zIndex: activeTab === 'home' ? 2 : 1,
+          transform: [{translateY: homeAnim}],
+          // 활성 탭에만 shadow 적용해 카드가 떠 있는 느낌
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: activeTab === 'home' ? -2 : 0},
+          shadowOpacity: activeTab === 'home' ? 0.08 : 0,
+          shadowRadius: 4,
+          elevation: activeTab === 'home' ? 4 : 0,
+        }}
+      >
         <TouchableOpacity
           onPress={() => handleTabPress('home')}
           style={{
-            backgroundColor: activeTab === 'home' ? '#FFFFFF' : 'transparent',
+            alignItems: 'center',
+            backgroundColor: '#FFFFFF',
             borderTopLeftRadius: 10,
             borderTopRightRadius: 10,
-            paddingHorizontal: 20,
             paddingVertical: 8,
           }}
         >
@@ -73,16 +83,26 @@ export default function SectionTabs() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Journal List 탭 */}
-      <Animated.View style={{transform: [{translateY: journalAnim}]}}>
+      {/* Journal List 탭 — 항상 #D8E6E8, 활성 시 앞으로 올라옴 */}
+      <Animated.View
+        style={{
+          flex: 1,
+          zIndex: activeTab === 'journal' ? 2 : 1,
+          transform: [{translateY: journalAnim}],
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: activeTab === 'journal' ? -2 : 0},
+          shadowOpacity: activeTab === 'journal' ? 0.08 : 0,
+          shadowRadius: 4,
+          elevation: activeTab === 'journal' ? 4 : 0,
+        }}
+      >
         <TouchableOpacity
           onPress={() => handleTabPress('journal')}
           style={{
-            backgroundColor:
-              activeTab === 'journal' ? '#FFFFFF' : 'transparent',
+            alignItems: 'center',
+            backgroundColor: '#D8E6E8',
             borderTopLeftRadius: 10,
             borderTopRightRadius: 10,
-            paddingHorizontal: 20,
             paddingVertical: 8,
           }}
         >
