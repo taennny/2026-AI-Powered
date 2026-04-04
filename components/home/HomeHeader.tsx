@@ -9,21 +9,23 @@
 import {View, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
+import {Colors} from '@/constants/Colors';
+
 export default function HomeHeader() {
   const handleMenuPress = () => {
     // TODO: 설정 컴포넌트 연결
   };
 
   return (
-    <SafeAreaView edges={['top']} style={{backgroundColor: '#F6F6F6'}}>
+    <SafeAreaView edges={['top']} style={{backgroundColor: Colors.surface}}>
       <View
-        style={{backgroundColor: '#F6F6F6'}}
+        style={{backgroundColor: Colors.surface}}
         className="flex-row items-center justify-end px-5 py-3"
       >
         <TouchableOpacity onPress={handleMenuPress} className="p-1 gap-y-[5px]">
-          <View style={{width: 22, height: 1.5, backgroundColor: '#333'}} />
-          <View style={{width: 22, height: 1.5, backgroundColor: '#333'}} />
-          <View style={{width: 22, height: 1.5, backgroundColor: '#333'}} />
+          <View style={{width: 22, height: 1.5, backgroundColor: Colors.textPrimary}} />
+          <View style={{width: 22, height: 1.5, backgroundColor: Colors.textPrimary}} />
+          <View style={{width: 22, height: 1.5, backgroundColor: Colors.textPrimary}} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

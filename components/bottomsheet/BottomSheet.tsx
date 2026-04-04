@@ -1,45 +1,119 @@
 /**
  * @file components/bottomsheet/BottomSheet.tsx
- * @description 홈 화면 바텀시트 배경 컴포넌트
+ * @description 홈 화면 바텀시트 컴포넌트
  * - PanResponder 기반 드래그 제스처로 위/아래 이동
- * - peek(일부 노출) ↔ expanded(전체 노출) 두 스냅 포인트
- * - peekHeight prop으로 peek 상태의 노출 높이 조절 가능 (기본값 320px)
+ * - 3단계 스냅: expanded(0) ↔ peek ↔ handleOnly
+ * - 날짜 헤더 + 시간대별 타임라인 레이아웃
  *
  * ## 다음 연결 작업
- * - [ ] children으로 날짜 헤더(PostDateHeader) 연결
- * - [ ] children으로 PostCard 리스트 연결
- * - [ ] 스냅 포인트 3단계로 확장 필요 시 snapPoints prop 추가 검토
+ * - [ ] DUMMY_POSTS → 실제 API 데이터로 교체 (selectedDate 기반 fetch)
+ * - [ ] ScrollView 스크롤 ↔ 바텀시트 드래그 제스처 충돌 처리 검토
  */
 
-import {useRef, ReactNode, useCallback} from 'react';
-import {Animated, PanResponder, View, LayoutChangeEvent} from 'react-native';
+import {useRef, useCallback, useState, useEffect} from 'react';
+import {
+  Animated,
+  PanResponder,
+  ScrollView,
+  Text,
+  View,
+  LayoutChangeEvent,
+} from 'react-native';
+
+import {DUMMY_POSTS, type PostCardData} from '@/constants/dummyData';
+import {Colors} from '@/constants/Colors';
+import PostCard from '@/components/bottomsheet/PostCard';
+import MapPreview from '@/components/bottomsheet/MapPreview';
 
 type Props = {
-  children?: ReactNode;
+  /** 캘린더에서 선택된 날짜 — 헤더 표시 및 카드 필터링에 사용 */
+  selectedDate?: Date;
   /** peek 상태에서 화면에 노출될 시트 높이 (px) */
   peekHeight?: number;
 };
 
-export default function BottomSheet({children, peekHeight = 320}: Props) {
-  // 시트 전체 높이 — onLayout에서 측정 후 저장
+/** Date → '25.04.01(tue)' 형식 문자열 */
+function formatDateHeader(date: Date): string {
+  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const yy = String(date.getFullYear()).slice(2);
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  const day = days[date.getDay()];
+  return `${yy}.${mm}.${dd}(${day})`;
+}
+
+/** 선택된 날짜에 해당하는 포스트만 필터링 */
+function filterByDate(posts: PostCardData[], date: Date): PostCardData[] {
+  const target = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return posts.filter(p => p.date === target);
+}
+
+/**
+ * 포스트 배열을 시작 시(hour) 기준으로 그룹핑
+ * 예) [{hour: 12, posts: [...]}, {hour: 14, posts: [...]}]
+ */
+function groupByHour(
+  posts: PostCardData[],
+): {hour: number; posts: PostCardData[]}[] {
+  const map = new Map<number, PostCardData[]>();
+  posts.forEach(post => {
+    const hour = parseInt(post.startTime.split(':')[0], 10);
+    if (!map.has(hour)) map.set(hour, []);
+    map.get(hour)!.push(post);
+  });
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([hour, ps]) => ({hour, posts: ps}));
+}
+
+const BAR_LEFT = 40;
+
+export default function BottomSheet({
+  selectedDate = new Date(),
+  peekHeight = 320,
+}: Props) {
   const sheetHeight = useRef(0);
-
-  // translateY = 0이면 완전히 펼쳐진 상태, sheetHeight - peekHeight이면 peek 상태
-  // 초기값 9999: 레이아웃 측정 전 시트가 화면에 보이지 않도록 숨겨둠
   const translateY = useRef(new Animated.Value(9999)).current;
-
-  // 드래그 종료 시점의 translateY를 기억해 다음 제스처의 기준점으로 사용
+  const HANDLE_HEIGHT = 30;
   const lastY = useRef(0);
-
-  // peekHeight를 PanResponder 클로저 내에서 안정적으로 참조하기 위해 ref로 보관
   const peekHeightRef = useRef(peekHeight);
 
-  // 컨테이너 높이가 확정된 후 peek 위치로 초기 배치
+  const [showMap, setShowMap] = useState(false);
+  const [isMapMounted, setIsMapMounted] = useState(false);
+  const mapOpacity = useRef(new Animated.Value(0)).current;
+
+  const hasPostsRef = useRef(false);
+
+  useEffect(() => {
+    const listenerId = translateY.addListener(({value}) => {
+      const threshold = sheetHeight.current * 0.45;
+      setShowMap(value < threshold && hasPostsRef.current);
+    });
+    return () => translateY.removeListener(listenerId);
+  }, [translateY]);
+
+  useEffect(() => {
+    if (showMap) {
+      setIsMapMounted(true);
+      Animated.timing(mapOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(mapOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setIsMapMounted(false));
+    }
+  }, [showMap, mapOpacity]);
+
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
       const h = e.nativeEvent.layout.height;
       sheetHeight.current = h;
-      const peekOffset = h - peekHeightRef.current; // peek 상태의 translateY 값
+      const peekOffset = h - peekHeightRef.current;
       translateY.setValue(peekOffset);
       lastY.current = peekOffset;
     },
@@ -48,27 +122,31 @@ export default function BottomSheet({children, peekHeight = 320}: Props) {
 
   const panResponder = useRef(
     PanResponder.create({
-      // 5px 이상 수직 이동 시에만 제스처 인식 (스크롤과 충돌 방지)
       onMoveShouldSetPanResponder: (_, {dy}) => Math.abs(dy) > 5,
 
-      // 드래그 시작: 진행 중인 spring 애니메이션 즉시 중단
       onPanResponderGrant: () => {
         translateY.stopAnimation();
       },
 
-      // 드래그 중: lastY 기준으로 dy만큼 이동, 상단 경계(0) 이상으로 올라가지 않도록 제한
       onPanResponderMove: (_, {dy}) => {
-        const next = Math.max(0, lastY.current + dy);
+        const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
+        const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
         translateY.setValue(next);
       },
 
-      // 드래그 종료: 속도(vy) 또는 위치 기준으로 스냅 포인트 결정 후 spring 애니메이션
       onPanResponderRelease: (_, {dy, vy}) => {
         const peek = sheetHeight.current - peekHeightRef.current;
-        const next = Math.max(0, lastY.current + dy);
+        const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
+        const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
 
-        // 위로 빠르게 스와이프(vy < -0.5)하거나 중간 이상 끌어올리면 expanded로 스냅
-        const snapTo = vy < -0.5 || next < peek / 2 ? 0 : peek;
+        let snapTo: number;
+        if (vy < -0.5 || next < peek / 2) {
+          snapTo = 0;
+        } else if (vy > 0.5 || next > (peek + handleOnly) / 2) {
+          snapTo = handleOnly;
+        } else {
+          snapTo = peek;
+        }
 
         lastY.current = snapTo;
         Animated.spring(translateY, {
@@ -81,9 +159,11 @@ export default function BottomSheet({children, peekHeight = 320}: Props) {
     }),
   ).current;
 
+  const hourGroups = groupByHour(filterByDate(DUMMY_POSTS, selectedDate));
+  const hasPosts = hourGroups.length > 0;
+  hasPostsRef.current = hasPosts; // 리스너 클로저에서 최신값 참조용
+
   return (
-    // 부모 컨테이너(home/index.tsx의 flex:1 View)를 꽉 채우도록 absolute 배치
-    // translateY로 위치를 조절해 peek/expanded 전환
     <Animated.View
       onLayout={onLayout}
       style={{
@@ -92,27 +172,104 @@ export default function BottomSheet({children, peekHeight = 320}: Props) {
         right: 0,
         top: 0,
         bottom: 0,
-        backgroundColor: '#D8E6E8',
+        backgroundColor: Colors.tealBg,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         transform: [{translateY}],
       }}
       {...panResponder.panHandlers}
     >
-      {/* 드래그 가능 영역임을 시각적으로 표시하는 핸들 바 */}
       <View style={{alignItems: 'center', paddingTop: 10, paddingBottom: 6}}>
         <View
           style={{
             width: 36,
             height: 4,
             borderRadius: 2,
-            backgroundColor: '#A0B4B8',
+            backgroundColor: Colors.tealDark,
           }}
         />
       </View>
 
-      {/* TODO: PostDateHeader, PostCard 리스트 등 콘텐츠 삽입 */}
-      {children}
+      <Text
+        style={{
+          textAlign: 'center',
+          fontSize: 15,
+          fontWeight: '700',
+          color: Colors.textPrimary,
+          marginBottom: 16,
+        }}
+      >
+        {formatDateHeader(selectedDate)}
+      </Text>
+
+      {isMapMounted && hasPosts && (
+        <Animated.View style={{opacity: mapOpacity}}>
+          <MapPreview posts={hourGroups.flatMap(g => g.posts)} />
+        </Animated.View>
+      )}
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{paddingBottom: 32}}
+      >
+        {!hasPosts ? (
+          <View
+            style={{
+              marginHorizontal: 16,
+              marginTop: 8,
+              paddingVertical: 18,
+              paddingHorizontal: 16,
+              borderLeftWidth: 8,
+              borderLeftColor: Colors.teal,
+              borderRadius: 4,
+            }}
+          >
+            <Text style={{fontSize: 14, color: Colors.textSecondary, lineHeight: 22}}>
+              아직 기록된 일기가 없어요.{'\n'}글을 쓰러 가볼까요?
+            </Text>
+          </View>
+        ) : (
+        <View style={{position: 'relative', paddingHorizontal: 16}}>
+          <View
+            style={{
+              position: 'absolute',
+              left: 16 + BAR_LEFT,
+              top: 0,
+              bottom: 0,
+              width: 8,
+              backgroundColor: Colors.teal,
+            }}
+          />
+
+          {hourGroups.map(({hour, posts}) => (
+            <View key={hour} style={{flexDirection: 'row', marginBottom: 8}}>
+              <View
+                style={{
+                  width: 32,
+                  paddingTop: 14,
+                  alignItems: 'flex-end',
+                  paddingRight: 8,
+                }}
+              >
+                <Text
+                  style={{fontSize: 12, fontWeight: '500', color: Colors.textTertiary}}
+                >
+                  {hour}
+                </Text>
+              </View>
+
+              <View style={{width: 24}} />
+
+              <View style={{flex: 1}}>
+                {posts.map(post => (
+                  <PostCard key={post.id} data={post} />
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+        )}
+      </ScrollView>
     </Animated.View>
   );
 }

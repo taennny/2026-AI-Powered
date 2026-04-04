@@ -22,7 +22,6 @@ export default function TabsLayout() {
       <HomeHeader />
       <SectionTabs />
       <Slot />
-      {/* journal-list 화면에서는 푸터 숨김 */}
       {isHome && <HomeFooter />}
     </View>
   );

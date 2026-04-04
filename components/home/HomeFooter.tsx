@@ -10,22 +10,24 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
+import {Colors} from '@/constants/Colors';
+
 export default function HomeFooter() {
   const handleWritePress = () => {
     // TODO: 글쓰기 라우터 연결
   };
 
   return (
-    <SafeAreaView edges={['bottom']} style={{backgroundColor: '#F6F6F6'}}>
+    <SafeAreaView edges={['bottom']} style={{backgroundColor: Colors.surface}}>
       <View
-        style={{backgroundColor: '#F6F6F6'}}
+        style={{backgroundColor: Colors.surface}}
         className="flex-row items-center justify-between px-5 py-3"
       >
         <View>
-          <Text style={{fontSize: 11, color: '#999', marginBottom: 2}}>
+          <Text style={{fontSize: 11, color: Colors.textTertiary, marginBottom: 2}}>
             이동 거리
           </Text>
-          <Text style={{fontSize: 18, fontWeight: '600', color: '#1a1a1a'}}>
+          <Text style={{fontSize: 18, fontWeight: '600', color: Colors.textPrimary}}>
             0.0Km
           </Text>
         </View>
@@ -33,7 +35,7 @@ export default function HomeFooter() {
         <TouchableOpacity
           onPress={handleWritePress}
           style={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: Colors.textPrimary,
             paddingHorizontal: 20,
             paddingVertical: 10,
             borderRadius: 20,
@@ -41,7 +43,7 @@ export default function HomeFooter() {
         >
           <Text
             style={{
-              color: '#fff',
+              color: Colors.white,
               fontSize: 13,
               fontWeight: '600',
               letterSpacing: 0.5,
