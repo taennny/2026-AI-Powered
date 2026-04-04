@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import DateTime, Float, ForeignKey, BigInteger, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from geoalchemy2 import Geometry
