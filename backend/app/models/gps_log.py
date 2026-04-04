@@ -11,13 +11,13 @@ class GpsLog(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    location: Mapped[object] = mapped_column(Geometry("POINT", srid=4326), nullable=False)
+    location: Mapped[object] = mapped_column(
+        Geometry("POINT", srid=4326), nullable=False
+    )
     accuracy: Mapped[float | None] = mapped_column(Float, nullable=True)
     speed: Mapped[float | None] = mapped_column(Float, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_gps_logs_user_recorded", "user_id", "recorded_at"),
-    )
+    __table_args__ = (Index("ix_gps_logs_user_recorded", "user_id", "recorded_at"),)
