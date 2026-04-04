@@ -5,7 +5,6 @@ from app.main import app
 
 @pytest.mark.asyncio
 async def test_register_success():
-    """회원가입 성공 테스트"""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
@@ -26,11 +25,9 @@ async def test_register_success():
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email():
-    """이메일 중복 회원가입 테스트"""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        # 첫 번째 가입
         await client.post(
             "/api/v1/auth/register",
             json={
@@ -39,7 +36,6 @@ async def test_register_duplicate_email():
                 "nickname": "tester",
             },
         )
-        # 같은 이메일로 두 번째 가입
         response = await client.post(
             "/api/v1/auth/register",
             json={
@@ -53,11 +49,9 @@ async def test_register_duplicate_email():
 
 @pytest.mark.asyncio
 async def test_login_success():
-    """로그인 성공 테스트"""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
-        # 먼저 회원가입
         await client.post(
             "/api/v1/auth/register",
             json={
@@ -66,7 +60,6 @@ async def test_login_success():
                 "nickname": "tester",
             },
         )
-        # 로그인
         response = await client.post(
             "/api/v1/auth/login",
             json={
@@ -83,7 +76,6 @@ async def test_login_success():
 
 @pytest.mark.asyncio
 async def test_login_wrong_password():
-    """비밀번호 틀림 로그인 테스트"""
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
