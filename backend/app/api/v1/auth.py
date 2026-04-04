@@ -46,7 +46,6 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
     from app.utils.jwt import decode_token
     from sqlalchemy import select
     from app.models.user import User
-    from datetime import datetime
 
     try:
         payload = decode_token(request.refresh_token)
