@@ -1,11 +1,12 @@
 import uuid
-from datetime import datetime, timezone
-from sqlalchemy import String, Text, Boolean, DateTime
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, Boolean, DateTime, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
+from datetime import datetime
+from typing import Optional
 
-
-class Base(DeclarativeBase):
-    pass
+from app.database import Base
 
 
 class User(Base):
