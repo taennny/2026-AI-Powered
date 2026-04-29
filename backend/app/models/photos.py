@@ -15,19 +15,11 @@ class Photo(Base):
         ForeignKey("daily_records.id"), nullable=True
     )
     storage_key: Mapped[str] = mapped_column(Text, nullable=False)
-    location: Mapped[object | None] = mapped_column(
-        Geometry("POINT", srid=4326), nullable=True
-    )
-    taken_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    location: Mapped[object | None] = mapped_column(Geometry("POINT", srid=4326), nullable=True)
+    taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
     )
