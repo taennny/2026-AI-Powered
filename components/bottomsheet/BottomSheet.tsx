@@ -1,12 +1,10 @@
 /**
- * @file components/bottomsheet/BottomSheet.tsx
- * @description 홈 화면 바텀시트 컴포넌트
- * - PanResponder 기반 드래그 제스처로 위/아래 이동
- * - 3단계 스냅: expanded(0) ↔ peek ↔ handleOnly
- * - 날짜 헤더 + 시간대별 타임라인 레이아웃
+ * @file components/bottomsheet/BottomSheet.tsx — 홈 바텀시트
+ * - PanResponder 3단계 스냅: expanded ↔ peek ↔ handleOnly
+ * - expanded 시 MapPreview 페이드인
  *
  * ## 다음 연결 작업
- * - [ ] ScrollView 스크롤 ↔ 바텀시트 드래그 제스처 충돌 처리 검토
+ * - [ ] ScrollView 스크롤 ↔ 드래그 제스처 충돌 처리 검토
  */
 
 import {useRef, useCallback, useState, useEffect} from 'react';
@@ -26,18 +24,12 @@ import PostCard from '@/components/bottomsheet/PostCard';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 
 type Props = {
-  /** 캘린더에서 선택된 날짜 — 헤더 표시에 사용 */
   selectedDate?: Date;
-  /** peek 상태에서 화면에 노출될 시트 높이 (px) */
   peekHeight?: number;
-  /** 선택된 날짜의 타임라인 장소 목록 — 부모에서 전달 */
   places: TimelinePlace[];
 };
 
-/** 장소 배열을 arrived_at 기준 hour로 그룹핑 */
-function groupByHour(
-  places: TimelinePlace[],
-): {hour: number; places: TimelinePlace[]}[] {
+function groupByHour(places: TimelinePlace[]): {hour: number; places: TimelinePlace[]}[] {
   const map = new Map<number, TimelinePlace[]>();
   places.forEach(place => {
     const hour = new Date(place.arrived_at).getHours();
@@ -51,11 +43,7 @@ function groupByHour(
 
 const BAR_LEFT = 40;
 
-export default function BottomSheet({
-  selectedDate = new Date(),
-  peekHeight = 320,
-  places,
-}: Props) {
+export default function BottomSheet({selectedDate = new Date(), peekHeight = 320, places}: Props) {
   const sheetHeight = useRef(0);
   const translateY = useRef(new Animated.Value(9999)).current;
   const HANDLE_HEIGHT = 30;
@@ -65,7 +53,6 @@ export default function BottomSheet({
   const [showMap, setShowMap] = useState(false);
   const [isMapMounted, setIsMapMounted] = useState(false);
   const mapOpacity = useRef(new Animated.Value(0)).current;
-
   const hasPlacesRef = useRef(false);
 
   useEffect(() => {
@@ -79,17 +66,10 @@ export default function BottomSheet({
   useEffect(() => {
     if (showMap) {
       setIsMapMounted(true);
-      Animated.timing(mapOpacity, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(mapOpacity, {toValue: 1, duration: 200, useNativeDriver: true}).start();
     } else {
-      Animated.timing(mapOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setIsMapMounted(false));
+      Animated.timing(mapOpacity, {toValue: 0, duration: 200, useNativeDriver: true})
+        .start(() => setIsMapMounted(false));
     }
   }, [showMap, mapOpacity]);
 
@@ -107,17 +87,12 @@ export default function BottomSheet({
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, {dy}) => Math.abs(dy) > 5,
-
-      onPanResponderGrant: () => {
-        translateY.stopAnimation();
-      },
-
+      onPanResponderGrant: () => { translateY.stopAnimation(); },
       onPanResponderMove: (_, {dy}) => {
         const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
         const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
         translateY.setValue(next);
       },
-
       onPanResponderRelease: (_, {dy, vy}) => {
         const peek = sheetHeight.current - peekHeightRef.current;
         const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
@@ -133,118 +108,63 @@ export default function BottomSheet({
         }
 
         lastY.current = snapTo;
-        Animated.spring(translateY, {
-          toValue: snapTo,
-          useNativeDriver: true,
-          tension: 65,
-          friction: 11,
-        }).start();
+        Animated.spring(translateY, {toValue: snapTo, useNativeDriver: true, tension: 65, friction: 11}).start();
       },
     }),
   ).current;
 
   const hourGroups = groupByHour(places);
   const hasPlaces = hourGroups.length > 0;
-  hasPlacesRef.current = hasPlaces; // 리스너 클로저에서 최신값 참조용
+  hasPlacesRef.current = hasPlaces;
 
   return (
     <Animated.View
       onLayout={onLayout}
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        backgroundColor: Colors.tealBg,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        transform: [{translateY}],
-      }}
+      className="absolute left-0 right-0 top-0 bottom-0 bg-teal-bg rounded-tl-[20px] rounded-tr-[20px]"
+      style={{transform: [{translateY}]}}
       {...panResponder.panHandlers}
     >
-      <View style={{alignItems: 'center', paddingTop: 10, paddingBottom: 6}}>
-        <View
-          style={{
-            width: 36,
-            height: 4,
-            borderRadius: 2,
-            backgroundColor: Colors.tealDark,
-          }}
-        />
+      {/* 핸들 */}
+      <View className="items-center pt-[10px] pb-[6px]">
+        <View className="w-9 h-1 rounded-full bg-teal-dark" />
       </View>
 
-      <Text
-        style={{
-          textAlign: 'center',
-          fontSize: 15,
-          fontWeight: '700',
-          color: Colors.textPrimary,
-          marginBottom: 16,
-        }}
-      >
+      {/* 날짜 헤더 */}
+      <Text className="text-center text-[15px] font-bold text-primary mb-4">
         {formatDate(selectedDate)}
       </Text>
 
+      {/* 지도 미리보기 */}
       {isMapMounted && hasPlaces && (
         <Animated.View style={{opacity: mapOpacity}}>
           <MapPreview places={places} />
         </Animated.View>
       )}
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{paddingBottom: 32}}
-      >
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 32}}>
         {!hasPlaces ? (
           <View
-            style={{
-              marginHorizontal: 16,
-              marginTop: 8,
-              paddingVertical: 18,
-              paddingHorizontal: 16,
-              borderLeftWidth: 8,
-              borderLeftColor: Colors.teal,
-              borderRadius: 4,
-            }}
+            className="mx-4 mt-2 py-[18px] px-4 rounded-sm"
+            style={{borderLeftWidth: 8, borderLeftColor: Colors.teal}}
           >
-            <Text style={{fontSize: 14, color: Colors.textSecondary, lineHeight: 22}}>
+            <Text className="text-sm text-secondary leading-[22px]">
               아직 기록된 일기가 없어요.{'\n'}글을 쓰러 가볼까요?
             </Text>
           </View>
         ) : (
-          <View style={{position: 'relative', paddingHorizontal: 16}}>
+          <View className="relative px-4">
+            {/* 세로 타임라인 바 */}
             <View
-              style={{
-                position: 'absolute',
-                left: 16 + BAR_LEFT,
-                top: 0,
-                bottom: 0,
-                width: 8,
-                backgroundColor: Colors.teal,
-              }}
+              className="absolute top-0 bottom-0 w-2 bg-teal"
+              style={{left: 16 + BAR_LEFT}}
             />
-
             {hourGroups.map(({hour, places: hourPlaces}) => (
-              <View key={hour} style={{flexDirection: 'row', marginBottom: 8}}>
-                <View
-                  style={{
-                    width: 32,
-                    paddingTop: 14,
-                    alignItems: 'flex-end',
-                    paddingRight: 8,
-                  }}
-                >
-                  <Text
-                    style={{fontSize: 12, fontWeight: '500', color: Colors.textTertiary}}
-                  >
-                    {hour}
-                  </Text>
+              <View key={hour} className="flex-row mb-2">
+                <View className="w-8 pt-[14px] items-end pr-2">
+                  <Text className="text-xs font-medium text-tertiary">{hour}</Text>
                 </View>
-
-                <View style={{width: 24}} />
-
-                <View style={{flex: 1}}>
+                <View className="w-6" />
+                <View className="flex-1">
                   {hourPlaces.map(place => (
                     <PostCard key={place.place_id} data={place} />
                   ))}

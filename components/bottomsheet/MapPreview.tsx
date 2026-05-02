@@ -9,10 +9,9 @@
  */
 
 import {useState} from 'react';
-import {Image, View, Text, StyleSheet} from 'react-native';
+import {Image, View, Text} from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
-import {Colors} from '@/constants/Colors';
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ?? '';
 
@@ -109,9 +108,9 @@ export default function MapPreview({places}: Props) {
 
   if (!url || loadFailed) {
     return (
-      <View style={[styles.container, styles.placeholder]}>
-        <Text style={styles.placeholderText}>API 키 설정 안됨</Text>
-        <Text style={styles.placeholderSub}>
+      <View className="mx-4 mb-4 rounded-[14px] overflow-hidden h-[180px] bg-teal items-center justify-center">
+        <Text className="text-sm text-secondary mb-1">API 키 설정 안됨</Text>
+        <Text className="text-[11px] text-tertiary">
           .env › EXPO_PUBLIC_KAKAO_REST_API_KEY
         </Text>
       </View>
@@ -119,40 +118,13 @@ export default function MapPreview({places}: Props) {
   }
 
   return (
-    <View style={styles.container}>
+    <View className="mx-4 mb-4 rounded-[14px] overflow-hidden h-[180px]">
       <Image
         source={{uri: url, headers: {Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`}}}
-        style={styles.image}
+        className="flex-1"
         resizeMode="cover"
         onError={() => setLoadFailed(true)}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 14,
-    overflow: 'hidden',
-    height: 180,
-  },
-  image: {
-    flex: 1,
-  },
-  placeholder: {
-    backgroundColor: Colors.teal,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  placeholderText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 4,
-  },
-  placeholderSub: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-  },
-});

@@ -1,6 +1,5 @@
 /**
- * @file components/subscription/PremiumView.tsx
- * @description 구독 화면 — 프리미엄 사용자 뷰
+ * @file components/subscription/PremiumView.tsx — 구독 화면 프리미엄 사용자 뷰
  *
  * ## 다음 연결 작업
  * - [ ] 결제 수단 변경 → 결제 플로우 연결
@@ -11,17 +10,13 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type SubscriptionStatus} from '@/services/subscriptionApi';
-import {Colors} from '@/constants/Colors';
 
-type Props = {
-  subscription: SubscriptionStatus;
-};
-
+type Props = {subscription: SubscriptionStatus};
 type BillingCycle = 'monthly' | 'annual';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
   {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'annual',  label: '연 ₩39,000 (33% 할인! 💡)'},
 ];
 
 function getNextPaymentDate(startedAt: string): string {
@@ -39,68 +34,30 @@ export default function PremiumView({subscription}: Props) {
   // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
   const currentBilling: BillingCycle = 'monthly';
 
-  const nextPayment = subscription.started_at
-    ? getNextPaymentDate(subscription.started_at)
-    : '-';
-  const daysCount = subscription.started_at
-    ? getDaysCount(subscription.started_at)
-    : 0;
+  const nextPayment = subscription.started_at ? getNextPaymentDate(subscription.started_at) : '-';
+  const daysCount   = subscription.started_at ? getDaysCount(subscription.started_at) : 0;
 
   return (
-    <View style={{flex: 1, paddingHorizontal: 24}}>
-      {/* 서브 타이틀 */}
-      <Text
-        style={{
-          fontSize: 16,
-          fontWeight: '700',
-          color: Colors.textPrimary,
-          marginBottom: 20,
-        }}
-      >
-        프리미엄 플랜
-      </Text>
+    <View className="flex-1 px-6">
+      <Text className="text-base font-bold text-primary mb-5">프리미엄 플랜</Text>
 
-      {/* 플랜 선택 */}
-      <View style={{gap: 14, marginBottom: 28}}>
+      {/* 플랜 선택 (현재 플랜 표시) */}
+      <View className="gap-y-[14px] mb-7">
         {PLANS.map(plan => {
           const isCurrent = plan.id === currentBilling;
           return (
             <TouchableOpacity
               key={plan.id}
               activeOpacity={isCurrent ? 1 : 0.7}
-              style={{flexDirection: 'row', alignItems: 'center', gap: 10}}
+              className="flex-row items-center gap-x-[10px]"
             >
-              {/* 라디오 버튼 — 현재 플랜은 회색 채움 */}
               <View
-                style={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  borderWidth: 1.5,
-                  borderColor: isCurrent
-                    ? Colors.textTertiary
-                    : Colors.textTertiary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className="w-[18px] h-[18px] rounded-full items-center justify-center"
+                style={{borderWidth: 1.5, borderColor: '#9ca3af'}}
               >
-                {isCurrent && (
-                  <View
-                    style={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: Colors.textTertiary,
-                    }}
-                  />
-                )}
+                {isCurrent && <View className="w-[10px] h-[10px] rounded-full bg-tertiary" />}
               </View>
-              <Text
-                style={{
-                  fontSize: 15,
-                  color: isCurrent ? Colors.textSecondary : Colors.textPrimary,
-                }}
-              >
+              <Text className={`text-[15px] ${isCurrent ? 'text-secondary' : 'text-primary'}`}>
                 {plan.label}
               </Text>
             </TouchableOpacity>
@@ -109,38 +66,20 @@ export default function PremiumView({subscription}: Props) {
       </View>
 
       {/* D-day 박스 */}
-      <View
-        style={{
-          backgroundColor: Colors.tealBg,
-          borderRadius: 16,
-          paddingVertical: 22,
-          paddingHorizontal: 20,
-          alignItems: 'center',
-          marginBottom: 40,
-        }}
-      >
-        <Text
-          style={{fontSize: 15, color: Colors.textPrimary, marginBottom: 6}}
-        >
-          로미와 함께 한 지{' '}
-          <Text style={{fontWeight: '700'}}>{daysCount}일</Text> 💗
+      <View className="bg-teal-bg rounded-2xl py-[22px] px-5 items-center mb-10">
+        <Text className="text-[15px] text-primary mb-[6px]">
+          로미와 함께 한 지 <Text className="font-bold">{daysCount}일</Text> 💗
         </Text>
-        <Text style={{fontSize: 14, color: Colors.textSecondary}}>
-          우리 오래봐요!
-        </Text>
+        <Text className="text-sm text-secondary">우리 오래봐요!</Text>
       </View>
 
       {/* 하단 버튼 */}
-      <View style={{gap: 16, marginTop: 'auto', paddingBottom: 40}}>
+      <View className="gap-y-4 mt-auto pb-10">
         <TouchableOpacity>
-          <Text style={{fontSize: 15, color: Colors.textPrimary}}>
-            결제 수단 변경
-          </Text>
+          <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
         <TouchableOpacity>
-          <Text style={{fontSize: 14, color: Colors.textTertiary}}>
-            구독 해지
-          </Text>
+          <Text className="text-sm text-tertiary">구독 해지</Text>
         </TouchableOpacity>
       </View>
     </View>

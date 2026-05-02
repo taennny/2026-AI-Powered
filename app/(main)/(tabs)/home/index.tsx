@@ -10,7 +10,6 @@ import {View} from 'react-native';
 
 import BottomSheet from '@/components/bottomsheet/BottomSheet';
 import Calendar from '@/components/home/Calendar';
-import {Colors} from '@/constants/Colors';
 import {useCalendar} from '@/hooks/useCalendar';
 
 // 달력이 항상 6줄로 고정됨을 가정: paddingTop(20) + 월헤더(48) + 요일레이블(23) + 6주×52.5px(315) = 406
@@ -23,7 +22,7 @@ export default function HomeIndex() {
 
   return (
     <View
-      style={{flex: 1, backgroundColor: Colors.white}}
+      className="flex-1 bg-white"
       onLayout={e =>
         setPeekHeight(e.nativeEvent.layout.height - CALENDAR_HEIGHT_6_ROWS)
       }

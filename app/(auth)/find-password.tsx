@@ -46,7 +46,7 @@ export default function FindPasswordScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View className="flex-1 bg-[#F7F7F7] px-[42px] pt-[140px]">
+    <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
       <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
         Roa{'\n'}me
       </Text>
@@ -69,7 +69,7 @@ export default function FindPasswordScreen() {
           placeholderTextColor="#CCCCCC"
           autoCapitalize="none"
           keyboardType="email-address"
-          className="h-[31px] rounded-[5px] border border-[#D9D9D9] px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
       </View>
 
@@ -79,14 +79,14 @@ export default function FindPasswordScreen() {
           onPress={() => router.replace('/(auth)/login')}
           className="w-[58px] h-[22px] rounded-[4px] items-center justify-center bg-[#E5E5EA] mr-[8px]"
         >
-          <Text className="text-[10px] leading-[10px] text-[#191F28]">로그인</Text>
+          <Text className="text-[10px] leading-[10px] text-primary">로그인</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.85}
           disabled={isLoading}
           onPress={handleSendResetEmail}
-          className="w-[90px] h-[22px] rounded-[4px] items-center justify-center bg-[#191F28]"
+          className="w-[90px] h-[22px] rounded-[4px] items-center justify-center bg-primary"
         >
           <Text className="text-[10px] leading-[10px] text-white">
             {isLoading ? '로딩중' : '메일 발송'}

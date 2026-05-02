@@ -1,11 +1,8 @@
 /**
- * @file components/home/Calendar.tsx
- * @description 홈 화면 월간 캘린더 컴포넌트
- * - 선택된 날짜만 하이라이트 (파란 원)
+ * @file components/home/Calendar.tsx — 홈 화면 월간 캘린더
+ * - 선택된 날짜만 하이라이트 (teal-accent 원)
  * - has_journal: tealAccent dot / has_timeline: tealDark dot (최대 2개)
- * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동)
- *
- * - eventDays는 useCalendar 훅에서 fetchCalendarMonth 결과를 전달받음
+ * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동 — useCalendar 훅)
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';
@@ -21,15 +18,10 @@ const MONTH_NAMES = [
 ];
 
 type Props = {
-  /** 선택된 날짜 — 부모에서 관리 */
   selectedDate?: Date;
-  /** 날짜 탭 시 호출 */
   onDateSelect?: (date: Date) => void;
-  /** 현재 표시 중인 월 — 부모에서 관리 (월 변경 시 API fetch 연동) */
   viewDate: Date;
-  /** 월 이동 시 호출 */
   onViewDateChange: (date: Date) => void;
-  /** API에서 받은 날짜별 이벤트 정보 */
   eventDays?: CalendarDay[];
 };
 
@@ -43,11 +35,8 @@ export default function Calendar({
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
-  const goToPrevMonth = () =>
-    onViewDateChange(new Date(year, month - 1, 1));
-
-  const goToNextMonth = () =>
-    onViewDateChange(new Date(year, month + 1, 1));
+  const goToPrevMonth = () => onViewDateChange(new Date(year, month - 1, 1));
+  const goToNextMonth = () => onViewDateChange(new Date(year, month + 1, 1));
 
   const firstDayOfWeek = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -77,54 +66,35 @@ export default function Calendar({
   };
 
   return (
-    <View style={{backgroundColor: Colors.white, paddingHorizontal: 16, paddingTop: 20}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 14}}>
-        <TouchableOpacity onPress={goToPrevMonth} style={{paddingRight: 10}}>
-          <Text style={{fontSize: 22, fontWeight: '500', color: Colors.teal}}>{'<'}</Text>
-        </TouchableOpacity>
+    <View className="bg-white px-4 pt-5">
 
-        <Text
-          style={{
-            fontSize: 28,
-            fontWeight: '800',
-            color: Colors.textPrimary,
-            letterSpacing: -0.5,
-          }}
-        >
+      {/* 월 헤더 */}
+      <View className="flex-row items-center mb-[14px]">
+        <TouchableOpacity onPress={goToPrevMonth} className="pr-[10px]">
+          <Text className="text-[22px] font-medium text-teal-accent">{'<'}</Text>
+        </TouchableOpacity>
+        <Text className="text-[28px] font-extrabold text-primary" style={{letterSpacing: -0.5}}>
           {MONTH_NAMES[month]} {year}
         </Text>
-
-        <TouchableOpacity onPress={goToNextMonth} style={{paddingLeft: 10}}>
-          <Text style={{fontSize: 22, fontWeight: '500', color: Colors.teal}}>{'>'}</Text>
+        <TouchableOpacity onPress={goToNextMonth} className="pl-[10px]">
+          <Text className="text-[22px] font-medium text-teal-accent">{'>'}</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={{flexDirection: 'row', marginBottom: 4}}>
+      {/* 요일 레이블 */}
+      <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
-          <View key={label} style={{flex: 1, alignItems: 'center', paddingBottom: 6}}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: '500',
-                color: Colors.textTertiary,
-                letterSpacing: 0.4,
-              }}
-            >
+          <View key={label} className="flex-1 items-center pb-[6px]">
+            <Text className="text-[11px] font-medium text-tertiary" style={{letterSpacing: 0.4}}>
               {label}
             </Text>
           </View>
         ))}
       </View>
 
+      {/* 날짜 그리드 */}
       {weeks.map((week, wi) => (
-        <View
-          key={wi}
-          style={{
-            flexDirection: 'row',
-            borderTopWidth: 0.5,
-            borderTopColor: Colors.borderLight,
-          }}
-        >
+        <View key={wi} className="flex-row border-t-[0.5px] border-line">
           {week.map((day, di) => {
             const eventDay = day ? getEventDay(day) : undefined;
             const highlighted = !!day && isSelected(day);
@@ -134,51 +104,26 @@ export default function Calendar({
                 key={di}
                 disabled={!day}
                 onPress={() => day && onDateSelect?.(new Date(year, month, day))}
-                style={{flex: 1, alignItems: 'center', paddingVertical: 10}}
+                className="flex-1 items-center py-[10px]"
               >
                 {day !== null && (
                   <>
                     <View
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 16,
-                        backgroundColor: highlighted ? Colors.tealAccent : 'transparent',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
+                      className="w-8 h-8 rounded-full items-center justify-center"
+                      style={{backgroundColor: highlighted ? Colors.tealAccent : 'transparent'}}
                     >
                       <Text
-                        style={{
-                          fontSize: 15,
-                          fontWeight: highlighted ? '700' : '400',
-                          color: highlighted ? Colors.white : Colors.textPrimary,
-                        }}
+                        className={`text-[15px] ${highlighted ? 'font-bold text-white' : 'font-normal text-primary'}`}
                       >
                         {day}
                       </Text>
                     </View>
 
-                    {/* 타임라인 있을 때만 dot 표시 — 타임라인만: 1개(tealAccent), 타임라인+일기: 2개 */}
                     {eventDay?.has_timeline && (
-                      <View style={{flexDirection: 'row', gap: 3, marginTop: 3}}>
-                        <View
-                          style={{
-                            width: 4,
-                            height: 4,
-                            borderRadius: 2,
-                            backgroundColor: Colors.tealAccent,
-                          }}
-                        />
+                      <View className="flex-row gap-x-[3px] mt-[3px]">
+                        <View className="w-1 h-1 rounded-full bg-teal-accent" />
                         {eventDay.has_journal && (
-                          <View
-                            style={{
-                              width: 4,
-                              height: 4,
-                              borderRadius: 2,
-                              backgroundColor: Colors.tealDark,
-                            }}
-                          />
+                          <View className="w-1 h-1 rounded-full bg-teal-dark" />
                         )}
                       </View>
                     )}
@@ -189,6 +134,7 @@ export default function Calendar({
           })}
         </View>
       ))}
+
     </View>
   );
 }

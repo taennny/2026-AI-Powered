@@ -60,7 +60,7 @@ export default function ResetPasswordScreen() {
   };
 
   return (
-    <View className="flex-1 bg-[#F7F7F7] px-[42px] pt-[140px]">
+    <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
       <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[92px]">
         Roa{'\n'}me
       </Text>
@@ -82,7 +82,7 @@ export default function ResetPasswordScreen() {
           placeholderTextColor="#CCCCCC"
           secureTextEntry
           autoCapitalize="none"
-          className="h-[31px] rounded-[5px] border border-[#D9D9D9] px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
         <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
           8자 이상, 특수문자 포함
@@ -94,7 +94,7 @@ export default function ResetPasswordScreen() {
         disabled={!isPasswordValid || isLoading}
         onPress={handleResetPasswordPress}
         className={`self-end w-[90px] h-[22px] rounded-[4px] items-center justify-center ${
-          isPasswordValid ? 'bg-[#191F28]' : 'bg-[#E5E5EA]'
+          isPasswordValid ? 'bg-primary' : 'bg-[#E5E5EA]'
         }`}
       >
         <Text

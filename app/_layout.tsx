@@ -11,6 +11,8 @@ import {Stack} from 'expo-router';
 import {useFonts} from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import {useEffect} from 'react';
+import {View} from 'react-native';
+import {useThemeStore} from '@/store/themeStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,5 +32,14 @@ export default function RootLayout() {
 
   if (!loaded) return null;
 
-  return <Stack screenOptions={{headerShown: false}} />;
+  return <ThemeRoot />;
+}
+
+function ThemeRoot() {
+  const themeVars = useThemeStore(s => s.themeVars);
+  return (
+    <View style={[{flex: 1}, themeVars]}>
+      <Stack screenOptions={{headerShown: false}} />
+    </View>
+  );
 }

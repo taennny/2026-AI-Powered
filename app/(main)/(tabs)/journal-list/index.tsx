@@ -1,8 +1,7 @@
 /**
- * @file app/(main)/(tabs)/journal-list/index.tsx
- * @description 섹션2 — 저널 리스트 화면
- * - 검색 바: 아이콘 탭 → 확장 애니메이션, X 탭 → 축소 애니메이션
- * - 검색 대상: 제목, 본문 미리보기, 날짜(26.04.04(sat) 형식)
+ * @file app/(main)/(tabs)/journal-list/index.tsx — 저널 리스트 화면
+ * - 검색 바: 아이콘 탭 → 확장 애니메이션, X 탭 → 축소
+ * - 검색 대상: 제목, 본문 미리보기, 날짜
  */
 
 import {useState, useRef, useEffect} from 'react';
@@ -40,23 +39,15 @@ export default function JournalListScreen() {
 
   const expand = () => {
     setIsFocused(true);
-    Animated.spring(widthAnim, {
-      toValue: 1,
-      useNativeDriver: false,
-      tension: 80,
-      friction: 10,
-    }).start(() => inputRef.current?.focus());
+    Animated.spring(widthAnim, {toValue: 1, useNativeDriver: false, tension: 80, friction: 10})
+      .start(() => inputRef.current?.focus());
   };
 
   const collapse = () => {
     setQuery('');
     inputRef.current?.blur();
-    Animated.spring(widthAnim, {
-      toValue: 0,
-      useNativeDriver: false,
-      tension: 80,
-      friction: 10,
-    }).start(() => setIsFocused(false));
+    Animated.spring(widthAnim, {toValue: 0, useNativeDriver: false, tension: 80, friction: 10})
+      .start(() => setIsFocused(false));
   };
 
   const barWidth = widthAnim.interpolate({
@@ -74,17 +65,10 @@ export default function JournalListScreen() {
   });
 
   return (
-    <View style={{flex: 1, backgroundColor: '#D8E6E8'}}>
-      {/* 검색 바 — 우측 정렬, 아이콘 탭 시 좌측으로 확장 */}
-      <View
-        style={{
-          paddingHorizontal: 16,
-          marginTop: 12,
-          marginBottom: 12,
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-        }}
-      >
+    <View className="flex-1 bg-teal">
+
+      {/* 검색 바 */}
+      <View className="px-4 mt-3 mb-3 flex-row justify-end">
         <Animated.View
           style={{
             flexDirection: 'row',
@@ -137,6 +121,7 @@ export default function JournalListScreen() {
           <JournalCard key={journal.id} data={journal} query={query} />
         ))}
       </ScrollView>
+
     </View>
   );
 }

@@ -1,3 +1,5 @@
+/** @file app/(main)/write/index.tsx — 프롬프트 입력 + AI 글 생성 화면 */
+
 import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -5,18 +7,18 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
-  StyleSheet,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useRouter} from 'expo-router';
 import {generateJournal, uploadPhoto, WritingStyle} from '@/services/journalApi';
+import {Colors} from '@/constants/Colors';
 
 export default function WriteScreen() {
   const router = useRouter();
@@ -40,20 +42,12 @@ export default function WriteScreen() {
   const handleHomePress = () => {
     Alert.alert('작성 취소', '글쓰기를 취소하고 홈으로 이동할까요?', [
       {text: '계속 작성', style: 'cancel'},
-      {
-        text: '이동',
-        style: 'destructive',
-        onPress: () => router.replace('/(main)/(tabs)/home'),
-      },
+      {text: '이동', style: 'destructive', onPress: () => router.replace('/(main)/(tabs)/home')},
     ]);
   };
 
   const handleImagePick = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
+    const result = await ImagePicker.launchImageLibraryAsync({mediaTypes: ['images'], quality: 0.8});
     if (!result.canceled) {
       setImageUri(result.assets[0].uri);
       setHasPhoto(true);
@@ -76,21 +70,16 @@ export default function WriteScreen() {
       Alert.alert('알림', '내용을 입력해야 글을 생성할 수 있습니다.');
       return;
     }
-
     try {
       setIsLoading(true);
-
       let photoId: string | undefined;
       let photoUrl: string | undefined;
-
       if (imageUri) {
         const uploadedPhoto = await uploadPhoto(imageUri);
         photoId = uploadedPhoto.photo_id;
         photoUrl = uploadedPhoto.photo_url;
       }
-
       const generatedJournal = await generateJournal({prompt, writingStyle, photoId});
-
       router.push({
         pathname: '/(main)/write-preview',
         params: {
@@ -108,120 +97,80 @@ export default function WriteScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
+      <SafeAreaView className="flex-1 bg-surface justify-center items-center">
         <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>로미가 열심히 적고 있어요.</Text>
+        <Text className="mt-[14px] text-sm text-tertiary">로미가 열심히 적고 있어요.</Text>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={styles.header}>
-          <Text style={styles.dateText}>{dateStr}</Text>
+    <SafeAreaView className="flex-1 bg-surface">
+      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+
+        {/* 헤더 */}
+        <View className="px-[22px] pt-4 pb-[10px] flex-row justify-between">
+          <Text className="text-xl font-bold text-primary">{dateStr}</Text>
           <TouchableOpacity onPress={handleHomePress}>
-            <Text style={styles.homeText}>Home</Text>
+            <Text className="text-xs text-muted mt-[6px]">Home</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.tabContainer}>
+        {/* 글쓰기 스타일 탭 */}
+        <View className="flex-row mx-[22px] h-[34px] bg-teal-bg rounded-[7px] p-0.5">
           <TouchableOpacity
-            style={[styles.tabButton, writingStyle === 'info' && styles.activeTabButton]}
+            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'info' ? ' bg-white' : ''}`}
             onPress={() => setWritingStyle('info')}
           >
-            <Text style={styles.tabText}>정보 위주</Text>
+            <Text className="text-xs font-semibold text-primary">정보 위주</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={[styles.tabButton, writingStyle === 'emotion' && styles.activeTabButton]}
+            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'emotion' ? ' bg-white' : ''}`}
             onPress={() => setWritingStyle('emotion')}
           >
-            <Text style={styles.tabText}>감성적</Text>
+            <Text className="text-xs font-semibold text-primary">감성적</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content}>
+        {/* 입력 영역 */}
+        <ScrollView className="flex-1 px-[22px] pt-[18px]">
           <TextInput
-            style={styles.promptInput}
+            className="text-sm text-primary leading-[22px]"
+            style={{minHeight: 260, textAlignVertical: 'top'}}
             value={prompt}
             onChangeText={setPrompt}
             multiline
             placeholder="내용을 입력하세요"
-            placeholderTextColor="#C7C7C7"
+            placeholderTextColor={Colors.textTertiary}
             textAlignVertical="top"
           />
-
           {imageUri && (
             <TouchableOpacity onPress={handleImagePick}>
-              <Image source={{uri: imageUri}} style={styles.previewImage} />
+              <Image
+                source={{uri: imageUri}}
+                className="w-full h-[210px] rounded-[10px] mt-[18px]"
+                resizeMode="cover"
+              />
             </TouchableOpacity>
           )}
         </ScrollView>
 
-        <View style={styles.bottomBar}>
-          <View style={styles.photoRow}>
+        {/* 하단 바 */}
+        <View className="h-[72px] border-t border-line bg-surface px-[22px] flex-row items-center justify-between">
+          <View className="flex-row items-center">
             <Switch value={hasPhoto} onValueChange={handlePhotoToggle} />
-            <Text style={styles.photoText}>사진</Text>
+            <Text className="ml-2 text-xs font-semibold text-primary">사진</Text>
           </View>
-
           <TouchableOpacity
-            style={[styles.writeButton, !canSubmit && styles.disabledWriteButton]}
+            className={`bg-[#EDEDED] px-[22px] py-[10px] rounded-md${!canSubmit ? ' opacity-50' : ''}`}
             onPress={handleWritePress}
             disabled={!canSubmit}
           >
-            <Text style={styles.writeButtonText}>글쓰기</Text>
+            <Text className="text-xs font-bold text-primary">글쓰기</Text>
           </TouchableOpacity>
         </View>
+
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#FAFAFA'},
-  keyboardView: {flex: 1},
-  header: {
-    paddingHorizontal: 22,
-    paddingTop: 16,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dateText: {fontSize: 20, fontWeight: '700', color: '#111'},
-  homeText: {fontSize: 12, color: '#C7C7C7', marginTop: 6},
-  tabContainer: {
-    flexDirection: 'row',
-    marginHorizontal: 22,
-    height: 34,
-    backgroundColor: '#EAF3F2',
-    borderRadius: 7,
-    padding: 2,
-  },
-  tabButton: {flex: 1, borderRadius: 6, justifyContent: 'center', alignItems: 'center'},
-  activeTabButton: {backgroundColor: '#FFFFFF'},
-  tabText: {fontSize: 12, fontWeight: '600', color: '#222'},
-  content: {flex: 1, paddingHorizontal: 22, paddingTop: 18},
-  promptInput: {minHeight: 260, fontSize: 14, lineHeight: 22, color: '#222'},
-  previewImage: {width: '100%', height: 210, borderRadius: 10, marginTop: 18},
-  bottomBar: {
-    height: 72,
-    borderTopWidth: 1,
-    borderTopColor: '#E8E8E8',
-    backgroundColor: '#FAFAFA',
-    paddingHorizontal: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  photoRow: {flexDirection: 'row', alignItems: 'center'},
-  photoText: {marginLeft: 8, fontSize: 12, color: '#222', fontWeight: '600'},
-  writeButton: {backgroundColor: '#EDEDED', paddingHorizontal: 22, paddingVertical: 10, borderRadius: 6},
-  disabledWriteButton: {opacity: 0.5},
-  writeButtonText: {fontSize: 12, color: '#222', fontWeight: '700'},
-  loadingContainer: {flex: 1, backgroundColor: '#FAFAFA', justifyContent: 'center', alignItems: 'center'},
-  loadingText: {marginTop: 14, fontSize: 14, color: '#999'},
-});

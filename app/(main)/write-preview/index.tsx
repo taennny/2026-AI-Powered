@@ -10,17 +10,17 @@ import React, {useState} from 'react';
 import {
   Alert,
   Image,
-  SafeAreaView,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {saveJournal, uploadPhoto} from '@/services/journalApi';
+import {Colors} from '@/constants/Colors';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
@@ -41,19 +41,12 @@ export default function WritePreviewScreen() {
   const handleCancelPress = () => {
     Alert.alert('작성 취소', '수정 중인 글을 취소할까요?', [
       {text: '계속 수정', style: 'cancel'},
-      {
-        text: '취소',
-        style: 'destructive',
-        onPress: () => router.replace('/(main)/(tabs)/home'),
-      },
+      {text: '취소', style: 'destructive', onPress: () => router.replace('/(main)/(tabs)/home')},
     ]);
   };
 
   const handleImageChangePress = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
+    const result = await ImagePicker.launchImageLibraryAsync({mediaTypes: ['images'], quality: 0.8});
     if (!result.canceled) {
       setSelectedImageUri(result.assets[0].uri);
     }
@@ -68,7 +61,6 @@ export default function WritePreviewScreen() {
       Alert.alert('알림', '제목과 내용을 입력해주세요.');
       return;
     }
-
     try {
       setIsSaving(true);
 
@@ -99,84 +91,61 @@ export default function WritePreviewScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancelPress}>
-          <Text style={styles.cancelText}>Cancel</Text>
-        </TouchableOpacity>
+    <SafeAreaView className="flex-1 bg-white">
 
+      {/* 헤더 */}
+      <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
+        <TouchableOpacity onPress={handleCancelPress}>
+          <Text className="text-xs text-muted">Cancel</Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleSavePress} disabled={!canSave || isSaving}>
-          <Text style={[styles.saveText, (!canSave || isSaving) && styles.disabledSaveText]}>
+          <Text className={`text-xs font-bold${!canSave || isSaving ? ' text-muted' : ' text-primary'}`}>
             {isSaving ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center'}}>
         <TextInput
-          style={styles.titleInput}
+          className="text-base font-bold text-primary mb-4"
+          style={{width: '90%', padding: 0, textAlign: 'center'}}
           value={journalTitle}
           onChangeText={setJournalTitle}
           placeholder="제목"
-          placeholderTextColor="#BDBDBD"
+          placeholderTextColor={Colors.textTertiary}
           textAlign="center"
         />
 
         {selectedImageUri ? (
-          <View style={styles.imageWrapper}>
+          <View className="w-full mb-5">
             <TouchableOpacity onPress={handleImageChangePress}>
-              <Image source={{uri: selectedImageUri}} style={styles.image} />
+              <Image source={{uri: selectedImageUri}} className="w-full h-[250px]" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteImageButton} onPress={handleImageDeletePress}>
-              <Text style={styles.deleteImageText}>사진 삭제</Text>
+            <TouchableOpacity className="mt-2 self-center" onPress={handleImageDeletePress}>
+              <Text className="text-xs text-tertiary">사진 삭제</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity style={styles.emptyImageBox} onPress={handleImageChangePress}>
-            <Text style={styles.emptyImageText}>사진 추가</Text>
+          <TouchableOpacity
+            className="w-full h-[210px] bg-[#F2F2F2] justify-center items-center mb-5"
+            onPress={handleImageChangePress}
+          >
+            <Text className="text-sm text-tertiary">사진 추가</Text>
           </TouchableOpacity>
         )}
 
         <TextInput
-          style={styles.contentInput}
+          className="text-sm text-primary leading-[22px]"
+          style={{width: '90%', minHeight: 160, textAlign: 'center'}}
           value={journalContent}
           onChangeText={setJournalContent}
           multiline
           placeholder="내용"
-          placeholderTextColor="#BDBDBD"
+          placeholderTextColor={Colors.textTertiary}
           textAlign="center"
         />
       </ScrollView>
+
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {flex: 1, backgroundColor: '#FFFFFF'},
-  header: {
-    paddingHorizontal: 18,
-    paddingTop: 14,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cancelText: {fontSize: 12, color: '#BDBDBD'},
-  saveText: {fontSize: 12, fontWeight: '700', color: '#222'},
-  disabledSaveText: {color: '#CFCFCF'},
-  content: {paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center'},
-  titleInput: {width: '90%', fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 16, padding: 0},
-  imageWrapper: {width: '100%', marginBottom: 20},
-  image: {width: '100%', height: 250},
-  deleteImageButton: {marginTop: 8, alignSelf: 'center'},
-  deleteImageText: {fontSize: 12, color: '#999'},
-  emptyImageBox: {
-    width: '100%',
-    height: 210,
-    backgroundColor: '#F2F2F2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emptyImageText: {fontSize: 13, color: '#999'},
-  contentInput: {width: '90%', minHeight: 160, fontSize: 14, lineHeight: 22, color: '#222'},
-});

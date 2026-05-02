@@ -83,7 +83,7 @@ export default function LoginScreen() {
             setEmail(text);
             setErrorMessage('');
           }}
-          className="border border-[#D1D1D6] rounded-md px-4 py-3 text-[16px]"
+          className="border border-line rounded-md px-4 py-3 text-[16px]"
         />
 
         <TextInput
@@ -95,7 +95,7 @@ export default function LoginScreen() {
             setPassword(text);
             setErrorMessage('');
           }}
-          className="border border-[#D1D1D6] rounded-md px-4 py-3 text-[16px]"
+          className="border border-line rounded-md px-4 py-3 text-[16px]"
         />
 
         {errorMessage ? (
@@ -108,7 +108,7 @@ export default function LoginScreen() {
       <TouchableOpacity
         disabled={isLoading}
         onPress={handleLoginPress}
-        className="bg-[#191F28] rounded-md py-3 mt-5"
+        className="bg-primary rounded-md py-3 mt-5"
       >
         <Text className="text-white text-center text-[16px] font-semibold">
           {isLoading ? '로딩중' : '로그인'}
