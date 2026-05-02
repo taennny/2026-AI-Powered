@@ -1,5 +1,7 @@
-from fastapi import FastAPI
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
 from app.api.v1.auth import router as auth_router
 from app.api.v1.gps import router as gps_router
 from app.database import init_db
