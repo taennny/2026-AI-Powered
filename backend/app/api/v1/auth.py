@@ -3,11 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.auth import (
-    RegisterRequest, RegisterResponse,
-    LoginRequest, LoginResponse,
-    RefreshRequest, RefreshResponse,
-    PasswordResetRequest, PasswordResetConfirm,
-    KakaoLoginRequest, KakaoLoginResponse
+    RegisterRequest,
+    RegisterResponse,
+    LoginRequest,
+    LoginResponse,
+    RefreshRequest,
+    RefreshResponse,
+    PasswordResetRequest,
+    PasswordResetConfirm,
+    KakaoLoginRequest,
+    KakaoLoginResponse,
 )
 from app.services.auth import register_user, login_user, kakao_login
 
@@ -20,9 +25,7 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
     try:
         user = await register_user(db, request)
         return RegisterResponse(
-            user_id=user.id,
-            email=user.email,
-            nickname=user.nickname
+            user_id=user.id, email=user.email, nickname=user.nickname
         )
     except ValueError as e:
         if "이메일" in str(e):
@@ -46,7 +49,6 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
     from app.utils.jwt import decode_token
     from sqlalchemy import select
     from app.models.user import User
-    from datetime import datetime, timezone
 
     try:
         payload = decode_token(request.refresh_token)
@@ -61,6 +63,7 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
             raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
 
         from app.utils.jwt import create_access_token
+
         access_token = create_access_token(str(user.id))
         return RefreshResponse(access_token=access_token)
 
@@ -80,6 +83,7 @@ async def password_reset_confirm(request: PasswordResetConfirm):
     """새 비밀번호 설정"""
     # Sprint 1에서는 토큰 검증 없이 성공 응답만 반환
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
+
 
 @router.post("/kakao", response_model=KakaoLoginResponse)
 async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_db)):

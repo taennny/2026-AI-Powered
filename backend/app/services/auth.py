@@ -8,6 +8,7 @@ from app.schemas.auth import RegisterRequest, LoginRequest
 from app.utils.jwt import create_access_token, create_refresh_token
 import bcrypt
 
+
 def hash_password(password: str) -> str:
     """비밀번호 해시화"""
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -15,7 +16,9 @@ def hash_password(password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """비밀번호 검증"""
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+    )
 
 
 async def register_user(db: AsyncSession, request: RegisterRequest) -> User:
@@ -47,7 +50,11 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> dict:
     user = result.scalar_one_or_none()
 
     # 이메일 없거나 비밀번호 틀리면 오류
-    if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
+    if (
+        not user
+        or not user.password_hash
+        or not verify_password(request.password, user.password_hash)
+    ):
         raise ValueError("이메일 또는 비밀번호가 올바르지 않습니다")
 
     # 토큰 생성
@@ -62,8 +69,10 @@ async def login_user(db: AsyncSession, request: LoginRequest) -> dict:
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "Bearer"
+        "token_type": "Bearer",
     }
+
+
 async def kakao_login(db: AsyncSession, code: str) -> dict:
     from app.services.kakao import get_kakao_token, get_kakao_user_info
 
@@ -76,7 +85,9 @@ async def kakao_login(db: AsyncSession, code: str) -> dict:
     kakao_id = str(kakao_user_info.get("id"))
     kakao_account = kakao_user_info.get("kakao_account", {})
     email = kakao_account.get("email", f"{kakao_id}@kakao.com")
-    nickname = kakao_user_info.get("properties", {}).get("nickname", f"카카오유저{kakao_id[:4]}")
+    nickname = kakao_user_info.get("properties", {}).get(
+        "nickname", f"카카오유저{kakao_id[:4]}"
+    )
 
     # 3. 기존 유저인지 확인
     result = await db.execute(select(User).where(User.social_id == kakao_id))
@@ -111,5 +122,5 @@ async def kakao_login(db: AsyncSession, code: str) -> dict:
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "Bearer",
-        "is_new_user": is_new_user
+        "is_new_user": is_new_user,
     }

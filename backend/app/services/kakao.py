@@ -13,7 +13,7 @@ async def get_kakao_token(code: str) -> dict:
                 "redirect_uri": settings.KAKAO_REDIRECT_URI,
                 "code": code,
             },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
     if response.status_code != 200:
         raise ValueError("유효하지 않은 인가 코드입니다")
@@ -25,7 +25,7 @@ async def get_kakao_user_info(kakao_access_token: str) -> dict:
     async with httpx.AsyncClient() as client:
         response = await client.get(
             "https://kapi.kakao.com/v2/user/me",
-            headers={"Authorization": f"Bearer {kakao_access_token}"}
+            headers={"Authorization": f"Bearer {kakao_access_token}"},
         )
     if response.status_code != 200:
         raise ValueError("유저 정보를 가져올 수 없습니다")
