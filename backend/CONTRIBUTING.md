@@ -58,3 +58,12 @@ chore: 설정, 빌드 등 기타
 ### VS Code 설정
 
 VS Code 확장 설치: `Black Formatter`, `Ruff`
+
+### CI 자동 검사
+
+PR 올리면 GitHub Actions가 자동으로 ruff + black + pytest 실행함.
+**PR 올리기 전에 로컬에서 반드시 먼저 실행:**
+```bash
+cd backend
+black .
+```
