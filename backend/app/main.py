@@ -2,7 +2,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.blog import router as blog_router
 from app.api.v1.gps import router as gps_router
+from app.api.v1.photos import router as photos_router
+from app.api.v1.subscription import router as subscription_router
 from app.database import init_db
 
 
@@ -20,7 +23,10 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(blog_router)
 app.include_router(gps_router)
+app.include_router(photos_router)
+app.include_router(subscription_router)
 
 
 @app.get("/health")
