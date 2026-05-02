@@ -87,7 +87,9 @@ async def upload_photo(
     return photo
 
 
-async def get_photo(photo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession) -> Photo | None:
+async def get_photo(
+    photo_id: uuid.UUID, user_id: uuid.UUID, db: AsyncSession
+) -> Photo | None:
     result = await db.execute(
         select(Photo).where(Photo.id == photo_id, Photo.user_id == user_id)
     )
