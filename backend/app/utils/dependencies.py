@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -28,7 +28,9 @@ async def get_current_user(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
-    if not user:
-        raise HTTPException(status_code=401, detail="존재하지 않는 유저입니다")
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="사용자를 찾을 수 없습니다"
+        )
 
     return user

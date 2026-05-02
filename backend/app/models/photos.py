@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from sqlalchemy import Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from geoalchemy2 import Geometry
-from app.database import Base
+
+from app.models.user import Base
 
 
 class Photo(Base):
@@ -20,11 +21,6 @@ class Photo(Base):
     )
     taken_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
-    )
-    uploaded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=lambda: datetime.now(timezone.utc),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
