@@ -28,6 +28,7 @@ def _parse_exif(file_bytes: bytes) -> dict:
         # GPS 좌표
         gps_ifd = exif_data.get("GPS", {})
         if gps_ifd:
+
             def to_degrees(values):
                 d, m, s = values
                 return d[0] / d[1] + m[0] / m[1] / 60 + s[0] / s[1] / 3600
@@ -48,7 +49,7 @@ def _parse_exif(file_bytes: bytes) -> dict:
                 result["longitude"] = lng
 
     except Exception:
-        pass
+        pass  # EXIF 없거나 파싱 실패해도 그냥 None으로
 
     return result
 
