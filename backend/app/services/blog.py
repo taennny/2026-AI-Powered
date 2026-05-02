@@ -1,11 +1,13 @@
 import uuid
 import logging
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import async_session
 from app.models.blog import Blog
 from app.models.daily_record import DailyRecord
+from app.models.enums import GenerationStatus
 from app.services.ai_client import request_blog_generation
 
 logger = logging.getLogger(__name__)
@@ -32,7 +34,7 @@ async def create_blog_generation(
         content="",
         style=style,
         target_date=daily_record.target_date,
-        generation_status="pending",
+        generation_status=GenerationStatus.PENDING,
     )
     db.add(blog)
     await db.commit()
@@ -40,34 +42,35 @@ async def create_blog_generation(
     return blog
 
 
-async def run_blog_generation(db: AsyncSession, blog_id: uuid.UUID) -> None:
-    """BackgroundTask에서 실행 — AI 호출 후 블로그 업데이트"""
-    result = await db.execute(select(Blog).where(Blog.id == blog_id))
-    blog = result.scalar_one_or_none()
-    if not blog:
-        return
+async def run_blog_generation(blog_id: uuid.UUID) -> None:
+    """BackgroundTask에서 실행 — 독립 세션으로 AI 호출 후 블로그 업데이트"""
+    async with async_session() as db:
+        result = await db.execute(select(Blog).where(Blog.id == blog_id))
+        blog = result.scalar_one_or_none()
+        if not blog:
+            return
 
-    blog.generation_status = "generating"
-    await db.commit()
+        blog.generation_status = GenerationStatus.GENERATING
+        await db.commit()
 
-    try:
-        ai_result = await request_blog_generation(
-            daily_record_data={
-                "daily_record_id": str(blog.daily_record_id),
-                "target_date": str(blog.target_date),
-            },
-            style=blog.style,
-        )
+        try:
+            ai_result = await request_blog_generation(
+                daily_record_data={
+                    "daily_record_id": str(blog.daily_record_id),
+                    "target_date": str(blog.target_date),
+                },
+                style=blog.style,
+            )
 
-        blog.title = ai_result.get("title", "제목 없음")
-        blog.content = ai_result.get("content", "")
-        blog.generation_status = "completed"
+            blog.title = ai_result.get("title", "제목 없음")
+            blog.content = ai_result.get("content", "")
+            blog.generation_status = GenerationStatus.COMPLETED
 
-    except Exception as e:
-        logger.error("블로그 생성 실패: blog_id=%s, error=%s", blog_id, e)
-        blog.generation_status = "failed"
+        except Exception as e:
+            logger.error("블로그 생성 실패: blog_id=%s, error=%s", blog_id, e)
+            blog.generation_status = GenerationStatus.FAILED
 
-    await db.commit()
+        await db.commit()
 
 
 async def get_blog_by_id(
@@ -132,7 +135,7 @@ async def publish_blog(
     """블로그 발행"""
     blog = await get_blog_by_id(db, blog_id, user_id)
 
-    if blog.generation_status != "completed":
+    if blog.generation_status != GenerationStatus.COMPLETED:
         raise ValueError("생성이 완료된 블로그만 발행할 수 있습니다")
 
     blog.is_published = True
