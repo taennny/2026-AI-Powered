@@ -5,8 +5,7 @@
  * - has_journal: tealAccent dot / has_timeline: tealDark dot (최대 2개)
  * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동)
  *
- * ## 다음 연결 작업
- * - [ ] eventDays → fetchCalendarMonth 응답으로 교체 (home/index.tsx에서)
+ * - eventDays는 useCalendar 훅에서 fetchCalendarMonth 결과를 전달받음
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';

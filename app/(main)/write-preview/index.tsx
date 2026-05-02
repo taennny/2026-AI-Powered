@@ -1,3 +1,11 @@
+/**
+ * @file app/(main)/write-preview/index.tsx
+ * @description 글쓰기 미리보기/저장 화면
+ * - write 화면에서 생성된 title, content, photoUrl을 파라미터로 수신
+ * - 제목/내용 수정 후 saveJournal() 호출
+ * - 이미지 교체 시 로컬 URI를 uploadPhoto()로 재업로드 후 저장
+ */
+
 import React, {useState} from 'react';
 import {
   Alert,
@@ -12,7 +20,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import {saveJournal} from '@/services/journalApi';
+import {saveJournal, uploadPhoto} from '@/services/journalApi';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
@@ -64,10 +72,20 @@ export default function WritePreviewScreen() {
     try {
       setIsSaving(true);
 
+      let finalPhotoUrl: string | undefined;
+      if (selectedImageUri) {
+        if (selectedImageUri.startsWith('http')) {
+          finalPhotoUrl = selectedImageUri;
+        } else {
+          const uploaded = await uploadPhoto(selectedImageUri);
+          finalPhotoUrl = uploaded.photo_url;
+        }
+      }
+
       await saveJournal({
         title: journalTitle,
         content: journalContent,
-        photoUrl: selectedImageUri || undefined,
+        photoUrl: finalPhotoUrl,
       });
 
       Alert.alert('완료', '글이 저장되었습니다.', [

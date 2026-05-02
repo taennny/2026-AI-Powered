@@ -4,34 +4,44 @@
  * - 이메일, 비밀번호 재설정, 카카오 SNS 연동, 로그아웃, 회원탈퇴
  *
  * ## 다음 연결 작업
- * - [ ] GET /api/v1/users/me — 이메일, 카카오 연동 여부 조회
- * - [ ] 비밀번호 재설정 → API 연결 또는 이메일 발송 플로우
- * - [ ] 카카오 연동 → Kakao OAuth code 획득 후 POST /api/v1/auth/kakao
- * - [ ] 로그아웃 → authStore 토큰 삭제 + (auth) 라우팅
+ * - [ ] GET /api/v1/users/me — 이메일, 카카오 연동 여부 동적 처리 (현재 MOCK 상수)
+ * - [ ] 카카오 연동 백엔드 URL 확인 — 현재 https://api.roame.com/auth/kakao/link 가정
  * - [ ] 회원탈퇴 → 확인 모달 + 탈퇴 API 연결
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 
 import {Colors} from '@/constants/Colors';
+import {useAuthStore} from '@/store/authStore';
 
 // TODO: GET /api/v1/users/me 연결 후 동적으로 교체
 const MOCK_EMAIL = 'user@email.com';
 const MOCK_KAKAO_LINKED = false;
 
 export default function AccountScreen() {
-  const handleLogout = () => {
-    // TODO: authStore 토큰 삭제 + (auth) 라우팅
+  const logout = useAuthStore(s => s.logout);
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const handleDeleteAccount = () => {
     // TODO: 확인 모달 + 회원탈퇴 API
   };
 
-  const handleKakaoLink = () => {
-    // TODO: Kakao OAuth 플로우 (인가 코드 획득 → POST /api/v1/auth/kakao)
+  const handleKakaoLink = async () => {
+    try {
+      await WebBrowser.openAuthSessionAsync(
+        'https://api.roame.com/auth/kakao/link?source=account-link',
+        'roameapp://kakao-login',
+      );
+    } catch (error) {
+      console.log('kakao link error', error);
+    }
   };
 
   return (
@@ -79,7 +89,7 @@ export default function AccountScreen() {
             <Text style={{fontSize: 13, color: Colors.textSecondary}}>
               E-mail : {MOCK_EMAIL}
             </Text>
-            <TouchableOpacity activeOpacity={0.6}>
+            <TouchableOpacity activeOpacity={0.6} onPress={() => router.push('/(auth)/find-password')}>
               <Text style={{fontSize: 15, color: Colors.textPrimary}}>비밀번호 재설정</Text>
             </TouchableOpacity>
           </View>

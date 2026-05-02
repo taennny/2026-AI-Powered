@@ -4,7 +4,6 @@
  *
  * ## 다음 연결 작업
  * - [ ] 카드 탭 시 journal-detail 화면으로 이동
- * - [ ] JournalData → 실제 API 타입으로 교체
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';

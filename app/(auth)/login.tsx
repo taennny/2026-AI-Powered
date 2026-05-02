@@ -1,5 +1,5 @@
 import * as WebBrowser from 'expo-web-browser';
-import {View, Text, TextInput, TouchableOpacity} from 'react-native';
+import {View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback} from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
 import {login} from '@/services/authApi';
@@ -68,6 +68,7 @@ export default function LoginScreen() {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View className="flex-1 bg-white px-6 justify-center">
       <Text className="text-[64px] leading-[64px] font-black text-[#1E1E1E] mb-12">
         Roa{'\n'}me
@@ -129,5 +130,6 @@ export default function LoginScreen() {
         className="w-12 h-12 rounded-full bg-[#E5E5EA] self-center mt-6"
       />
     </View>
+    </TouchableWithoutFeedback>
   );
 }

@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback} from 'react-native';
 import {useRouter} from 'expo-router';
 import {sendResetEmail} from '@/services/authApi';
 
@@ -45,6 +45,7 @@ export default function FindPasswordScreen() {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View className="flex-1 bg-[#F7F7F7] px-[42px] pt-[140px]">
       <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
         Roa{'\n'}me
@@ -93,5 +94,6 @@ export default function FindPasswordScreen() {
         </TouchableOpacity>
       </View>
     </View>
+    </TouchableWithoutFeedback>
   );
 }

@@ -1,9 +1,8 @@
 /**
  * @file components/home/HomeFooter.tsx
  * @description 홈 하단 푸터 컴포넌트
- *
- * ## 다음 연결 작업
- * - [ ] 글쓰기 버튼 router.push('/(main)/write') 연결
+ * - 이동 거리: timelineStore에서 읽음
+ * - 글쓰기 버튼: /(main)/write 이동
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';

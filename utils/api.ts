@@ -12,6 +12,7 @@ import {
   saveAccessToken,
   removeTokens,
 } from '@/utils/tokenStorage';
+import {useAuthStore} from '@/store/authStore';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -81,6 +82,7 @@ api.interceptors.response.use(
 
         if (!refreshToken) {
           await removeTokens();
+          useAuthStore.getState().clearToken();
           return Promise.reject(error);
         }
 
@@ -99,6 +101,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         await removeTokens();
+        useAuthStore.getState().clearToken();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
