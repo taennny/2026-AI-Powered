@@ -18,7 +18,7 @@ class GpsLog(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     location: Mapped[object] = mapped_column(
-        Geometry("POINT", srid=4326, spatial_index=False), nullable=False
+        Geometry("POINT", srid=4326), nullable=False
     )
     accuracy: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

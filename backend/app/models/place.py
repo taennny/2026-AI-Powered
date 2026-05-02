@@ -27,7 +27,7 @@ class Place(Base):
     kakao_place_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     address: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     location: Mapped[object] = mapped_column(
-        Geometry("POINT", srid=4326, spatial_index=False), nullable=False
+        Geometry("POINT", srid=4326), nullable=False
     )
     arrived_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
