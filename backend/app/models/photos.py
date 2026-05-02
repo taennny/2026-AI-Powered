@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from geoalchemy2 import Geometry
-from app.models.user import Base
+from app.database import Base
 
 
 class Photo(Base):
