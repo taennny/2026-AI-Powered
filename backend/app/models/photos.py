@@ -16,7 +16,7 @@ class Photo(Base):
     )
     storage_key: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[object | None] = mapped_column(
-        Geometry("POINT", srid=4326, management=False), nullable=True
+        Geometry("POINT", srid=4326, spatial_index=False), nullable=True
     )
     taken_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
