@@ -6,7 +6,6 @@
  * - 날짜 헤더 + 시간대별 타임라인 레이아웃
  *
  * ## 다음 연결 작업
- * - [ ] DUMMY_POSTS → 실제 API 데이터로 교체 (selectedDate 기반 fetch)
  * - [ ] ScrollView 스크롤 ↔ 바텀시트 드래그 제스처 충돌 처리 검토
  */
 
@@ -20,50 +19,34 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 
-import {DUMMY_POSTS, type PostCardData} from '@/constants/dummyData';
+import {type TimelinePlace} from '@/services/calendarApi';
 import {Colors} from '@/constants/Colors';
+import {formatDate} from '@/utils/formatDate';
 import PostCard from '@/components/bottomsheet/PostCard';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 
 type Props = {
-  /** 캘린더에서 선택된 날짜 — 헤더 표시 및 카드 필터링에 사용 */
+  /** 캘린더에서 선택된 날짜 — 헤더 표시에 사용 */
   selectedDate?: Date;
   /** peek 상태에서 화면에 노출될 시트 높이 (px) */
   peekHeight?: number;
+  /** 선택된 날짜의 타임라인 장소 목록 — 부모에서 전달 */
+  places: TimelinePlace[];
 };
 
-/** Date → '25.04.01(tue)' 형식 문자열 */
-function formatDateHeader(date: Date): string {
-  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-  const yy = String(date.getFullYear()).slice(2);
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
-  const day = days[date.getDay()];
-  return `${yy}.${mm}.${dd}(${day})`;
-}
-
-/** 선택된 날짜에 해당하는 포스트만 필터링 */
-function filterByDate(posts: PostCardData[], date: Date): PostCardData[] {
-  const target = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return posts.filter(p => p.date === target);
-}
-
-/**
- * 포스트 배열을 시작 시(hour) 기준으로 그룹핑
- * 예) [{hour: 12, posts: [...]}, {hour: 14, posts: [...]}]
- */
+/** 장소 배열을 arrived_at 기준 hour로 그룹핑 */
 function groupByHour(
-  posts: PostCardData[],
-): {hour: number; posts: PostCardData[]}[] {
-  const map = new Map<number, PostCardData[]>();
-  posts.forEach(post => {
-    const hour = parseInt(post.startTime.split(':')[0], 10);
+  places: TimelinePlace[],
+): {hour: number; places: TimelinePlace[]}[] {
+  const map = new Map<number, TimelinePlace[]>();
+  places.forEach(place => {
+    const hour = new Date(place.arrived_at).getHours();
     if (!map.has(hour)) map.set(hour, []);
-    map.get(hour)!.push(post);
+    map.get(hour)!.push(place);
   });
   return Array.from(map.entries())
     .sort(([a], [b]) => a - b)
-    .map(([hour, ps]) => ({hour, posts: ps}));
+    .map(([hour, ps]) => ({hour, places: ps}));
 }
 
 const BAR_LEFT = 40;
@@ -71,6 +54,7 @@ const BAR_LEFT = 40;
 export default function BottomSheet({
   selectedDate = new Date(),
   peekHeight = 320,
+  places,
 }: Props) {
   const sheetHeight = useRef(0);
   const translateY = useRef(new Animated.Value(9999)).current;
@@ -82,12 +66,12 @@ export default function BottomSheet({
   const [isMapMounted, setIsMapMounted] = useState(false);
   const mapOpacity = useRef(new Animated.Value(0)).current;
 
-  const hasPostsRef = useRef(false);
+  const hasPlacesRef = useRef(false);
 
   useEffect(() => {
     const listenerId = translateY.addListener(({value}) => {
       const threshold = sheetHeight.current * 0.45;
-      setShowMap(value < threshold && hasPostsRef.current);
+      setShowMap(value < threshold && hasPlacesRef.current);
     });
     return () => translateY.removeListener(listenerId);
   }, [translateY]);
@@ -159,9 +143,9 @@ export default function BottomSheet({
     }),
   ).current;
 
-  const hourGroups = groupByHour(filterByDate(DUMMY_POSTS, selectedDate));
-  const hasPosts = hourGroups.length > 0;
-  hasPostsRef.current = hasPosts; // 리스너 클로저에서 최신값 참조용
+  const hourGroups = groupByHour(places);
+  const hasPlaces = hourGroups.length > 0;
+  hasPlacesRef.current = hasPlaces; // 리스너 클로저에서 최신값 참조용
 
   return (
     <Animated.View
@@ -199,12 +183,12 @@ export default function BottomSheet({
           marginBottom: 16,
         }}
       >
-        {formatDateHeader(selectedDate)}
+        {formatDate(selectedDate)}
       </Text>
 
-      {isMapMounted && hasPosts && (
+      {isMapMounted && hasPlaces && (
         <Animated.View style={{opacity: mapOpacity}}>
-          <MapPreview posts={hourGroups.flatMap(g => g.posts)} />
+          <MapPreview places={places} />
         </Animated.View>
       )}
 
@@ -212,7 +196,7 @@ export default function BottomSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{paddingBottom: 32}}
       >
-        {!hasPosts ? (
+        {!hasPlaces ? (
           <View
             style={{
               marginHorizontal: 16,
@@ -229,45 +213,45 @@ export default function BottomSheet({
             </Text>
           </View>
         ) : (
-        <View style={{position: 'relative', paddingHorizontal: 16}}>
-          <View
-            style={{
-              position: 'absolute',
-              left: 16 + BAR_LEFT,
-              top: 0,
-              bottom: 0,
-              width: 8,
-              backgroundColor: Colors.teal,
-            }}
-          />
+          <View style={{position: 'relative', paddingHorizontal: 16}}>
+            <View
+              style={{
+                position: 'absolute',
+                left: 16 + BAR_LEFT,
+                top: 0,
+                bottom: 0,
+                width: 8,
+                backgroundColor: Colors.teal,
+              }}
+            />
 
-          {hourGroups.map(({hour, posts}) => (
-            <View key={hour} style={{flexDirection: 'row', marginBottom: 8}}>
-              <View
-                style={{
-                  width: 32,
-                  paddingTop: 14,
-                  alignItems: 'flex-end',
-                  paddingRight: 8,
-                }}
-              >
-                <Text
-                  style={{fontSize: 12, fontWeight: '500', color: Colors.textTertiary}}
+            {hourGroups.map(({hour, places: hourPlaces}) => (
+              <View key={hour} style={{flexDirection: 'row', marginBottom: 8}}>
+                <View
+                  style={{
+                    width: 32,
+                    paddingTop: 14,
+                    alignItems: 'flex-end',
+                    paddingRight: 8,
+                  }}
                 >
-                  {hour}
-                </Text>
-              </View>
+                  <Text
+                    style={{fontSize: 12, fontWeight: '500', color: Colors.textTertiary}}
+                  >
+                    {hour}
+                  </Text>
+                </View>
 
-              <View style={{width: 24}} />
+                <View style={{width: 24}} />
 
-              <View style={{flex: 1}}>
-                {posts.map(post => (
-                  <PostCard key={post.id} data={post} />
-                ))}
+                <View style={{flex: 1}}>
+                  {hourPlaces.map(place => (
+                    <PostCard key={place.place_id} data={place} />
+                  ))}
+                </View>
               </View>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
         )}
       </ScrollView>
     </Animated.View>

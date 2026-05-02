@@ -8,15 +8,16 @@
  * - [ ] 마커 탭 시 해당 PostCard 하이라이트 연동
  */
 
+import {useState} from 'react';
 import {Image, View, Text, StyleSheet} from 'react-native';
 
-import {type PostCardData} from '@/constants/dummyData';
+import {type TimelinePlace} from '@/services/calendarApi';
 import {Colors} from '@/constants/Colors';
 
 const KAKAO_REST_API_KEY = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY ?? '';
 
 type Props = {
-  posts: PostCardData[];
+  places: TimelinePlace[];
 };
 
 const MAP_WIDTH = 600;
@@ -42,10 +43,15 @@ function calcKakaoLevel(
   };
 
   const latFraction = (latRad(maxLat) - latRad(minLat)) / Math.PI;
-  const lngFraction = (maxLng - minLng + (maxLng < minLng ? 360 : 0)) / 360;
+  const lngFraction =
+    (maxLng - minLng + (maxLng < minLng ? 360 : 0)) / 360;
 
-  const latZoom = Math.floor(Math.log(MAP_HEIGHT / WORLD_PX / latFraction) / Math.LN2);
-  const lngZoom = Math.floor(Math.log(MAP_WIDTH / WORLD_PX / lngFraction) / Math.LN2);
+  const latZoom = Math.floor(
+    Math.log(MAP_HEIGHT / WORLD_PX / latFraction) / Math.LN2,
+  );
+  const lngZoom = Math.floor(
+    Math.log(MAP_WIDTH / WORLD_PX / lngFraction) / Math.LN2,
+  );
 
   const zoom = Math.min(latZoom, lngZoom, 16) - 1; // -1: 마커 가장자리 여백
   const level = Math.min(Math.max(18 - zoom, 1), 14);
@@ -54,54 +60,60 @@ function calcKakaoLevel(
 
 /**
  * Kakao Static Map REST API URL 생성
- * 좌표 순서: 경도(lng), 위도(lat) — Kakao는 lng,lat 순서
- * 마커 형식: type:default,pos:{lng} {lat} (공백 구분, 파이프로 다중 마커)
+ * endpoint: dapi.kakao.com/v2/maps/staticmap
+ * 인증: Authorization 헤더 (KakaoAK {REST_API_KEY}) — Image source headers로 전달
+ * 좌표 순서: 경도(lng),위도(lat) — Kakao는 lng,lat 순서
+ * 마커 형식: {lng},{lat},{label} (쉼표 구분, 파이프로 다중 마커)
  */
-function buildStaticMapUrl(posts: PostCardData[]): string | null {
+function buildStaticMapUrl(places: TimelinePlace[]): string | null {
   if (!KAKAO_REST_API_KEY) return null;
 
-  if (posts.length === 0) {
+  if (places.length === 0) {
     return (
-      `https://map.kakao.com/v1/staticmap.png` +
-      `?appkey=${KAKAO_REST_API_KEY}` +
-      `&center=126.9780,37.5665` +
+      `https://dapi.kakao.com/v2/maps/static.png` +
+      `?center=126.9780,37.5665` +
       `&level=8` +
       `&w=${MAP_WIDTH}&h=${MAP_HEIGHT}`
     );
   }
 
-  const lats = posts.map(p => p.latitude);
-  const lngs = posts.map(p => p.longitude);
+  const lats = places.map(p => p.lat);
+  const lngs = places.map(p => p.lng);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
   const centerLat = (minLat + maxLat) / 2;
   const centerLng = (minLng + maxLng) / 2;
-  const level = posts.length === 1 ? 3 : calcKakaoLevel(minLat, maxLat, minLng, maxLng);
+  const level =
+    places.length === 1
+      ? 3
+      : calcKakaoLevel(minLat, maxLat, minLng, maxLng);
 
-  const markers = posts
-    .map(p => `type:default,pos:${p.longitude} ${p.latitude}`)
+  const markers = places
+    .map(p => `${p.lng},${p.lat}`)
     .join('|');
 
   return (
-    `https://map.kakao.com/v1/staticmap.png` +
-    `?appkey=${KAKAO_REST_API_KEY}` +
-    `&center=${centerLng},${centerLat}` +
+    `https://dapi.kakao.com/v2/maps/static.png` +
+    `?center=${centerLng},${centerLat}` +
     `&level=${level}` +
     `&w=${MAP_WIDTH}&h=${MAP_HEIGHT}` +
     `&markers=${encodeURIComponent(markers)}`
   );
 }
 
-export default function MapPreview({posts}: Props) {
-  const url = buildStaticMapUrl(posts);
+export default function MapPreview({places}: Props) {
+  const url = buildStaticMapUrl(places);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  if (!url) {
+  if (!url || loadFailed) {
     return (
       <View style={[styles.container, styles.placeholder]}>
-        <Text style={styles.placeholderText}>🗺️ API 키를 설정해주세요</Text>
-        <Text style={styles.placeholderSub}>.env › EXPO_PUBLIC_KAKAO_REST_API_KEY</Text>
+        <Text style={styles.placeholderText}>API 키 설정 안됨</Text>
+        <Text style={styles.placeholderSub}>
+          .env › EXPO_PUBLIC_KAKAO_REST_API_KEY
+        </Text>
       </View>
     );
   }
@@ -109,10 +121,10 @@ export default function MapPreview({posts}: Props) {
   return (
     <View style={styles.container}>
       <Image
-        source={{uri: url}}
+        source={{uri: url, headers: {Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`}}}
         style={styles.image}
         resizeMode="cover"
-        onError={e => console.warn('[MapPreview] 이미지 로드 실패:', e.nativeEvent.error)}
+        onError={() => setLoadFailed(true)}
       />
     </View>
   );

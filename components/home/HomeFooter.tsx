@@ -3,7 +3,6 @@
  * @description 홈 하단 푸터 컴포넌트
  *
  * ## 다음 연결 작업
- * - [ ] 이동 거리 실제 데이터 연결 (선택 날짜 기준)
  * - [ ] 글쓰기 버튼 router.push('/(main)/write') 연결
  */
 
@@ -11,10 +10,12 @@ import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 
 import {Colors} from '@/constants/Colors';
+import {useTimelineStore} from '@/store/timelineStore';
 
 export default function HomeFooter() {
+  const totalDistance = useTimelineStore(s => s.totalDistance);
+
   const handleWritePress = () => {
-    // TODO: 글쓰기 라우터 연결
   };
 
   return (
@@ -28,7 +29,7 @@ export default function HomeFooter() {
             이동 거리
           </Text>
           <Text style={{fontSize: 18, fontWeight: '600', color: Colors.textPrimary}}>
-            0.0Km
+            {totalDistance.toFixed(1)}Km
           </Text>
         </View>
 
