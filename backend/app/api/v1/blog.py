@@ -1,141 +1,150 @@
 import uuid
+from datetime import date, datetime, timezone
+from typing import Literal
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.user import User
-from app.schemas.blog import (
-    BlogGenerateRequest,
-    BlogGenerateResponse,
-    BlogListResponse,
-    BlogPublishResponse,
-    BlogResponse,
-    BlogStatusResponse,
-    BlogUpdateRequest,
-)
-from app.services.blog import (
-    create_blog_generation,
-    get_blog_by_id,
-    get_blog_list,
-    publish_blog,
-    run_blog_generation,
-    update_blog,
-)
-from app.utils.dependencies import get_current_user
+from app.models.blog import Blog
+from app.schemas.blog import BlogGenerateRequest, BlogResponse, BlogStatusResponse
+from app.services import blog_generator
 
-router = APIRouter(tags=["blog"])
+router = APIRouter(prefix="/blog", tags=["blog"])
+blogs_router = APIRouter(prefix="/blogs", tags=["blog"])
 
 
-@router.get("/api/v1/blogs", response_model=BlogListResponse)
+class BlogListResponse(BaseModel):
+    items: list[BlogResponse]
+    total: int
+
+
+@blogs_router.get("", response_model=BlogListResponse, summary="블로그 목록 + 검색")
 async def list_blogs(
-    skip: int = Query(0, ge=0),
+    user_id: uuid.UUID = Query(...),
+    style: Literal["emotional", "info"] | None = Query(None),
+    q: str | None = Query(None, description="제목 검색어"),
+    date_from: date | None = Query(None),
+    date_to: date | None = Query(None),
+    published_only: bool = Query(False),
     limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """블로그 목록 조회"""
-    blogs, total = await get_blog_list(db, current_user.id, skip, limit)
-    return BlogListResponse(blogs=blogs, total=total)
+) -> BlogListResponse:
+    stmt = select(Blog).where(Blog.user_id == user_id)
 
+    if style:
+        stmt = stmt.where(Blog.style == style)
+    if q:
+        stmt = stmt.where(Blog.title.ilike(f"%{q}%"))
+    if date_from:
+        stmt = stmt.where(Blog.target_date >= date_from)
+    if date_to:
+        stmt = stmt.where(Blog.target_date <= date_to)
+    if published_only:
+        stmt = stmt.where(Blog.is_published.is_(True))
 
-@router.post(
-    "/api/v1/blog/generate", response_model=BlogGenerateResponse, status_code=202
-)
-async def generate_blog(
-    request: BlogGenerateRequest,
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """AI 블로그 생성 요청 (비동기)"""
-    try:
-        blog = await create_blog_generation(
-            db, current_user.id, request.daily_record_id, request.style
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar_one()
 
-    background_tasks.add_task(run_blog_generation, blog.id)
+    stmt = stmt.order_by(Blog.target_date.desc()).limit(limit).offset(offset)
+    result = await db.execute(stmt)
+    blogs = result.scalars().all()
 
-    return BlogGenerateResponse(
-        blog_id=blog.id,
-        status=blog.generation_status,
-        message="블로그 생성이 요청되었습니다",
+    return BlogListResponse(
+        items=[BlogResponse.model_validate(b) for b in blogs],
+        total=total,
     )
 
 
-@router.get("/api/v1/blogs/{blog_id}/status", response_model=BlogStatusResponse)
-async def blog_status(
+@router.post("/generate")
+async def generate_blog(
+    req: BlogGenerateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    return StreamingResponse(
+        blog_generator.generate_stream(req, db),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/{blog_id}/status", response_model=BlogStatusResponse)
+async def get_blog_status(
     blog_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """블로그 생성 상태 조회"""
-    try:
-        blog = await get_blog_by_id(db, blog_id, current_user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
+) -> BlogStatusResponse:
+    blog = await db.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
     return BlogStatusResponse(
         blog_id=blog.id,
-        status=blog.generation_status,
-        created_at=blog.created_at,
+        generation_status=blog.generation_status,
+        title=blog.title or None,
     )
 
 
-@router.get("/api/v1/blog/{blog_id}", response_model=BlogResponse)
+@router.get("/{blog_id}", response_model=BlogResponse)
 async def get_blog(
     blog_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """블로그 조회"""
-    try:
-        blog = await get_blog_by_id(db, blog_id, current_user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    return blog
+) -> BlogResponse:
+    blog = await db.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    return BlogResponse.model_validate(blog)
 
 
-@router.put("/api/v1/blog/{blog_id}", response_model=BlogResponse)
-async def edit_blog(
+class BlogUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    visibility: Literal["private", "public"] | None = None
+
+
+@router.put("/{blog_id}", response_model=BlogResponse)
+async def update_blog(
     blog_id: uuid.UUID,
-    request: BlogUpdateRequest,
+    req: BlogUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """블로그 수정"""
-    try:
-        blog = await update_blog(
-            db,
-            blog_id,
-            current_user.id,
-            request.title,
-            request.content,
-            request.visibility,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+) -> BlogResponse:
+    blog = await db.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    if blog.generation_status not in ("completed", "failed"):
+        raise HTTPException(status_code=409, detail="Cannot edit while generation is in progress")
 
-    return blog
+    if req.title is not None:
+        blog.title = req.title
+    if req.content is not None:
+        blog.content = req.content
+    if req.visibility is not None:
+        blog.visibility = req.visibility
+
+    blog.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(blog)
+    return BlogResponse.model_validate(blog)
 
 
-@router.post("/api/v1/blog/{blog_id}/publish", response_model=BlogPublishResponse)
-async def publish(
+@router.post("/{blog_id}/publish", response_model=BlogResponse)
+async def publish_blog(
     blog_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """블로그 발행"""
-    try:
-        blog = await publish_blog(db, blog_id, current_user.id)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+) -> BlogResponse:
+    blog = await db.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    if blog.generation_status != "completed":
+        raise HTTPException(status_code=409, detail="Only completed blogs can be published")
+    if blog.is_published:
+        raise HTTPException(status_code=409, detail="Already published")
 
-    return BlogPublishResponse(
-        blog_id=blog.id,
-        is_published=blog.is_published,
-        message="블로그가 발행되었습니다",
-    )
+    blog.is_published = True
+    blog.visibility = "public"
+    blog.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(blog)
+    return BlogResponse.model_validate(blog)

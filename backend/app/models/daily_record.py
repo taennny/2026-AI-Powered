@@ -11,7 +11,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -31,6 +31,7 @@ class DailyRecord(Base):
     photo_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_distance: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     map_image_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    blocks: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
