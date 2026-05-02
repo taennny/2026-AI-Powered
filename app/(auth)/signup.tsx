@@ -1,7 +1,7 @@
 import {useMemo, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useRouter} from 'expo-router';
-import {signup} from '../lib/authApi';
+import {signup} from '@/services/authApi';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -28,68 +28,51 @@ export default function SignupScreen() {
       isPrivacyPolicyChecked &&
       isAgeConfirmed
     );
-  }, [
-    email,
-    password,
-    isServiceTermsChecked,
-    isPrivacyPolicyChecked,
-    isAgeConfirmed,
-  ]);
+  }, [email, password, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
 
   const handleEmailChange = (text: string) => {
     setEmail(text);
-
     if (!text) {
       setEmailGuideMessage('');
       setEmailGuideColor('#CCCCCC');
       return;
     }
-
     if (text.includes('@')) {
       setEmailGuideMessage('사용 가능한 아이디입니다.');
       setEmailGuideColor('#4EF5F9');
       return;
     }
-
     setEmailGuideMessage('');
     setEmailGuideColor('#CCCCCC');
   };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
-
     if (!text) {
       setPasswordGuideMessage('');
       setPasswordGuideColor('#CCCCCC');
       return;
     }
-
     if (text.length >= 8) {
       setPasswordGuideMessage('사용 가능한 비밀번호입니다.');
       setPasswordGuideColor('#4EF5F9');
       return;
     }
-
     setPasswordGuideMessage('비밀번호 형식이 아닙니다.');
     setPasswordGuideColor('#FF0000');
   };
 
   const handleSignupPress = async () => {
-    if (!isSignupButtonEnabled || isLoading) {
-      return;
-    }
+    if (!isSignupButtonEnabled || isLoading) return;
 
     try {
       setIsLoading(true);
       setEmailGuideMessage('');
       setPasswordGuideMessage('');
 
-      await signup({
-        email,
-        password,
-      });
+      await signup({email, password});
 
-      router.replace('/login');
+      router.replace('/(auth)/login');
     } catch (error: any) {
       const status = error?.response?.status;
 
@@ -103,8 +86,6 @@ export default function SignupScreen() {
         setEmailGuideMessage('회원가입 중 오류가 발생했습니다.');
         setEmailGuideColor('#FF3B30');
       }
-
-      console.log('signup error', error);
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +93,6 @@ export default function SignupScreen() {
 
   const checkboxBaseStyle =
     'w-[11px] h-[11px] rounded-full border border-[#BDBDBD] items-center justify-center mr-[6px]';
-
   const checkboxInnerStyle = 'w-[5px] h-[5px] rounded-full bg-[#BDBDBD]';
 
   return (
@@ -123,17 +103,11 @@ export default function SignupScreen() {
 
       <View className="mb-[10px]">
         <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
-            이메일
-          </Text>
-          <Text
-            style={{color: emailGuideColor}}
-            className="text-[10px] leading-[10px]"
-          >
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">이메일</Text>
+          <Text style={{color: emailGuideColor}} className="text-[10px] leading-[10px]">
             {emailGuideMessage}
           </Text>
         </View>
-
         <TextInput
           value={email}
           onChangeText={handleEmailChange}
@@ -147,17 +121,11 @@ export default function SignupScreen() {
 
       <View className="mb-[6px]">
         <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
-            비밀번호
-          </Text>
-          <Text
-            style={{color: passwordGuideColor}}
-            className="text-[10px] leading-[10px]"
-          >
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">비밀번호</Text>
+          <Text style={{color: passwordGuideColor}} className="text-[10px] leading-[10px]">
             {passwordGuideMessage}
           </Text>
         </View>
-
         <TextInput
           value={password}
           onChangeText={handlePasswordChange}
@@ -167,7 +135,6 @@ export default function SignupScreen() {
           autoCapitalize="none"
           className="h-[31px] rounded-[5px] border border-[#D9D9D9] px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
-
         <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
           8자 이상, 특수문자 포함
         </Text>
@@ -176,55 +143,41 @@ export default function SignupScreen() {
       <View className="mt-[18px] mb-[20px]">
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() =>
-            setIsServiceTermsChecked(previousValue => !previousValue)
-          }
+          onPress={() => setIsServiceTermsChecked(v => !v)}
           className="flex-row items-center mb-[8px]"
         >
           <View className={checkboxBaseStyle}>
-            {isServiceTermsChecked ? (
-              <View className={checkboxInnerStyle} />
-            ) : null}
+            {isServiceTermsChecked ? <View className={checkboxInnerStyle} /> : null}
           </View>
           <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
             서비스 이용약관 동의
           </Text>
-          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
-            {'>'}
-          </Text>
+          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">{'>'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() =>
-            setIsPrivacyPolicyChecked(previousValue => !previousValue)
-          }
+          onPress={() => setIsPrivacyPolicyChecked(v => !v)}
           className="flex-row items-center mb-[8px]"
         >
           <View className={checkboxBaseStyle}>
-            {isPrivacyPolicyChecked ? (
-              <View className={checkboxInnerStyle} />
-            ) : null}
+            {isPrivacyPolicyChecked ? <View className={checkboxInnerStyle} /> : null}
           </View>
           <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
             개인정보 수집 및 이용 동의
           </Text>
-          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
-            {'>'}
-          </Text>
+          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">{'>'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setIsAgeConfirmed(previousValue => !previousValue)}
+          onPress={() => setIsAgeConfirmed(v => !v)}
           className="flex-row items-center"
         >
           <View className={checkboxBaseStyle}>
             {isAgeConfirmed ? <View className={checkboxInnerStyle} /> : null}
           </View>
-          <Text className="text-[11px] leading-[11px] text-[#6E6E73]">
-            만 14세 이상입니다.
-          </Text>
+          <Text className="text-[11px] leading-[11px] text-[#6E6E73]">만 14세 이상입니다.</Text>
         </TouchableOpacity>
       </View>
 

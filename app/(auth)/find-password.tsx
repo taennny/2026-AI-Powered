@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useRouter} from 'expo-router';
-import {sendResetEmail} from '../lib/authApi';
+import {sendResetEmail} from '@/services/authApi';
 
 export default function FindPasswordScreen() {
   const router = useRouter();
@@ -39,8 +39,6 @@ export default function FindPasswordScreen() {
         setGuideMessage('이메일 전송 중 오류가 발생했습니다.');
         setGuideColor('#FF3B30');
       }
-
-      console.log('send reset email error', error);
     } finally {
       setIsLoading(false);
     }
@@ -54,20 +52,14 @@ export default function FindPasswordScreen() {
 
       <View className="mb-[10px]">
         <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
-            이메일
-          </Text>
-          <Text
-            style={{color: guideColor}}
-            className="text-[10px] leading-[10px]"
-          >
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">이메일</Text>
+          <Text style={{color: guideColor}} className="text-[10px] leading-[10px]">
             {guideMessage}
           </Text>
         </View>
-
         <TextInput
           value={email}
-          onChangeText={(text) => {
+          onChangeText={text => {
             setEmail(text);
             setGuideMessage('');
             setGuideColor('#CCCCCC');
@@ -83,12 +75,10 @@ export default function FindPasswordScreen() {
       <View className="flex-row justify-end mt-[12px]">
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => router.replace('/login')}
+          onPress={() => router.replace('/(auth)/login')}
           className="w-[58px] h-[22px] rounded-[4px] items-center justify-center bg-[#E5E5EA] mr-[8px]"
         >
-          <Text className="text-[10px] leading-[10px] text-[#191F28]">
-            로그인
-          </Text>
+          <Text className="text-[10px] leading-[10px] text-[#191F28]">로그인</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

@@ -2,10 +2,12 @@ import * as WebBrowser from 'expo-web-browser';
 import {View, Text, TextInput, TouchableOpacity} from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
-import {login} from '../lib/authApi';
+import {login} from '@/services/authApi';
+import {useAuthStore} from '@/store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const setToken = useAuthStore(s => s.setToken);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,12 +30,10 @@ export default function LoginScreen() {
       setIsLoading(true);
       setErrorMessage('');
 
-      await login({
-        email,
-        password,
-      });
+      const {access_token} = await login({email, password});
+      setToken(access_token);
 
-      router.replace('/(tabs)');
+      router.replace('/(main)/(tabs)/home');
     } catch (error: any) {
       const status = error?.response?.status;
 
@@ -51,12 +51,11 @@ export default function LoginScreen() {
       } else {
         setErrorMessage('로그인 중 오류가 발생했습니다.');
       }
-
-      console.log('login error', error);
     } finally {
       setIsLoading(false);
     }
   };
+
   const handleKakaoLogin = async () => {
     try {
       await WebBrowser.openAuthSessionAsync(
@@ -116,18 +115,14 @@ export default function LoginScreen() {
       </TouchableOpacity>
 
       <View className="flex-row justify-center mt-4 space-x-4">
-        <TouchableOpacity onPress={() => router.push('/signup')}>
+        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
           <Text className="text-[#8E8E93] text-[12px]">회원가입</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/find-password')}>
+        <TouchableOpacity onPress={() => router.push('/(auth)/find-password')}>
           <Text className="text-[#8E8E93] text-[12px]">비밀번호 찾기</Text>
         </TouchableOpacity>
       </View>
-
-      <TouchableOpacity onPress={() => router.push('/write')}>
-        <Text>글쓰기 화면 테스트</Text>
-      </TouchableOpacity>
 
       <TouchableOpacity
         onPress={handleKakaoLogin}

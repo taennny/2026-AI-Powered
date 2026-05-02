@@ -8,6 +8,7 @@
 
 import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
+import {router} from 'expo-router';
 
 import {Colors} from '@/constants/Colors';
 import {useTimelineStore} from '@/store/timelineStore';
@@ -16,6 +17,7 @@ export default function HomeFooter() {
   const totalDistance = useTimelineStore(s => s.totalDistance);
 
   const handleWritePress = () => {
+    router.push('/(main)/write');
   };
 
   return (

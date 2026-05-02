@@ -1,7 +1,7 @@
 import {useMemo, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import {resetPassword} from '../lib/authApi';
+import {resetPassword} from '@/services/authApi';
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
@@ -18,41 +18,21 @@ export default function ResetPasswordScreen() {
   }, [newPassword]);
 
   const passwordGuideMessage = useMemo(() => {
-    if (errorMessage) {
-      return errorMessage;
-    }
-
-    if (!newPassword) {
-      return '';
-    }
-
-    if (isPasswordValid) {
-      return '사용 가능한 비밀번호입니다.';
-    }
-
+    if (errorMessage) return errorMessage;
+    if (!newPassword) return '';
+    if (isPasswordValid) return '사용 가능한 비밀번호입니다.';
     return '올바른 형식이 아닙니다.';
   }, [errorMessage, isPasswordValid, newPassword]);
 
   const passwordGuideColor = useMemo(() => {
-    if (errorMessage) {
-      return '#FF3B30';
-    }
-
-    if (!newPassword) {
-      return '#CCCCCC';
-    }
-
-    if (isPasswordValid) {
-      return '#4EF5F9';
-    }
-
+    if (errorMessage) return '#FF3B30';
+    if (!newPassword) return '#CCCCCC';
+    if (isPasswordValid) return '#4EF5F9';
     return '#FF3B30';
   }, [errorMessage, isPasswordValid, newPassword]);
 
   const handleResetPasswordPress = async () => {
-    if (!isPasswordValid || isLoading) {
-      return;
-    }
+    if (!isPasswordValid || isLoading) return;
 
     if (!token || typeof token !== 'string') {
       setErrorMessage('재설정 링크가 유효하지 않습니다.');
@@ -65,7 +45,7 @@ export default function ResetPasswordScreen() {
 
       await resetPassword(token, newPassword);
 
-      router.replace('/login');
+      router.replace('/(auth)/login');
     } catch (error: any) {
       const status = error?.response?.status;
 
@@ -74,8 +54,6 @@ export default function ResetPasswordScreen() {
       } else {
         setErrorMessage('비밀번호 변경 중 오류가 발생했습니다.');
       }
-
-      console.log('reset password error', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,20 +67,14 @@ export default function ResetPasswordScreen() {
 
       <View className="mb-[22px]">
         <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
-            새 비밀번호 입력
-          </Text>
-          <Text
-            style={{color: passwordGuideColor}}
-            className="text-[10px] leading-[10px]"
-          >
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">새 비밀번호 입력</Text>
+          <Text style={{color: passwordGuideColor}} className="text-[10px] leading-[10px]">
             {passwordGuideMessage}
           </Text>
         </View>
-
         <TextInput
           value={newPassword}
-          onChangeText={(text) => {
+          onChangeText={text => {
             setNewPassword(text);
             setErrorMessage('');
           }}
@@ -112,7 +84,6 @@ export default function ResetPasswordScreen() {
           autoCapitalize="none"
           className="h-[31px] rounded-[5px] border border-[#D9D9D9] px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
-
         <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
           8자 이상, 특수문자 포함
         </Text>
