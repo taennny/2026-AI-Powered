@@ -5,8 +5,8 @@
  */
 
 import {View, Text, TouchableOpacity, Animated} from 'react-native';
-import {useState, useRef} from 'react';
-import {router} from 'expo-router';
+import {useRef, useEffect} from 'react';
+import {router, usePathname} from 'expo-router';
 
 type Tab = 'home' | 'journal';
 
@@ -14,18 +14,21 @@ const ACTIVE_FLEX = 52;
 const INACTIVE_FLEX = 48;
 
 export default function SectionTabs() {
-  const [activeTab, setActiveTab] = useState<Tab>('home');
-  const homeFlex = useRef(new Animated.Value(ACTIVE_FLEX)).current;
+  const pathname = usePathname();
+  const activeTab: Tab = pathname.includes('journal') ? 'journal' : 'home';
+  const homeFlex = useRef(new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX)).current;
 
-  const handleTabPress = (tab: Tab) => {
-    if (tab === activeTab) return;
-    setActiveTab(tab);
+  useEffect(() => {
     Animated.spring(homeFlex, {
-      toValue: tab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX,
+      toValue: activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX,
       useNativeDriver: false,
       tension: 38,
       friction: 14,
     }).start();
+  }, [activeTab]);
+
+  const handleTabPress = (tab: Tab) => {
+    if (tab === activeTab) return;
     if (tab === 'home') {
       router.replace('/(main)/(tabs)/home');
     } else {

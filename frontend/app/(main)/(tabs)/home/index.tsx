@@ -16,7 +16,7 @@ import {useCalendar} from '@/hooks/useCalendar';
 const CALENDAR_HEIGHT_6_ROWS = 440;
 
 export default function HomeIndex() {
-  const [peekHeight, setPeekHeight] = useState(0);
+  const [peekHeight, setPeekHeight] = useState<number | null>(null);
   const {selectedDate, setSelectedDate, viewDate, setViewDate, calendarDays, places} =
     useCalendar();
 
@@ -24,7 +24,7 @@ export default function HomeIndex() {
     <View
       className="flex-1 bg-white"
       onLayout={e =>
-        setPeekHeight(e.nativeEvent.layout.height - CALENDAR_HEIGHT_6_ROWS)
+        setPeekHeight(Math.max(0, e.nativeEvent.layout.height - CALENDAR_HEIGHT_6_ROWS))
       }
     >
       <Calendar
@@ -36,7 +36,7 @@ export default function HomeIndex() {
       />
 
       {/* peekHeight 확정 후 렌더링 — 0이면 초기 위치 오류 방지 */}
-      {peekHeight > 0 && (
+      {peekHeight !== null && (
         <BottomSheet
           selectedDate={selectedDate}
           peekHeight={peekHeight}
