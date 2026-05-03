@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 기본 테마 (basic) CSS 변수 — 웹 호환용. React Native는 themeStore의 vars()로 주입됨 */
+:root {
+  --color-teal-bg:    #E6F0F1;
+  --color-teal:       #D8E6E8;
+  --color-teal-dark:  #A0B4B8;
+  --color-teal-accent:#7BBFD4;
+  --color-primary:    #191F28;
+  --color-medium:     #374151;
+  --color-secondary:  #6b7280;
+  --color-tertiary:   #9ca3af;
+  --color-surface:    #F6F6F6;
+  --color-line:       #e5e7eb;
+}
