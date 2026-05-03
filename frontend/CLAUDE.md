@@ -138,19 +138,21 @@ style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
 
 **1. NativeWind 토큰 (`tailwind.config.js`)** — className으로 사용:
 
-| 클래스 | 값 | 용도 |
-|---|---|---|
-| `bg-teal-bg` / `text-teal-bg` | `#E6F0F1` | 시트·화면 배경 |
-| `bg-teal` | `#D8E6E8` | 타임라인 바, Journal 탭 |
-| `bg-teal-dark` | `#A0B4B8` | 드래그 핸들 |
-| `bg-teal-accent` | `#7BBFD4` | 선택 날짜, 이벤트 dot, 검색 하이라이트 |
-| `text-primary` / `bg-primary` | `#191F28` | 기본 텍스트, 버튼 배경 |
-| `text-medium` | `#374151` | 카드 서브 텍스트 |
-| `text-secondary` | `#6b7280` | 보조 텍스트 |
-| `text-tertiary` | `#9ca3af` | 힌트·레이블 |
-| `bg-surface` | `#F6F6F6` | 헤더·푸터·화면 배경 |
-| `border-line` | `#e5e7eb` | 구분선·테두리 |
-| `text-muted` | `#CCCCCC` | 비활성 텍스트 (정적) |
+모든 색상 토큰은 `var(--color-*)` CSS 변수를 참조합니다. 실제 hex 값은 `constants/themes.ts`의 `THEMES` 프리셋에 정의되어 있으며, `ThemeRoot`에서 루트 View에 `themeVars`로 주입됩니다. `text-muted`만 정적 hex(`#CCCCCC`)로 고정됩니다.
+
+| 클래스 | CSS 변수 | basic 테마 값 | 용도 |
+|---|---|---|---|
+| `bg-teal-bg` / `text-teal-bg` | `--color-teal-bg` | `#E6F0F1` | 시트·화면 배경 |
+| `bg-teal` | `--color-teal` | `#D8E6E8` | 타임라인 바, Journal 탭 |
+| `bg-teal-dark` | `--color-teal-dark` | `#A0B4B8` | 드래그 핸들 |
+| `bg-teal-accent` | `--color-teal-accent` | `#7BBFD4` | 선택 날짜, 이벤트 dot, 검색 하이라이트 |
+| `text-primary` / `bg-primary` | `--color-primary` | `#191F28` | 기본 텍스트, 버튼 배경 |
+| `text-medium` | `--color-medium` | `#374151` | 카드 서브 텍스트 |
+| `text-secondary` | `--color-secondary` | `#6b7280` | 보조 텍스트 |
+| `text-tertiary` | `--color-tertiary` | `#9ca3af` | 힌트·레이블 |
+| `bg-surface` | `--color-surface` | `#F6F6F6` | 헤더·푸터·화면 배경 |
+| `border-line` | `--color-line` | `#e5e7eb` | 구분선·테두리 |
+| `text-muted` | (정적) | `#CCCCCC` | 비활성 텍스트 |
 
 **2. `constants/Colors.ts`** — prop 값 전용 (placeholderTextColor, icon color 등):
 ```ts
@@ -158,11 +160,11 @@ Colors.textTertiary   // '#9ca3af'
 Colors.tealAccent     // '#7BBFD4'
 ```
 
-**테마 시스템** (현재 basic 고정, 추후 활성화 예정):
-- `constants/themes.ts`: 4개 테마 프리셋 (basic, dark, strawberry, aqua) — `vars()`로 CSS 변수 주입
-- `store/themeStore.ts`: 활성 테마 Zustand 상태
-- `app/_layout.tsx` ThemeRoot: 루트 View에 `themeVars` 적용
-- `tailwind.config.js` 색상이 현재 직접 hex로 매핑 → 테마 활성화 시 CSS 변수(`var(--color-*)`)로 전환
+**테마 시스템** (인프라 완성, UI 토글 미구현):
+- `constants/themes.ts`: 4개 테마 프리셋 (basic, dark, strawberry, aqua) — `vars()`로 CSS 변수 값 정의
+- `store/themeStore.ts`: `setTheme(id)` 호출로 즉시 전환 가능
+- `app/_layout.tsx` ThemeRoot: 루트 View에 `themeVars` style로 주입 → 하위 모든 NativeWind 색상 토큰에 반영
+- CSS 변수 레이어는 이미 완성됨 — 남은 작업은 설정 화면에서 `setTheme()` 연결뿐
 
 ### 홈 화면 레이아웃 패턴
 
@@ -213,7 +215,7 @@ store/timelineStore.ts
 store/themeStore.ts
   - themeId: ThemeId
   - themeVars: ReturnType<typeof vars>
-  - setTheme(id)        # 테마 전환 (현재 basic 고정)
+  - setTheme(id)        # 테마 전환 (인프라 완성, UI 토글 미연결)
 ```
 
 **핵심 패턴**: `tokenStorage`는 디스크(앱 재시작 후 유지), `authStore`는 메모리 상태(컴포넌트 리렌더 트리거). 로그인·로그아웃 시 반드시 둘 다 업데이트해야 합니다.
@@ -236,6 +238,10 @@ hooks/useAuth.ts          # 빈 파일 (미구현)
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
 | `formatTimeAgo(iso)` | ISO 8601 → `'방금'` / `'N분 전'` 등 |
 
+### ESLint / 코드 스타일
+
+ESLint 9 flat config (`eslint.config.js`). `eslint-plugin-unused-imports`로 미사용 import는 **error** (warning 아님) — lint 실패 원인 1위. import 순서는 `import/order` warn (외부 → 내부 → 상대경로, 그룹 간 빈 줄 필수).
+
 ### 경로 별칭
 
 `@/`는 프로젝트 루트를 가리킵니다 (`tsconfig.json` 경로 설정).
@@ -253,7 +259,7 @@ hooks/useAuth.ts          # 빈 파일 (미구현)
 | GET /api/v1/users/me | `settings/account/index.tsx` | 이메일·카카오 연동 여부 동적 처리 (현재 MOCK) |
 | Kakao Static Map 실기기 테스트 | `MapPreview.tsx` | 엔드포인트 `/v2/maps/static.png` |
 | ScrollView ↔ BottomSheet 제스처 충돌 | `BottomSheet.tsx` | PanResponder 충돌 미해결 |
-| 테마 활성화 | `tailwind.config.js`, `constants/themes.ts` | 색상 토큰을 CSS 변수로 전환, `bg-primary + text-white` 버튼 색상 설계 필요 |
+| 테마 UI 토글 연결 | `settings/theme/index.tsx` | CSS 변수 레이어 완성됨 — `setTheme()` UI 연결 + `bg-primary + text-white` 버튼 색상 설계 필요 |
 
 ## 백엔드 팀 확인 필요
 
