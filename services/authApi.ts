@@ -28,12 +28,12 @@ export interface RefreshResponse {
 }
 
 export async function signup({email, password}: SignupRequest) {
-  const response = await api.post('/auth/signup', {email, password});
+  const response = await api.post('/api/v1/auth/register', {email, password});
   return response.data;
 }
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
-  const response = await api.post('/auth/login', data);
+  const response = await api.post('/api/v1/auth/login', data);
   const {access_token, refresh_token} = response.data;
   await saveTokens(access_token, refresh_token);
   return response.data;
@@ -44,18 +44,18 @@ export async function refreshAccessToken(): Promise<RefreshResponse> {
   if (!refreshToken) {
     throw new Error('refresh token 없음');
   }
-  const response = await api.post('/auth/refresh', {refresh_token: refreshToken});
+  const response = await api.post('/api/v1/auth/refresh', {refresh_token: refreshToken});
   await saveAccessToken(response.data.access_token);
   return response.data;
 }
 
 export async function sendResetEmail(email: string) {
-  const response = await api.post('/auth/password/reset-email', {email});
+  const response = await api.post('/api/v1/auth/password-reset/request', {email});
   return response.data;
 }
 
 export async function resetPassword(token: string, newPassword: string) {
-  const response = await api.post('/auth/password/reset', {
+  const response = await api.post('/api/v1/auth/password-reset/confirm', {
     token,
     new_password: newPassword,
   });

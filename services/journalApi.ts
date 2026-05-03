@@ -32,7 +32,7 @@ export const uploadPhoto = async (imageUri: string) => {
     name: 'photo.jpg',
     type: 'image/jpeg',
   } as any);
-  const response = await api.post('/api/v1/photos/upload', formData, {
+  const response = await api.post('/photos/upload', formData, {
     headers: {'Content-Type': 'multipart/form-data'},
   });
   return response.data;
@@ -40,13 +40,13 @@ export const uploadPhoto = async (imageUri: string) => {
 
 export const generateJournal = async (data: GenerateJournalRequest) => {
   const response = await api.post<GenerateJournalResponse>(
-    '/api/v1/journals/generate',
+    '/api/v1/blog/generate',
     data,
   );
   return response.data;
 };
 
 export const saveJournal = async (data: SaveJournalRequest) => {
-  const response = await api.post('/api/v1/journals', data);
+  const response = await api.post('/api/v1/blogs', data);
   return response.data;
 };
