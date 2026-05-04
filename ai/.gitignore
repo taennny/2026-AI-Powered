@@ -1,0 +1,6 @@
+.env
+ai-1-gps/models/
+ai-1-gps/data/
+ai-1-gps/ai.ipynb
+__pycache__/
+*.pyc

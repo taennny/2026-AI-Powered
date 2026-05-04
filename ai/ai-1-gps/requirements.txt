@@ -1,0 +1,11 @@
+
+flask
+
+flask-restx
+
+geopy
+requests
+joblib
+pandas
+scikit-learn
+python-dotenv
