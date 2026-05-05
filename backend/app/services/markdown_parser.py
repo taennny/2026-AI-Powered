@@ -116,9 +116,6 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
 
     # 감성 모드: 사진 태그 없음, 섹션 구분 없이 단일 본문
     if style == "emotional":
-        full_body = "\n".join(
-            s.body for s in sections if s.body
-        )
         return ParsedBlog(title=title, sections=sections, raw_content=raw)
 
     total_table = "\n".join(total_table_lines).strip() or None
