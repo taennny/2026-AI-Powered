@@ -24,8 +24,12 @@ class Settings(BaseSettings):
     KAKAO_REST_API_KEY: str = ""
     KAKAO_REDIRECT_URI: str = ""
 
+    # AI Server (외부 LLM 서버 URL)
+    AI_SERVER_URL: str = ""
+
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 
 settings = Settings()

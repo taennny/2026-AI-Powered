@@ -1,8 +1,70 @@
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+# --- 블로그 생성 요청/응답 ---
+class BlogGenerateRequest(BaseModel):
+    daily_record_id: uuid.UUID
+    style: str = Field(
+        default="casual", description="블로그 스타일 (casual, emotional, info)"
+    )
+
+
+class BlogGenerateResponse(BaseModel):
+    blog_id: uuid.UUID
+    status: str
+    message: str
+
+
+# --- 블로그 상태 조회 ---
+class BlogStatusResponse(BaseModel):
+    blog_id: uuid.UUID
+    status: str
+    created_at: datetime
+
+
+# --- 블로그 조회 ---
+class BlogResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    daily_record_id: Optional[uuid.UUID] = None
+    title: str
+    content: str
+    style: str
+    target_date: date
+    generation_status: str
+    is_published: bool
+    visibility: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- 블로그 목록 조회 ---
+class BlogListResponse(BaseModel):
+    blogs: list[BlogResponse]
+    total: int
+
+
+# --- 블로그 수정 ---
+class BlogUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    visibility: Optional[str] = None
+
+
+# --- 블로그 발행 ---
+class BlogPublishResponse(BaseModel):
+    blog_id: uuid.UUID
+    is_published: bool
+    message: str
+
+
+# ── 외부 /generate 엔드포인트용 스키마 ──────────────────────────────────────────
 
 
 class ExpenseSchema(BaseModel):
@@ -33,24 +95,12 @@ class TimelineData(BaseModel):
     blocks: list[TimelineBlock]
 
 
-class BlogGenerateRequest(BaseModel):
-    user_id: uuid.UUID
-    daily_record_id: uuid.UUID | None = None
-    style: Literal["emotional", "info"]
-    timeline_data: TimelineData
-
-
-class BlogGenerateResponse(BaseModel):
-    blog_id: uuid.UUID
-    status: str
-
-
 class ParsedSection(BaseModel):
-    seq: int | None  # matches TimelineBlock.seq, None for intro/outro/table
+    seq: int | None
     heading: str | None
     body: str
     info_box: str | None = None
-    photo_tags: list[str] = Field(default_factory=list)  # ["[PHOTO:1:1]", ...]
+    photo_tags: list[str] = Field(default_factory=list)
 
 
 class ParsedBlog(BaseModel):
@@ -58,26 +108,3 @@ class ParsedBlog(BaseModel):
     sections: list[ParsedSection]
     total_expense_table: str | None = None
     raw_content: str
-
-
-class BlogStatusResponse(BaseModel):
-    blog_id: uuid.UUID
-    generation_status: str
-    title: str | None = None
-
-
-class BlogResponse(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    daily_record_id: uuid.UUID | None
-    title: str
-    content: str
-    style: str
-    target_date: date
-    generation_status: str
-    is_published: bool
-    visibility: str
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
