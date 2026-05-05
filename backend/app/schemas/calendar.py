@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel
 
-from app.schemas.blog import TimelineBlock, UserProfile
+from app.schemas.blog import TimelineBlock
 
 
 class DailyRecordResponse(BaseModel):
