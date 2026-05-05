@@ -33,7 +33,9 @@ def serialize(data: TimelineData) -> str:
 
     for block in data.blocks:
         lines.append(f"[블록 {block.seq}] {block.start}~{block.end}")
-        lines.append(f"장소: {block.place} ({block.category}) / {_format_address_short(block.address)}")
+        lines.append(
+            f"장소: {block.place} ({block.category}) / {_format_address_short(block.address)}"
+        )
         lines.append(f"소비: {_format_expense(block)}")
         lines.append(f"사진: {block.photos}장")
         if block.memo:

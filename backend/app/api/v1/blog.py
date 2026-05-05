@@ -114,7 +114,9 @@ async def update_blog(
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
     if blog.generation_status not in ("completed", "failed"):
-        raise HTTPException(status_code=409, detail="Cannot edit while generation is in progress")
+        raise HTTPException(
+            status_code=409, detail="Cannot edit while generation is in progress"
+        )
 
     if req.title is not None:
         blog.title = req.title
@@ -138,7 +140,9 @@ async def publish_blog(
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
     if blog.generation_status != "completed":
-        raise HTTPException(status_code=409, detail="Only completed blogs can be published")
+        raise HTTPException(
+            status_code=409, detail="Only completed blogs can be published"
+        )
     if blog.is_published:
         raise HTTPException(status_code=409, detail="Already published")
 

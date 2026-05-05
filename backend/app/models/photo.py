@@ -24,7 +24,9 @@ class Photo(Base):
     block_seq: Mapped[int | None] = mapped_column(Integer, nullable=True)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     stored_path: Mapped[str] = mapped_column(String(512), nullable=False)
-    mime_type: Mapped[str] = mapped_column(String(50), nullable=False, default="image/jpeg")
+    mime_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="image/jpeg"
+    )
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     taken_at: Mapped[datetime | None] = mapped_column(

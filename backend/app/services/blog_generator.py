@@ -59,7 +59,9 @@ async def _create_pending(req: BlogGenerateRequest, db: AsyncSession) -> Blog:
     return blog
 
 
-async def _update_blog(blog: Blog, title: str, content: str, status: str, db: AsyncSession) -> None:
+async def _update_blog(
+    blog: Blog, title: str, content: str, status: str, db: AsyncSession
+) -> None:
     blog.title = title
     blog.content = content
     blog.generation_status = status
@@ -70,7 +72,9 @@ def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def generate_stream(req: BlogGenerateRequest, db: AsyncSession) -> AsyncIterator[str]:
+async def generate_stream(
+    req: BlogGenerateRequest, db: AsyncSession
+) -> AsyncIterator[str]:
     blog = await _create_pending(req, db)
     yield _sse("init", {"blog_id": str(blog.id), "status": "generating"})
 
@@ -116,12 +120,15 @@ async def generate_stream(req: BlogGenerateRequest, db: AsyncSession) -> AsyncIt
             title = parsed.title
 
         await _update_blog(blog, title, accumulated, "completed", db)
-        yield _sse("done", {
-            "blog_id": str(blog.id),
-            "title": title,
-            "status": "completed",
-            "sections": len(parsed.sections),
-        })
+        yield _sse(
+            "done",
+            {
+                "blog_id": str(blog.id),
+                "title": title,
+                "status": "completed",
+                "sections": len(parsed.sections),
+            },
+        )
 
     except Exception as exc:
         await _update_blog(blog, title or "생성 실패", accumulated, "failed", db)

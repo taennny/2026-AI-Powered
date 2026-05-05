@@ -34,7 +34,9 @@ def _photo_count_for_seq(seq: int | None, blocks: list[TimelineBlock]) -> int:
     return 0
 
 
-def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "info"]) -> ParsedBlog:
+def parse(
+    raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "info"]
+) -> ParsedBlog:
     lines = raw.strip().splitlines()
 
     title = lines[0].lstrip("# ").strip() if lines else ""
@@ -54,14 +56,20 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
         if not current_body and current_heading is None:
             return
         body_text = "\n".join(current_body).strip()
-        tags = _photo_tags(current_seq, _photo_count_for_seq(current_seq, blocks)) if style == "info" else []
-        sections.append(ParsedSection(
-            seq=current_seq,
-            heading=current_heading,
-            body=body_text,
-            info_box=current_info_box,
-            photo_tags=tags,
-        ))
+        tags = (
+            _photo_tags(current_seq, _photo_count_for_seq(current_seq, blocks))
+            if style == "info"
+            else []
+        )
+        sections.append(
+            ParsedSection(
+                seq=current_seq,
+                heading=current_heading,
+                body=body_text,
+                info_box=current_info_box,
+                photo_tags=tags,
+            )
+        )
         current_heading = None
         current_seq = None
         current_body = []
@@ -75,7 +83,12 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
         if re.match(r"^##\s*총\s*지출", line):
             flush_section()
             if intro_body:
-                sections.insert(0, ParsedSection(seq=None, heading=None, body="\n".join(intro_body).strip()))
+                sections.insert(
+                    0,
+                    ParsedSection(
+                        seq=None, heading=None, body="\n".join(intro_body).strip()
+                    ),
+                )
                 intro_body = []
             in_intro = False
             in_total_table = True
@@ -88,7 +101,11 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
         section_match = _SECTION_RE.match(line)
         if section_match:
             if in_intro and intro_body:
-                sections.append(ParsedSection(seq=None, heading=None, body="\n".join(intro_body).strip()))
+                sections.append(
+                    ParsedSection(
+                        seq=None, heading=None, body="\n".join(intro_body).strip()
+                    )
+                )
                 intro_body = []
                 in_intro = False
             else:
@@ -110,7 +127,9 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
             current_body.append(line)
 
     if in_intro and intro_body:
-        sections.append(ParsedSection(seq=None, heading=None, body="\n".join(intro_body).strip()))
+        sections.append(
+            ParsedSection(seq=None, heading=None, body="\n".join(intro_body).strip())
+        )
     else:
         flush_section()
 
@@ -119,4 +138,6 @@ def parse(raw: str, blocks: list[TimelineBlock], style: Literal["emotional", "in
         return ParsedBlog(title=title, sections=sections, raw_content=raw)
 
     total_table = "\n".join(total_table_lines).strip() or None
-    return ParsedBlog(title=title, sections=sections, total_expense_table=total_table, raw_content=raw)
+    return ParsedBlog(
+        title=title, sections=sections, total_expense_table=total_table, raw_content=raw
+    )

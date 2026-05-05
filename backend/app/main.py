@@ -40,6 +40,7 @@ async def health_check():
 
 # ── 외부 서버 연동용 엔드포인트 ──────────────────────────────────────────────────
 
+
 class GenerateRequest(BaseModel):
     style: Literal["info", "emotional", "casual"] = "info"
     timeline_data: TimelineData

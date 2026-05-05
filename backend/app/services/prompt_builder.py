@@ -70,10 +70,14 @@ EMOTIONAL_USER_TEMPLATE = """{timeline}
 - 장소명은 자연스럽게 1~2회만 사용"""
 
 
-def build(style: Literal["emotional", "info", "casual"], serialized_timeline: str) -> tuple[str, str]:
+def build(
+    style: Literal["emotional", "info", "casual"], serialized_timeline: str
+) -> tuple[str, str]:
     """Returns (system_prompt, user_prompt)."""
     if style == "info":
         return INFO_SYSTEM, INFO_USER_TEMPLATE.format(timeline=serialized_timeline)
     if style == "casual":
         return CASUAL_SYSTEM, CASUAL_USER_TEMPLATE.format(timeline=serialized_timeline)
-    return EMOTIONAL_SYSTEM, EMOTIONAL_USER_TEMPLATE.format(timeline=serialized_timeline)
+    return EMOTIONAL_SYSTEM, EMOTIONAL_USER_TEMPLATE.format(
+        timeline=serialized_timeline
+    )
