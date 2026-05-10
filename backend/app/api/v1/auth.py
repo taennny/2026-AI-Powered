@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user import User
+from app.utils.dependencies import get_current_user
 
 from app.database import get_db
 from app.schemas.auth import (
@@ -93,3 +95,8 @@ async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_
         return KakaoLoginResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+@router.get("/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    """현재 로그인한 유저 정보 조회"""
+    return {"email": current_user.email}
