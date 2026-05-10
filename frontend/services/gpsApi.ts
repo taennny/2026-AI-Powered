@@ -1,8 +1,10 @@
 import {api} from '@/utils/api';
 
 export type GpsLog = {
-  latitude: number;
-  longitude: number;
+  lat: number;
+  lng: number;
+  accuracy: number;
+  speed: number;
   timestamp: number;
 };
 

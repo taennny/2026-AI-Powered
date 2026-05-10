@@ -9,8 +9,10 @@ TaskManager.defineTask(GPS_TASK_NAME, async ({data, error}: TaskManager.TaskMana
   if (error || !data) return;
   const {locations} = data as {locations: Location.LocationObject[]};
   const logs = locations.map(loc => ({
-    latitude: loc.coords.latitude,
-    longitude: loc.coords.longitude,
+    lat: loc.coords.latitude,
+    lng: loc.coords.longitude,
+    accuracy: loc.coords.accuracy ?? 0,
+    speed: loc.coords.speed ?? 0,
     timestamp: loc.timestamp,
   }));
   await uploadGpsLogs(logs).catch(() => {});
