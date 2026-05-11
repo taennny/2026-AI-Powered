@@ -12,6 +12,8 @@ import {useTimelineStore} from '@/store/timelineStore';
 
 export default function HomeFooter() {
   const totalDistance = useTimelineStore(s => s.totalDistance);
+  const placesCount = useTimelineStore(s => s.placesCount);
+  const hasTimeline = placesCount > 0;
 
   return (
     <SafeAreaView edges={['bottom']} className="bg-surface">
@@ -22,7 +24,8 @@ export default function HomeFooter() {
         </View>
         <TouchableOpacity
           onPress={() => router.push('/(main)/write')}
-          className="bg-primary px-5 py-[10px] rounded-[20px]"
+          disabled={!hasTimeline}
+          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-primary' : 'bg-muted'}`}
         >
           <Text className="text-white text-[13px] font-semibold tracking-[0.5px]">글쓰기</Text>
         </TouchableOpacity>

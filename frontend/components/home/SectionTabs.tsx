@@ -16,15 +16,28 @@ const INACTIVE_FLEX = 48;
 export default function SectionTabs() {
   const pathname = usePathname();
   const activeTab: Tab = pathname.includes('journal') ? 'journal' : 'home';
-  const homeFlex = useRef(new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX)).current;
+  const homeFlex = useRef(
+    new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX),
+  ).current;
+  const journalFlex = useRef(
+    new Animated.Value(activeTab === 'journal' ? ACTIVE_FLEX : INACTIVE_FLEX),
+  ).current;
 
   useEffect(() => {
-    Animated.spring(homeFlex, {
-      toValue: activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX,
-      useNativeDriver: false,
-      tension: 38,
-      friction: 14,
-    }).start();
+    Animated.parallel([
+      Animated.spring(homeFlex, {
+        toValue: activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX,
+        useNativeDriver: false,
+        tension: 38,
+        friction: 14,
+      }),
+      Animated.spring(journalFlex, {
+        toValue: activeTab === 'journal' ? ACTIVE_FLEX : INACTIVE_FLEX,
+        useNativeDriver: false,
+        tension: 38,
+        friction: 14,
+      }),
+    ]).start();
   }, [activeTab]);
 
   const handleTabPress = (tab: Tab) => {
@@ -36,21 +49,19 @@ export default function SectionTabs() {
     }
   };
 
-  const journalFlex = homeFlex.interpolate({
-    inputRange: [INACTIVE_FLEX, ACTIVE_FLEX],
-    outputRange: [ACTIVE_FLEX, INACTIVE_FLEX],
-  });
-
   return (
     <View className="bg-surface flex-row pt-2">
-      <Animated.View style={{flex: homeFlex, zIndex: activeTab === 'home' ? 1 : 0}}>
+      <Animated.View
+        style={{flex: homeFlex, zIndex: activeTab === 'home' ? 1 : 0}}
+      >
         <TouchableOpacity
           onPress={() => handleTabPress('home')}
           className="items-center bg-white rounded-tl-[10px] rounded-tr-[10px] py-2"
           style={{
-            boxShadow: activeTab === 'home'
-              ? '3px -2px 6px rgba(0,0,0,0.09)'
-              : '0 -1px 4px rgba(0,0,0,0.05)',
+            boxShadow:
+              activeTab === 'home'
+                ? '3px -2px 6px rgba(0,0,0,0.09)'
+                : '0 -1px 4px rgba(0,0,0,0.05)',
           }}
         >
           <Text
@@ -59,14 +70,17 @@ export default function SectionTabs() {
         </TouchableOpacity>
       </Animated.View>
 
-      <Animated.View style={{flex: journalFlex, zIndex: activeTab === 'journal' ? 1 : 0}}>
+      <Animated.View
+        style={{flex: journalFlex, zIndex: activeTab === 'journal' ? 1 : 0}}
+      >
         <TouchableOpacity
           onPress={() => handleTabPress('journal')}
           className="items-center bg-teal rounded-tl-[10px] rounded-tr-[10px] py-2"
           style={{
-            boxShadow: activeTab === 'journal'
-              ? '-3px -2px 6px rgba(0,0,0,0.09)'
-              : '0 -1px 4px rgba(0,0,0,0.05)',
+            boxShadow:
+              activeTab === 'journal'
+                ? '-3px -2px 6px rgba(0,0,0,0.09)'
+                : '0 -1px 4px rgba(0,0,0,0.05)',
           }}
         >
           <Text
