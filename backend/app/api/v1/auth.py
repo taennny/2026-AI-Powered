@@ -96,6 +96,7 @@ async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+
 @router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     """현재 로그인한 유저 정보 조회"""
