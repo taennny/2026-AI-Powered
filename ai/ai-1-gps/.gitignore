@@ -1,0 +1,6 @@
+models/
+data/
+*.pkl
+ai.ipynb
+__pycache__/
+.env
