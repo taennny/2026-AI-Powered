@@ -9,9 +9,14 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-roame1234}
       POSTGRES_DB: ${DB_NAME:-roame}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - roame-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-roame} -d ${DB_NAME:-roame}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   minio:
     image: minio/minio:latest
     container_name: roame-minio
@@ -34,13 +39,17 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin123}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
     ports:
       - "8000:8000"
     volumes:
       - ./app:/code/app
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
 
 volumes:
   roame-db-data:

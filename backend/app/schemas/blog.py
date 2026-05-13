@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class BlogGenerateRequest(BaseModel):
     daily_record_id: uuid.UUID
     style: str = Field(
-        default="casual", description="블로그 스타일 (casual, formal, travel)"
+        default="casual", description="블로그 스타일 (casual, emotional, info)"
     )
 
 
@@ -62,3 +62,49 @@ class BlogPublishResponse(BaseModel):
     blog_id: uuid.UUID
     is_published: bool
     message: str
+
+
+# ── 외부 /generate 엔드포인트용 스키마 ──────────────────────────────────────────
+
+
+class ExpenseSchema(BaseModel):
+    amount: int
+    item: str
+
+
+class TimelineBlock(BaseModel):
+    seq: int
+    start: str
+    end: str
+    place: str
+    category: str
+    address: str
+    expense: ExpenseSchema | None = None
+    photos: int = 0
+    memo: str | None = None
+
+
+class UserProfile(BaseModel):
+    nickname: str
+    taste_tags: list[str] = Field(default_factory=list)
+
+
+class TimelineData(BaseModel):
+    date: str  # "YYYY-MM-DD"
+    user: UserProfile
+    blocks: list[TimelineBlock]
+
+
+class ParsedSection(BaseModel):
+    seq: int | None
+    heading: str | None
+    body: str
+    info_box: str | None = None
+    photo_tags: list[str] = Field(default_factory=list)
+
+
+class ParsedBlog(BaseModel):
+    title: str
+    sections: list[ParsedSection]
+    total_expense_table: str | None = None
+    raw_content: str

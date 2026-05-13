@@ -19,5 +19,10 @@ async def get_db():
 
 async def init_db():
     """DB 테이블 생성"""
+    import app.models.blog  # noqa: F401
+    import app.models.daily_record  # noqa: F401
+    import app.models.photo  # noqa: F401
+    import app.models.user  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
