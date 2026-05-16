@@ -1,11 +1,9 @@
-/** @file app/(main)/settings/subscription/index.tsx — 구독 설정 화면 (플랜 조회 + Premium/Free 분기) */
-
 import {useEffect, useState} from 'react';
-import {View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {Alert, View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
-import {fetchSubscription, type SubscriptionStatus} from '@/services/subscriptionApi';
+import {fetchSubscription, subscribePremium, type SubscriptionStatus} from '@/services/subscriptionApi';
 import PremiumView from '@/components/subscription/PremiumView';
 import FreeView from '@/components/subscription/FreeView';
 
@@ -27,6 +25,36 @@ export default function SubscriptionScreen() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const handleSubscribe = () => {
+    Alert.alert(
+      '프리미엄 구독',
+      '로미 프리미엄을 시작할까요?',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '확인',
+          onPress: async () => {
+            try {
+              await subscribePremium();
+              Alert.alert('', '결제가 완료되었습니다.', [
+                {
+                  text: '확인',
+                  onPress: () => {
+                    setSubscription(prev =>
+                      prev ? {...prev, plan: 'premium', is_active: true} : prev,
+                    );
+                  },
+                },
+              ]);
+            } catch {
+              Alert.alert('오류', '구독 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const isPremium = subscription?.plan === 'premium' && subscription?.is_active;
 
@@ -63,7 +91,7 @@ export default function SubscriptionScreen() {
       ) : isPremium && subscription ? (
         <PremiumView subscription={subscription} />
       ) : (
-        <FreeView />
+        <FreeView onSubscribe={handleSubscribe} />
       )}
 
     </SafeAreaView>

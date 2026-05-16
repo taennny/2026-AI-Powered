@@ -1,10 +1,3 @@
-/**
- * @file components/subscription/FreeView.tsx — 구독 화면 베이직(무료) 사용자 뷰
- *
- * ## 다음 연결 작업
- * - [ ] 로미 프리미엄 시작하기 버튼 → 결제 플로우 연결
- */
-
 import {useState} from 'react';
 import {View, Text, TouchableOpacity} from 'react-native';
 
@@ -17,7 +10,11 @@ const PLANS: {id: BillingCycle; label: string}[] = [
 
 const BENEFITS = ['테마 적용 가능', '광고 안 보기', '글쓰기 무한'];
 
-export default function FreeView() {
+type Props = {
+  onSubscribe: () => void;
+};
+
+export default function FreeView({onSubscribe}: Props) {
   const [selected, setSelected] = useState<BillingCycle>('monthly');
 
   return (
@@ -61,7 +58,7 @@ export default function FreeView() {
       </View>
 
       {/* 구독 버튼 */}
-      <TouchableOpacity activeOpacity={0.85} className="bg-primary rounded-[28px] py-4 items-center">
+      <TouchableOpacity activeOpacity={0.85} onPress={onSubscribe} className="bg-primary rounded-[28px] py-4 items-center">
         <Text className="text-[15px] font-bold text-white">로미 프리미엄 시작하기</Text>
       </TouchableOpacity>
     </View>

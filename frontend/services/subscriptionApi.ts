@@ -17,3 +17,7 @@ export async function fetchSubscription(): Promise<SubscriptionStatus> {
   const {data} = await api.get<SubscriptionStatus>('/api/v1/subscriptions/me');
   return data;
 }
+
+export async function subscribePremium(): Promise<void> {
+  await api.put('/api/v1/subscriptions/me', {plan_type: 'premium'});
+}
