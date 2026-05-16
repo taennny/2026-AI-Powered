@@ -71,3 +71,7 @@ export async function fetchMe(): Promise<UserMe> {
   const response = await api.get('/api/v1/auth/me');
   return response.data;
 }
+
+export async function deleteAccount(): Promise<void> {
+  await api.delete('/api/v1/auth/me');
+}

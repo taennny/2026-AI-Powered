@@ -1,11 +1,11 @@
 import {useEffect, useState} from 'react';
-import {View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {Alert, View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
 import {useAuthStore} from '@/store/authStore';
-import {fetchMe, type UserMe} from '@/services/authApi';
+import {fetchMe, deleteAccount, type UserMe} from '@/services/authApi';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
@@ -25,7 +25,26 @@ export default function AccountScreen() {
   };
 
   const handleDeleteAccount = () => {
-    // TODO: 확인 모달 + 회원탈퇴 API
+    Alert.alert(
+      '회원탈퇴',
+      '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '탈퇴',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAccount();
+              await logout();
+              router.replace('/(auth)/login');
+            } catch {
+              Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleKakaoLink = async () => {
