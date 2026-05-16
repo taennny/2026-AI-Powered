@@ -61,3 +61,13 @@ export async function resetPassword(token: string, newPassword: string) {
   });
   return response.data;
 }
+
+export interface UserMe {
+  email: string;
+  is_kakao_linked: boolean;
+}
+
+export async function fetchMe(): Promise<UserMe> {
+  const response = await api.get('/api/v1/auth/me');
+  return response.data;
+}
