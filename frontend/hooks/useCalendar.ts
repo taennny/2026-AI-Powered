@@ -23,7 +23,7 @@ export function useCalendar() {
   });
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [places, setPlaces] = useState<TimelinePlace[]>([]);
-  const setTotalDistance = useTimelineStore(s => s.setTotalDistance);
+  const setTimeline = useTimelineStore(s => s.setTimeline);
 
   // 월 이동 시 캘린더 데이터 fetch
   useEffect(() => {
@@ -37,11 +37,11 @@ export function useCalendar() {
     fetchTimeline(toDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
-        setTotalDistance(data.total_distance);
+        setTimeline(data.total_distance, data.places.length);
       })
       .catch(() => {
         setPlaces([]);
-        setTotalDistance(0);
+        setTimeline(0, 0);
       });
   }, [selectedDate]);
 
