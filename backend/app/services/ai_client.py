@@ -12,14 +12,14 @@ RETRY_DELAYS = [1, 3, 5]  # 초 단위 대기 (1s → 3s → 5s)
 TIMEOUT_SECONDS = 60.0  # GPT-4o 블로그 생성 고려
 
 
-async def request_blog_generation(daily_record_data: dict, style: str) -> dict:
+async def request_blog_generation(timeline_data: dict, style: str) -> dict:
     """AI 서버에 블로그 생성 요청.
 
     AI 서버 URL이 설정되어 있으면 실제 호출 (최대 3회 재시도),
     없으면 Mock 응답 반환.
     """
     if not settings.AI_SERVER_URL:
-        return _mock_response(daily_record_data, style)
+        return _mock_response(style)
 
     last_exception = None
 
@@ -29,7 +29,7 @@ async def request_blog_generation(daily_record_data: dict, style: str) -> dict:
                 response = await client.post(
                     f"{settings.AI_SERVER_URL}/generate",
                     json={
-                        "daily_record": daily_record_data,
+                        "timeline_data": timeline_data,
                         "style": style,
                     },
                 )
@@ -75,7 +75,7 @@ async def request_blog_generation(daily_record_data: dict, style: str) -> dict:
     raise last_exception  # type: ignore[misc]
 
 
-def _mock_response(daily_record_data: dict, style: str) -> dict:
+def _mock_response(style: str) -> dict:
     """AI 서버가 준비되기 전까지 사용할 Mock 응답"""
     return {
         "title": f"[Mock] {style} 스타일 블로그",

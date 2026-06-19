@@ -3,14 +3,46 @@ import logging
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.database import async_session
 from app.models.blog import Blog
 from app.models.daily_record import DailyRecord
 from app.models.enums import GenerationStatus
+from app.models.place import Place
+from app.models.user import User
 from app.services.ai_client import request_blog_generation
+from app.services.timeline_serializer import build_timeline_data, map_style
 
 logger = logging.getLogger(__name__)
+
+
+async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
+    """블로그의 하루 기록 + 유저 + 장소들을 timeline_data로 직렬화."""
+    daily_record = (
+        await db.execute(
+            select(DailyRecord).where(DailyRecord.id == blog.daily_record_id)
+        )
+    ).scalar_one_or_none()
+    if daily_record is None:
+        raise ValueError("하루 기록을 찾을 수 없습니다")
+
+    user = (await db.execute(select(User).where(User.id == blog.user_id))).scalar_one()
+
+    places = list(
+        (
+            await db.execute(
+                select(Place)
+                .where(Place.daily_record_id == blog.daily_record_id)
+                .order_by(Place.arrived_at)
+                .options(defer(Place.location))  # 블로그 생성엔 좌표 불필요
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    return build_timeline_data(daily_record, user, places)
 
 
 async def create_blog_generation(
@@ -54,12 +86,10 @@ async def run_blog_generation(blog_id: uuid.UUID) -> None:
         await db.commit()
 
         try:
+            timeline_data = await _build_timeline_for_blog(db, blog)
             ai_result = await request_blog_generation(
-                daily_record_data={
-                    "daily_record_id": str(blog.daily_record_id),
-                    "target_date": str(blog.target_date),
-                },
-                style=blog.style,
+                timeline_data=timeline_data,
+                style=map_style(blog.style),
             )
 
             blog.title = ai_result.get("title", "제목 없음")
