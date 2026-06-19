@@ -8,7 +8,7 @@
 | 모듈 | 메서드 | 경로               | 설명                             | 상태             |
 | ---- | ------ | ------------------ | -------------------------------- | ---------------- |
 | AI-1 | POST   | `/api/ai/analyze`  | GPS 체류 감지 + 카카오 장소 매칭 | ✅ baseline      |
-| AI-2 | POST   | `/api/ai/classify` | 사진 블록 매칭 + CLIP 분류       | ✅ 매칭 / CLIP 2b 예정 |
+| AI-2 | POST   | `/api/ai/classify` | 사진 블록 매칭 + CLIP 분류       | ✅ 매칭 + CLIP    |
 | AI-3 | POST   | `/generate`        | GPT 블로그 생성                  | ✅               |
 | -    | GET    | `/health`          | 헬스 체크                        | ✅               |
 | -    | GET    | `/swagger`         | Swagger UI                       | ✅               |
@@ -33,9 +33,12 @@
 { "photos": [ { "photo_id": "uuid", "taken_at": "2026-06-19T10:15:00Z",
                 "lat": 37.5, "lng": 127.0, "photo_url": "https://.../presigned" } ],
   "stays":  [ { "seq": 1, "start": "2026-06-19T10:00:00Z", "end": "2026-06-19T10:40:00Z" } ] }
-// 응답 — 사진별 블록 매칭 + 블록별 집계 (scene/confidence 는 CLIP 2b 에서 채움)
-{ "photos": [ { "photo_id": "uuid", "stay_seq": 1, "scene": null, "confidence": null } ],
-  "stay_photo_summary": [ { "stay_seq": 1, "photo_count": 2, "top_scenes": [] } ] }
+// 응답 — 사진별 블록 매칭 + CLIP 분류 + 블록별 집계(대표 scene·대표 사진)
+{ "photos": [ { "photo_id": "uuid", "stay_seq": 1, "scene": "디저트/카페", "confidence": 0.94 } ],
+  "stay_photo_summary": [ { "stay_seq": 1, "photo_count": 2,
+                            "top_scenes": ["디저트/카페"], "cover_photo_id": "uuid" } ] }
+// scene 종류: 음식/디저트·카페/음료/풍경·야외/인물/실내·공간/상품·쇼핑/동물/야경·거리/문서·스크린샷
+// 문서·스크린샷(잡사진)은 top_scenes·cover 선정에서 제외. photo_url 없거나 torch 미설치 시 scene=null(매칭만).
 ```
 
 ### POST /generate
@@ -70,5 +73,5 @@ python app.py          # http://localhost:5000/swagger
 
 - **1단계 (완료)**: 통합 서버 골격 + 백엔드 계약 정합 (analyze / generate)
 - **2a단계 (완료)**: 사진 → 체류 블록 시간기반 매칭 + 블록별 개수 집계 (`/api/ai/classify`)
-- **2b단계**: CLIP 제로샷 분류로 scene/confidence 채움 + 잡사진 필터링 + 대표 사진 선정
+- **2b단계 (완료)**: CLIP 제로샷 분류로 scene/confidence 채움 + 잡사진 필터링 + 블록 대표 사진(cover) 선정
 - **3단계**: AI-1 체류 감지를 Isolation Forest + RandomForest 모델로 고도화

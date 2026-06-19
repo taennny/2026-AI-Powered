@@ -12,21 +12,27 @@
   응답:  {
     "photos": [ { "photo_id": str, "stay_seq": int | null,
                   "scene": str | null, "confidence": float | null } ],
-    "stay_photo_summary": [ { "stay_seq": int, "photo_count": int, "top_scenes": [str] } ]
+    "stay_photo_summary": [ { "stay_seq": int, "photo_count": int,
+                              "top_scenes": [str], "cover_photo_id": str | null } ]
   }
 
 구현 단계
-  - 2a (현재): taken_at 기반 사진 → 체류 블록 매칭, 블록별 사진 개수 집계.
-               EXIF(시간·위치)는 백엔드가 이미 추출하므로 그대로 받아 사용한다.
-  - 2b (예정): photo_url 로 이미지를 받아 CLIP 제로샷 분류 → scene/confidence 채움,
-               잡사진(스크린샷·문서) 필터링 및 블록 대표 사진 선정.
+  - 2a: taken_at 기반 사진 → 체류 블록 매칭, 블록별 개수 집계.
+  - 2b (현재): photo_url 로 이미지를 받아 CLIP 제로샷 분류 → scene/confidence 채움,
+               잡사진(스크린샷·문서) 필터링 + 블록 대표 사진(cover) 선정.
+  EXIF(시간·위치)는 백엔드가 이미 추출하므로 그대로 받아 사용한다.
+  torch/transformers 미설치 시 분류는 건너뛰고 매칭만 동작한다 (graceful).
 """
 
 import logging
+from collections import Counter
 from datetime import datetime, timezone
 
+import requests
 from flask import request
 from flask_restx import Namespace, Resource, fields
+
+from modules import clip_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +41,8 @@ ns = Namespace(
     path="/api/ai",
     description="사진 블록 매칭 + CLIP 분류 (AI-2)",
 )
+
+IMAGE_DOWNLOAD_TIMEOUT = 10  # 초
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -50,19 +58,16 @@ def _parse_dt(value: str | None) -> datetime | None:
     return dt
 
 
-def match_photos_to_stays(photos: list, stays: list) -> tuple[list, list]:
+def match_photos_to_stays(photos: list, stays: list) -> list:
     """사진을 촬영 시각 기준으로 체류 블록에 매칭한다.
 
-    반환: (per_photo, summary)
-      per_photo: [ { photo_id, stay_seq, scene, confidence } ]
-      summary:   [ { stay_seq, photo_count, top_scenes } ]
+    반환: [ { photo_id, stay_seq, scene, confidence } ] (scene/confidence 는 분류 전 None)
     """
     parsed_stays = [
         (s.get("seq"), _parse_dt(s.get("start")), _parse_dt(s.get("end"))) for s in stays
     ]
 
     per_photo = []
-    counts: dict = {}
     for photo in photos:
         taken_at = _parse_dt(photo.get("taken_at"))
         stay_seq = None
@@ -75,18 +80,93 @@ def match_photos_to_stays(photos: list, stays: list) -> tuple[list, list]:
             {
                 "photo_id": photo.get("photo_id"),
                 "stay_seq": stay_seq,
-                "scene": None,  # 2b CLIP 에서 채움
+                "scene": None,
                 "confidence": None,
             }
         )
-        if stay_seq is not None:
-            counts[stay_seq] = counts.get(stay_seq, 0) + 1
+    return per_photo
 
-    summary = [
-        {"stay_seq": s.get("seq"), "photo_count": counts.get(s.get("seq"), 0), "top_scenes": []}
-        for s in stays
-    ]
-    return per_photo, summary
+
+def _download_image(url: str):
+    """URL 에서 이미지를 받아 RGB PIL 이미지로 반환한다. 실패 시 None."""
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        res = requests.get(url, timeout=IMAGE_DOWNLOAD_TIMEOUT)
+        res.raise_for_status()
+        return Image.open(BytesIO(res.content)).convert("RGB")
+    except Exception as e:
+        logger.warning("이미지 다운로드 실패 (%s): %s", url, e)
+        return None
+
+
+def classify_photos(photos: list, per_photo: list) -> None:
+    """photo_url 이 있는 사진을 CLIP 으로 분류해 per_photo 의 scene/confidence 를 채운다.
+
+    CLIP 미사용 가능(미설치/이미지 없음) 시 조용히 건너뛴다 (per_photo 그대로).
+    """
+    if not clip_classifier.is_available():
+        logger.info("CLIP 미설치 — 분류 건너뜀 (매칭만 수행)")
+        return
+
+    images, ids = [], []
+    for photo in photos:
+        url = photo.get("photo_url")
+        if not url:
+            continue
+        img = _download_image(url)
+        if img is not None:
+            images.append(img)
+            ids.append(photo.get("photo_id"))
+
+    if not images:
+        return
+
+    try:
+        results = clip_classifier.classify(images)
+    except Exception as e:
+        logger.error("CLIP 분류 실패: %s", e)
+        return
+
+    scene_map = {pid: res for pid, res in zip(ids, results)}
+    for pp in per_photo:
+        if pp["photo_id"] in scene_map:
+            pp["scene"], pp["confidence"] = scene_map[pp["photo_id"]]
+
+
+def build_stay_summary(stays: list, per_photo: list) -> list:
+    """블록별로 사진 개수 · 대표 scene · 대표 사진(cover)을 집계한다."""
+    by_stay: dict = {}
+    for pp in per_photo:
+        by_stay.setdefault(pp["stay_seq"], []).append(pp)
+
+    summary = []
+    for stay in stays:
+        seq = stay.get("seq")
+        items = by_stay.get(seq, [])
+        # 잡사진(문서·스크린샷)은 대표 scene/cover 에서 제외
+        content = [
+            p
+            for p in items
+            if p["scene"] and p["scene"] not in clip_classifier.JUNK_SCENES
+        ]
+        top_scenes = [s for s, _ in Counter(p["scene"] for p in content).most_common(2)]
+        cover_photo_id = (
+            max(content, key=lambda p: p["confidence"] or 0)["photo_id"]
+            if content
+            else None
+        )
+        summary.append(
+            {
+                "stay_seq": seq,
+                "photo_count": len(items),
+                "top_scenes": top_scenes,
+                "cover_photo_id": cover_photo_id,
+            }
+        )
+    return summary
 
 
 # ──────────────────────────────────────────
@@ -99,7 +179,7 @@ photo_model = ns.model(
         "taken_at": fields.String(description="촬영 시각 (ISO 8601, 백엔드 EXIF)"),
         "lat": fields.Float(description="촬영 위도"),
         "lng": fields.Float(description="촬영 경도"),
-        "photo_url": fields.String(description="이미지 접근 URL (2b CLIP용)"),
+        "photo_url": fields.String(description="이미지 접근 URL (CLIP 분류용)"),
     },
 )
 
@@ -136,6 +216,7 @@ stay_summary_model = ns.model(
         "stay_seq": fields.Integer,
         "photo_count": fields.Integer,
         "top_scenes": fields.List(fields.String),
+        "cover_photo_id": fields.String,
     },
 )
 
@@ -155,7 +236,7 @@ class Classify(Resource):
     @ns.response(400, "잘못된 요청")
     @ns.response(500, "서버 오류")
     def post(self):
-        """사진을 체류 블록에 매칭하고 블록별 사진 개수를 집계한다. (2b: CLIP 분류 추가 예정)"""
+        """사진을 체류 블록에 매칭하고 CLIP 으로 분류한다."""
         try:
             data = request.json or {}
             photos = data.get("photos", [])
@@ -164,12 +245,16 @@ class Classify(Resource):
             if not isinstance(photos, list) or not isinstance(stays, list):
                 return {"error": "photos, stays는 리스트여야 합니다."}, 400
 
-            per_photo, summary = match_photos_to_stays(photos, stays)
+            per_photo = match_photos_to_stays(photos, stays)
+            classify_photos(photos, per_photo)
+            summary = build_stay_summary(stays, per_photo)
 
-            matched = sum(1 for p in per_photo if p["stay_seq"] is not None)
-            logger.info("사진 매칭 완료 | 총 %d장 중 %d장 블록 매칭", len(photos), matched)
+            classified = sum(1 for p in per_photo if p["scene"] is not None)
+            logger.info(
+                "사진 처리 완료 | 총 %d장, 분류 %d장", len(photos), classified
+            )
             return {"photos": per_photo, "stay_photo_summary": summary}, 200
 
         except Exception as e:
-            logger.error("사진 매칭 오류: %s", e)
+            logger.error("사진 처리 오류: %s", e)
             return {"error": str(e)}, 500
