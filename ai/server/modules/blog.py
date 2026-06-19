@@ -3,8 +3,12 @@
 엔드포인트: POST /generate
 
 백엔드 연동 계약 (backend/app/services/ai_client.py 기준)
-  요청:  { "daily_record": { ... }, "style": "casual" | "emotional" | "info" }
+  요청:  { "daily_record": { ... }, "style": "casual" | "emotional" | "info",
+           "user_note": str | null (선택) }
   응답:  { "title": str, "content": str }
+
+user_note: 사용자가 글쓰기 화면에서 직접 입력한 메모(단어~몇 문장).
+  값이 있으면 생성 프롬프트에 자연스럽게 반영하고, 없으면 타임라인만으로 생성한다.
 
 daily_record 표준 형식 (백엔드가 places + photos 를 조립해 전달해야 함):
   {
@@ -91,11 +95,30 @@ def serialize(data: dict) -> str:
     return "\n".join(lines).rstrip()
 
 
+USER_NOTE_MAX_LEN = 1000  # 과도한 입력 방지 (초과분은 잘림)
+
+
+def compose_user_prompt(daily_record: dict, style: str, user_note: str = "") -> str:
+    """타임라인 직렬화 + (선택) 사용자 메모를 합쳐 LLM user 프롬프트를 만든다."""
+    _, user_template = PROMPTS[style]
+    user_prompt = user_template.format(timeline=serialize(daily_record))
+    note = (user_note or "").strip()[:USER_NOTE_MAX_LEN]
+    if note:
+        user_prompt += (
+            "\n\n[작성자 메모] 아래 내용을 글에 자연스럽게 반영하세요. "
+            "단, 메모에 없는 사실을 지어내지는 마세요:\n" + note
+        )
+    return user_prompt
+
+
 generate_input = ns.model(
     "GenerateInput",
     {
         "style": fields.String(required=True, description="casual / emotional / info"),
         "daily_record": fields.Raw(required=True, description="하루 기록 (date/user/blocks)"),
+        "user_note": fields.String(
+            required=False, description="사용자 입력 메모 (선택). 있으면 생성에 반영"
+        ),
     },
 )
 
@@ -117,6 +140,7 @@ class Generate(Resource):
             data = request.json or {}
             style = data.get("style", "casual")
             daily_record = data.get("daily_record")
+            user_note = data.get("user_note")  # 선택 필드
 
             if not daily_record:
                 return {"error": "daily_record가 없습니다."}, 400
@@ -127,9 +151,8 @@ class Generate(Resource):
             if not settings.OPENAI_API_KEY:
                 return {"error": "OPENAI_API_KEY가 설정되지 않았습니다."}, 500
 
-            serialized = serialize(daily_record)
-            system_prompt, user_template = PROMPTS[style]
-            user_prompt = user_template.format(timeline=serialized)
+            system_prompt, _ = PROMPTS[style]
+            user_prompt = compose_user_prompt(daily_record, style, user_note)
 
             response = _get_client().chat.completions.create(
                 model=settings.OPENAI_MODEL,
