@@ -142,3 +142,30 @@ async def test_get_nonexistent_blog(client):
     fake_id = str(uuid.uuid4())
     res = await client.get(f"/api/v1/blog/{fake_id}")
     assert res.status_code == 404
+
+
+# ============================================================
+# 6. user_note / 필드 별칭 / 스타일 매핑
+# ============================================================
+
+
+async def test_generate_forwards_user_note_and_aliases(client, daily_record_id):
+    """프론트가 prompt/writingStyle로 보내도 user_note·style로 받아 AI까지 전달"""
+    from unittest.mock import AsyncMock, patch
+
+    fake = AsyncMock(return_value={"title": "t", "content": "c"})
+    with patch("app.services.blog.request_blog_generation", fake):
+        res = await client.post(
+            "/api/v1/blog/generate",
+            json={
+                "daily_record_id": str(daily_record_id),
+                "writingStyle": "emotion",  # → style 별칭 → AI 어휘 emotional
+                "prompt": "오랜만에 친구 만난 날",  # → user_note 별칭
+            },
+        )
+    assert res.status_code == 202
+
+    # BackgroundTask가 ASGITransport에서 실행되며 AI 호출됨
+    fake.assert_awaited_once()
+    assert fake.call_args.kwargs["user_note"] == "오랜만에 친구 만난 날"
+    assert fake.call_args.kwargs["style"] == "emotional"
