@@ -45,9 +45,23 @@ class BlogResponse(BaseModel):
 
 
 # --- 블로그 목록 조회 ---
+class BlogListItem(BaseModel):
+    id: uuid.UUID
+    date: date
+    title: str
+    summary: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    is_published: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class BlogListResponse(BaseModel):
-    blogs: list[BlogResponse]
     total: int
+    page: int
+    size: int
+    blogs: list[BlogListItem]
 
 
 # --- 블로그 수정 ---

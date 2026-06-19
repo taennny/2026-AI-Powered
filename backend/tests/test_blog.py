@@ -122,6 +122,37 @@ async def test_blog_list(client, daily_record_id):
     assert len(res.json()["blogs"]) == 1
 
 
+async def test_blog_list_pagination_and_fields(client, daily_record_id):
+    """목록 응답이 page/size + 카드 필드(date/summary)를 포함하는지 확인"""
+    await client.post(
+        "/api/v1/blog/generate",
+        json={"daily_record_id": str(daily_record_id), "style": "casual"},
+    )
+
+    res = await client.get("/api/v1/blogs", params={"page": 1, "size": 5})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["page"] == 1
+    assert body["size"] == 5
+
+    item = body["blogs"][0]
+    assert "date" in item
+    assert "summary" in item
+    assert "thumbnail_url" in item
+
+
+async def test_blog_list_search(client, daily_record_id):
+    """키워드 검색 — 매칭 없는 키워드는 빈 목록"""
+    await client.post(
+        "/api/v1/blog/generate",
+        json={"daily_record_id": str(daily_record_id), "style": "casual"},
+    )
+
+    res = await client.get("/api/v1/blogs", params={"q": "존재하지않는키워드ZZZ"})
+    assert res.status_code == 200
+    assert res.json()["total"] == 0
+
+
 # ============================================================
 # 5. 에러 케이스
 # ============================================================
