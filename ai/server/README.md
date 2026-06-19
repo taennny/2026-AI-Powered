@@ -8,7 +8,7 @@
 | 모듈 | 메서드 | 경로               | 설명                             | 상태             |
 | ---- | ------ | ------------------ | -------------------------------- | ---------------- |
 | AI-1 | POST   | `/api/ai/analyze`  | GPS 체류 감지 + 카카오 장소 매칭 | ✅ baseline      |
-| AI-2 | POST   | `/api/ai/classify` | CLIP 사진 분류                   | 2단계 예정 (501) |
+| AI-2 | POST   | `/api/ai/classify` | 사진 블록 매칭 + CLIP 분류       | ✅ 매칭 / CLIP 2b 예정 |
 | AI-3 | POST   | `/generate`        | GPT 블로그 생성                  | ✅               |
 | -    | GET    | `/health`          | 헬스 체크                        | ✅               |
 | -    | GET    | `/swagger`         | Swagger UI                       | ✅               |
@@ -24,6 +24,18 @@
 { "stays": [ { "place_name": "스타벅스", "category": "음식점 > 카페",
                "start": "2026-06-19T10:00:00", "end": "2026-06-19T10:40:00",
                "duration_min": 40, "lat": 37.5, "lng": 127.0 } ] }
+```
+
+### POST /api/ai/classify
+
+```jsonc
+// 요청 — 사진(EXIF는 백엔드가 추출)과 체류 블록을 넘김
+{ "photos": [ { "photo_id": "uuid", "taken_at": "2026-06-19T10:15:00Z",
+                "lat": 37.5, "lng": 127.0, "photo_url": "https://.../presigned" } ],
+  "stays":  [ { "seq": 1, "start": "2026-06-19T10:00:00Z", "end": "2026-06-19T10:40:00Z" } ] }
+// 응답 — 사진별 블록 매칭 + 블록별 집계 (scene/confidence 는 CLIP 2b 에서 채움)
+{ "photos": [ { "photo_id": "uuid", "stay_seq": 1, "scene": null, "confidence": null } ],
+  "stay_photo_summary": [ { "stay_seq": 1, "photo_count": 2, "top_scenes": [] } ] }
 ```
 
 ### POST /generate
@@ -57,5 +69,6 @@ python app.py          # http://localhost:5000/swagger
 ## 단계별 개발 계획
 
 - **1단계 (완료)**: 통합 서버 골격 + 백엔드 계약 정합 (analyze / generate)
-- **2단계**: AI-2 CLIP 사진 분류 구현 + EXIF 매칭 → blocks 채우기
+- **2a단계 (완료)**: 사진 → 체류 블록 시간기반 매칭 + 블록별 개수 집계 (`/api/ai/classify`)
+- **2b단계**: CLIP 제로샷 분류로 scene/confidence 채움 + 잡사진 필터링 + 대표 사진 선정
 - **3단계**: AI-1 체류 감지를 Isolation Forest + RandomForest 모델로 고도화
