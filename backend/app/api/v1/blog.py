@@ -72,7 +72,7 @@ async def generate_blog(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    background_tasks.add_task(run_blog_generation, blog.id)
+    background_tasks.add_task(run_blog_generation, blog.id, request.user_note)
 
     return BlogGenerateResponse(
         blog_id=blog.id,
