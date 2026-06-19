@@ -31,6 +31,7 @@
 ```jsonc
 // 요청
 { "style": "casual",
+  "user_note": "오랜만에 친구 만난 날 (선택 필드, 없으면 타임라인만으로 생성)",
   "daily_record": {
     "date": "2026-06-19",
     "user": { "nickname": "태윤", "taste_tags": ["카페", "맛집"] },
