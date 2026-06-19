@@ -12,7 +12,9 @@ RETRY_DELAYS = [1, 3, 5]  # 초 단위 대기 (1s → 3s → 5s)
 TIMEOUT_SECONDS = 60.0  # GPT-4o 블로그 생성 고려
 
 
-async def request_blog_generation(timeline_data: dict, style: str) -> dict:
+async def request_blog_generation(
+    daily_record: dict, style: str, user_note: str | None = None
+) -> dict:
     """AI 서버에 블로그 생성 요청.
 
     AI 서버 URL이 설정되어 있으면 실제 호출 (최대 3회 재시도),
@@ -29,8 +31,9 @@ async def request_blog_generation(timeline_data: dict, style: str) -> dict:
                 response = await client.post(
                     f"{settings.AI_SERVER_URL}/generate",
                     json={
-                        "timeline_data": timeline_data,
                         "style": style,
+                        "user_note": user_note,
+                        "daily_record": daily_record,
                     },
                 )
                 response.raise_for_status()

@@ -75,7 +75,7 @@ async def create_blog_generation(
     return blog
 
 
-async def run_blog_generation(blog_id: uuid.UUID) -> None:
+async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) -> None:
     """BackgroundTask에서 실행 — 독립 세션으로 AI 호출 후 블로그 업데이트"""
     async with async_session() as db:
         result = await db.execute(select(Blog).where(Blog.id == blog_id))
@@ -87,10 +87,11 @@ async def run_blog_generation(blog_id: uuid.UUID) -> None:
         await db.commit()
 
         try:
-            timeline_data = await _build_timeline_for_blog(db, blog)
+            daily_record = await _build_timeline_for_blog(db, blog)
             ai_result = await request_blog_generation(
-                timeline_data=timeline_data,
+                daily_record=daily_record,
                 style=map_style(blog.style),
+                user_note=user_note,
             )
 
             blog.title = ai_result.get("title", "제목 없음")
