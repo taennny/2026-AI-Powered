@@ -1,7 +1,8 @@
 import uuid
 import logging
+from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
@@ -117,20 +118,32 @@ async def get_blog_by_id(
 
 
 async def get_blog_list(
-    db: AsyncSession, user_id: uuid.UUID, skip: int = 0, limit: int = 20
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    page: int = 1,
+    size: int = 20,
+    q: str | None = None,
+    target_date: date | None = None,
 ) -> tuple[list[Blog], int]:
-    """블로그 목록 조회 + 총 개수"""
+    """블로그 목록 조회 + 총 개수 (키워드 검색 / 날짜 필터 / 페이지네이션)"""
+    filters = [Blog.user_id == user_id]
+    if q:
+        keyword = f"%{q}%"
+        filters.append(or_(Blog.title.ilike(keyword), Blog.content.ilike(keyword)))
+    if target_date is not None:
+        filters.append(Blog.target_date == target_date)
+
     count_result = await db.execute(
-        select(func.count()).select_from(Blog).where(Blog.user_id == user_id)
+        select(func.count()).select_from(Blog).where(*filters)
     )
     total = count_result.scalar_one()
 
     result = await db.execute(
         select(Blog)
-        .where(Blog.user_id == user_id)
+        .where(*filters)
         .order_by(Blog.created_at.desc())
-        .offset(skip)
-        .limit(limit)
+        .offset((page - 1) * size)
+        .limit(size)
     )
     blogs = list(result.scalars().all())
     return blogs, total
