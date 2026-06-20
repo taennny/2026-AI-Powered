@@ -5,7 +5,6 @@
 
 import uuid
 
-
 # ============================================================
 # 1. 블로그 생성 E2E (핵심 흐름)
 # ============================================================
@@ -123,6 +122,37 @@ async def test_blog_list(client, daily_record_id):
     assert len(res.json()["blogs"]) == 1
 
 
+async def test_blog_list_pagination_and_fields(client, daily_record_id):
+    """목록 응답이 page/size + 카드 필드(date/summary)를 포함하는지 확인"""
+    await client.post(
+        "/api/v1/blog/generate",
+        json={"daily_record_id": str(daily_record_id), "style": "casual"},
+    )
+
+    res = await client.get("/api/v1/blogs", params={"page": 1, "size": 5})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["page"] == 1
+    assert body["size"] == 5
+
+    item = body["blogs"][0]
+    assert "date" in item
+    assert "summary" in item
+    assert "thumbnail_url" in item
+
+
+async def test_blog_list_search(client, daily_record_id):
+    """키워드 검색 — 매칭 없는 키워드는 빈 목록"""
+    await client.post(
+        "/api/v1/blog/generate",
+        json={"daily_record_id": str(daily_record_id), "style": "casual"},
+    )
+
+    res = await client.get("/api/v1/blogs", params={"q": "존재하지않는키워드ZZZ"})
+    assert res.status_code == 200
+    assert res.json()["total"] == 0
+
+
 # ============================================================
 # 5. 에러 케이스
 # ============================================================
@@ -143,3 +173,30 @@ async def test_get_nonexistent_blog(client):
     fake_id = str(uuid.uuid4())
     res = await client.get(f"/api/v1/blog/{fake_id}")
     assert res.status_code == 404
+
+
+# ============================================================
+# 6. user_note / 필드 별칭 / 스타일 매핑
+# ============================================================
+
+
+async def test_generate_forwards_user_note_and_aliases(client, daily_record_id):
+    """프론트가 prompt/writingStyle로 보내도 user_note·style로 받아 AI까지 전달"""
+    from unittest.mock import AsyncMock, patch
+
+    fake = AsyncMock(return_value={"title": "t", "content": "c"})
+    with patch("app.services.blog.request_blog_generation", fake):
+        res = await client.post(
+            "/api/v1/blog/generate",
+            json={
+                "daily_record_id": str(daily_record_id),
+                "writingStyle": "emotion",  # → style 별칭 → AI 어휘 emotional
+                "prompt": "오랜만에 친구 만난 날",  # → user_note 별칭
+            },
+        )
+    assert res.status_code == 202
+
+    # BackgroundTask가 ASGITransport에서 실행되며 AI 호출됨
+    fake.assert_awaited_once()
+    assert fake.call_args.kwargs["user_note"] == "오랜만에 친구 만난 날"
+    assert fake.call_args.kwargs["style"] == "emotional"

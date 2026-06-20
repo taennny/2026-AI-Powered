@@ -1,0 +1,14 @@
+flask
+flask-restx
+flask-cors
+python-dotenv
+# AI-1 (GPS 체류 감지 + 카카오 장소 매칭)
+geopy
+pandas
+requests
+# AI-3 (GPT 블로그 생성)
+openai
+# AI-2 (CLIP 사진 분류)
+torch
+transformers
+pillow
