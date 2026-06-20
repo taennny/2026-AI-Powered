@@ -9,7 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.daily_record import DailyRecord
 from app.models.gps_log import GpsLog
+from app.models.photos import Photo
 from app.models.place import Place
+from app.services.storage import get_presigned_url
 
 try:
     from app.models.blog import Blog
@@ -103,22 +105,39 @@ async def get_timeline(
     )
     places = places_result.scalars().all()
 
-    place_list = [
-        {
-            "place_id": str(place.id),
-            "name": place.name,
-            "category": place.category,
-            "arrived_at": place.arrived_at,
-            "left_at": place.left_at,
-            "lat": to_shape(place.location).y,
-            "lng": to_shape(place.location).x,
-        }
-        for place in places
-    ]
+    place_list = []
+    for place in places:
+        photos_result = await db.execute(
+            select(Photo).where(
+                and_(
+                    Photo.user_id == user_id,
+                    Photo.taken_at >= place.arrived_at,
+                    Photo.taken_at <= place.left_at,
+                )
+            )
+        )
+        photos = photos_result.scalars().all()
+
+        photo_urls = []
+        for photo in photos:
+            url = await get_presigned_url(photo.storage_key)
+            photo_urls.append(url)
+
+        place_list.append(
+            {
+                "place_id": str(place.id),
+                "name": place.name,
+                "category": place.category,
+                "arrived_at": place.arrived_at,
+                "left_at": place.left_at,
+                "lat": to_shape(place.location).y,
+                "lng": to_shape(place.location).x,
+                "photos": photo_urls,
+            }
+        )
 
     return {
         "date": record.target_date.strftime("%Y-%m-%d"),
-        "total_distance": record.total_distance or 0.0,
         "polyline": polyline,
         "places": place_list,
     }

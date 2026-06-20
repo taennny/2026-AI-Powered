@@ -31,10 +31,10 @@ class PlaceEntry(BaseModel):
     left_at: datetime | None
     lat: float
     lng: float
+    photos: List[str] = []
 
 
 class TimelineResponse(BaseModel):
     date: str
-    total_distance: float
     polyline: List[PolylinePoint]
     places: List[PlaceEntry]
