@@ -1,18 +1,14 @@
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SubscriptionResponse(BaseModel):
-    id: uuid.UUID
-    user_id: uuid.UUID
-    plan_type: str
-    is_active: bool
+    plan: str = Field(validation_alias="plan_type")
+    started_at: Optional[datetime] = Field(default=None, validation_alias="created_at")
     expires_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
+    is_active: bool
 
     model_config = {"from_attributes": True}
 
