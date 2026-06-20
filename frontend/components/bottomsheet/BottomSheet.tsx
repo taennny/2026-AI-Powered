@@ -29,7 +29,9 @@ type Props = {
   places: TimelinePlace[];
 };
 
-function groupByHour(places: TimelinePlace[]): {hour: number; places: TimelinePlace[]}[] {
+function groupByHour(
+  places: TimelinePlace[],
+): {hour: number; places: TimelinePlace[]}[] {
   const map = new Map<number, TimelinePlace[]>();
   places.forEach(place => {
     const hour = new Date(place.arrived_at).getHours();
@@ -43,7 +45,11 @@ function groupByHour(places: TimelinePlace[]): {hour: number; places: TimelinePl
 
 const BAR_LEFT = 40;
 
-export default function BottomSheet({selectedDate = new Date(), peekHeight = 320, places}: Props) {
+export default function BottomSheet({
+  selectedDate = new Date(),
+  peekHeight = 320,
+  places,
+}: Props) {
   const sheetHeight = useRef(0);
   const translateY = useRef(new Animated.Value(9999)).current;
   const HANDLE_HEIGHT = 30;
@@ -66,10 +72,17 @@ export default function BottomSheet({selectedDate = new Date(), peekHeight = 320
   useEffect(() => {
     if (showMap) {
       setIsMapMounted(true);
-      Animated.timing(mapOpacity, {toValue: 1, duration: 200, useNativeDriver: true}).start();
+      Animated.timing(mapOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
     } else {
-      Animated.timing(mapOpacity, {toValue: 0, duration: 200, useNativeDriver: true})
-        .start(() => setIsMapMounted(false));
+      Animated.timing(mapOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setIsMapMounted(false));
     }
   }, [showMap, mapOpacity]);
 
@@ -87,7 +100,9 @@ export default function BottomSheet({selectedDate = new Date(), peekHeight = 320
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, {dy}) => Math.abs(dy) > 5,
-      onPanResponderGrant: () => { translateY.stopAnimation(); },
+      onPanResponderGrant: () => {
+        translateY.stopAnimation();
+      },
       onPanResponderMove: (_, {dy}) => {
         const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
         const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
@@ -108,7 +123,12 @@ export default function BottomSheet({selectedDate = new Date(), peekHeight = 320
         }
 
         lastY.current = snapTo;
-        Animated.spring(translateY, {toValue: snapTo, useNativeDriver: true, tension: 65, friction: 11}).start();
+        Animated.spring(translateY, {
+          toValue: snapTo,
+          useNativeDriver: true,
+          tension: 65,
+          friction: 11,
+        }).start();
       },
     }),
   ).current;
@@ -141,7 +161,10 @@ export default function BottomSheet({selectedDate = new Date(), peekHeight = 320
         </Animated.View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 32}}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{paddingBottom: 32}}
+      >
         {!hasPlaces ? (
           <View
             className="mx-4 mt-2 py-[18px] px-4 rounded-sm"
@@ -156,12 +179,14 @@ export default function BottomSheet({selectedDate = new Date(), peekHeight = 320
             {/* 세로 타임라인 바 */}
             <View
               className="absolute top-0 bottom-0 w-2 bg-teal"
-              style={{left: 16 + BAR_LEFT}}
+              style={{left: 6 + BAR_LEFT}}
             />
             {hourGroups.map(({hour, places: hourPlaces}) => (
               <View key={hour} className="flex-row mb-2">
                 <View className="w-8 pt-[14px] items-end pr-2">
-                  <Text className="text-xs font-medium text-tertiary">{hour}</Text>
+                  <Text className="text-xs font-medium text-tertiary">
+                    {hour}
+                  </Text>
                 </View>
                 <View className="w-6" />
                 <View className="flex-1">

@@ -2,10 +2,12 @@ import {create} from 'zustand';
 
 type TimelineStore = {
   totalDistance: number;
-  setTotalDistance: (distance: number) => void;
+  placesCount: number;
+  setTimeline: (distance: number, count: number) => void;
 };
 
 export const useTimelineStore = create<TimelineStore>(set => ({
   totalDistance: 0,
-  setTotalDistance: distance => set({totalDistance: distance}),
+  placesCount: 0,
+  setTimeline: (distance, count) => set({totalDistance: distance, placesCount: count}),
 }));
