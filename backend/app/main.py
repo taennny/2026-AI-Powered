@@ -28,7 +28,7 @@ app.include_router(blog_router)
 app.include_router(gps_router)
 app.include_router(photos_router)
 app.include_router(subscription_router)
-app.include_router(calendar_router, prefix="/api/v1")
+app.include_router(calendar_router)
 
 
 @app.get("/health")
