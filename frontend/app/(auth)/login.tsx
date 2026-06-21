@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {useRouter} from 'expo-router';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
+import { Image } from 'react-native';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -115,10 +116,17 @@ export default function LoginScreen() {
         </Text>
       </TouchableOpacity>
 
-      <View className="flex-row justify-center mt-4 space-x-4">
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+      <View className="flex-row justify-center mt-4 space-x-8">
+        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}
+          className="mr-12">
           <Text className="text-[#8E8E93] text-[12px]">회원가입</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+  onPress={() => router.push('/(main)/write')}
+  className="mt-4 self-center"
+>
+  <Text className="text-sm text-blue-500">글쓰기 화면 테스트</Text>
+</TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push('/(auth)/find-password')}>
           <Text className="text-[#8E8E93] text-[12px]">비밀번호 찾기</Text>
@@ -126,10 +134,19 @@ export default function LoginScreen() {
       </View>
 
       <TouchableOpacity
-        onPress={handleKakaoLogin}
-        className="w-12 h-12 rounded-full bg-[#E5E5EA] self-center mt-6"
-      />
+  onPress={handleKakaoLogin}
+  className="w-12 h-12 rounded-full bg-[#FEE500] self-center mt-6 items-center justify-center"
+>
+  <Image
+    source={require('../../assets/images/kakao.png')}
+    style={{ width: 55, height: 55 }}
+    resizeMode="contain"
+  />
+</TouchableOpacity>
     </View>
     </TouchableWithoutFeedback>
+    
+    
   );
+  
 }

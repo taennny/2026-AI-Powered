@@ -21,19 +21,21 @@ export type TimelinePlace = {
   place_id: string;
   name: string;
   category: string;
-  arrived_at: string;    // ISO 8601
-  left_at: string;       // ISO 8601
+  arrived_at: string;
+  left_at: string;
   lat: number;
   lng: number;
+  photos?: string[];
 };
 
 export type TimelineData = {
-  date: string;          // 'YYYY-MM-DD'
-  total_distance: number;
-  polyline: {lat: number; lng: number}[];
+  date: string;
+  polyline: {
+    lat: number;
+    lng: number;
+  }[];
   places: TimelinePlace[];
 };
-
 /** GET /api/v1/calendar/{year}/{month} */
 export async function fetchCalendarMonth(
   year: number,
