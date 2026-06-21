@@ -19,6 +19,9 @@ module.exports = {
         // 서피스
         surface:      'var(--color-surface)',     // bg-surface    헤더·푸터·화면 배경
         line:         'var(--color-line)',        // border-line   구분선·테두리
+        // 버튼 전용 (primary와 분리 — dark 테마에서 bg-primary가 흰색이 되는 문제 해결)
+        'btn-bg':     'var(--color-btn-bg)',      // bg-btn-bg     버튼 배경
+        'btn-text':   'var(--color-btn-text)',    // text-btn-text 버튼 텍스트
         // ─── 정적 토큰 (테마와 무관) ──────────────────────────────────
         muted:        '#CCCCCC',                 // text-muted    비활성 아이콘·화살표
       },

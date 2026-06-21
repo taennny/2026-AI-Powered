@@ -16,7 +16,7 @@ import {
 import {Ionicons} from '@expo/vector-icons';
 
 import {fetchBlogs, type JournalData} from '@/services/blogApi';
-import {Colors} from '@/constants/Colors';
+import {useThemeColors} from '@/hooks/useThemeColors';
 import JournalCard from '@/components/journal/JournalCard';
 import {formatDateStr} from '@/utils/formatDate';
 
@@ -30,6 +30,7 @@ export default function JournalListScreen() {
   const [isFocused, setIsFocused] = useState(false);
   const widthAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
+  const tc = useThemeColors();
 
   useEffect(() => {
     fetchBlogs()
@@ -73,7 +74,7 @@ export default function JournalListScreen() {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: Colors.white,
+            backgroundColor: tc.surface,
             borderRadius: 20,
             height: 40,
             width: barWidth,
@@ -84,7 +85,7 @@ export default function JournalListScreen() {
             onPress={isFocused ? undefined : expand}
             style={{width: 40, height: 40, alignItems: 'center', justifyContent: 'center'}}
           >
-            <Ionicons name="search" size={16} color={Colors.textTertiary} />
+            <Ionicons name="search" size={16} color={tc.tertiary} />
           </TouchableOpacity>
 
           <TextInput
@@ -92,11 +93,11 @@ export default function JournalListScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder="Search"
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor={tc.tertiary}
             style={{
               flex: 1,
               fontSize: 14,
-              color: Colors.textPrimary,
+              color: tc.primary,
               padding: 0,
               opacity: isFocused ? 1 : 0,
             }}
@@ -107,7 +108,7 @@ export default function JournalListScreen() {
               onPress={collapse}
               style={{paddingHorizontal: 12, height: 40, alignItems: 'center', justifyContent: 'center'}}
             >
-              <Ionicons name="close" size={16} color={Colors.textTertiary} />
+              <Ionicons name="close" size={16} color={tc.tertiary} />
             </TouchableOpacity>
           )}
         </Animated.View>

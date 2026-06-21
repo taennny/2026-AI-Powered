@@ -21,7 +21,7 @@ export default function PostCard({data}: Props) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      className="bg-white rounded-[14px] px-4 py-[14px] mb-[10px]"
+      className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px]"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
       <Text className="text-sm font-semibold text-primary mb-1">{timeLabel}</Text>

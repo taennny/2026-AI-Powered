@@ -18,10 +18,11 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useRouter} from 'expo-router';
 import {generateJournal, uploadPhoto, WritingStyle} from '@/services/journalApi';
-import {Colors} from '@/constants/Colors';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WriteScreen() {
   const router = useRouter();
+  const tc = useThemeColors();
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [prompt, setPrompt] = useState('');
@@ -119,13 +120,13 @@ export default function WriteScreen() {
         {/* 글쓰기 스타일 탭 */}
         <View className="flex-row mx-[22px] h-[34px] bg-teal-bg rounded-[7px] p-0.5">
           <TouchableOpacity
-            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'info' ? ' bg-white' : ''}`}
+            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'info' ? ' bg-surface' : ''}`}
             onPress={() => setWritingStyle('info')}
           >
             <Text className="text-xs font-semibold text-primary">정보 위주</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'emotion' ? ' bg-white' : ''}`}
+            className={`flex-1 rounded-md justify-center items-center${writingStyle === 'emotion' ? ' bg-surface' : ''}`}
             onPress={() => setWritingStyle('emotion')}
           >
             <Text className="text-xs font-semibold text-primary">감성적</Text>
@@ -141,7 +142,7 @@ export default function WriteScreen() {
             onChangeText={setPrompt}
             multiline
             placeholder="내용을 입력하세요"
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor={tc.tertiary}
             textAlignVertical="top"
           />
           {imageUri && (

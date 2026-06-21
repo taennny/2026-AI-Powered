@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
-import {Colors} from '@/constants/Colors';
+import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate} from '@/utils/formatDate';
 import PostCard from '@/components/bottomsheet/PostCard';
 import MapPreview from '@/components/bottomsheet/MapPreview';
@@ -133,6 +133,7 @@ export default function BottomSheet({
     }),
   ).current;
 
+  const tc = useThemeColors();
   const hourGroups = groupByHour(places);
   const hasPlaces = hourGroups.length > 0;
   hasPlacesRef.current = hasPlaces;
@@ -168,7 +169,7 @@ export default function BottomSheet({
         {!hasPlaces ? (
           <View
             className="mx-4 mt-2 py-[18px] px-4 rounded-sm"
-            style={{borderLeftWidth: 8, borderLeftColor: Colors.teal}}
+            style={{borderLeftWidth: 8, borderLeftColor: tc.teal}}
           >
             <Text className="text-sm text-secondary leading-[22px]">
               아직 기록된 일기가 없어요.{'\n'}글을 쓰러 가볼까요?

@@ -75,10 +75,6 @@ app/
     → source=account-link 시 → settings/account로 복귀
 ```
 
-### 탭 네비게이션 패턴
-
-`(tabs)/_layout.tsx`는 expo-router의 `<Slot />`을 사용해 `home`과 `journal-list` 두 화면 간 전환을 처리합니다. 탭 전환은 `SectionTabs` 컴포넌트에서 `router.replace()`로 구현되며, 실제 네이티브 탭바 대신 커스텀 탭 UI를 사용합니다. `HomeFooter`는 `usePathname()`으로 경로를 감지해 `home`에서만 렌더링합니다.
-
 ### API 레이어
 
 모든 API 호출은 `utils/api.ts`의 axios 인스턴스를 통해 이루어집니다.
@@ -95,8 +91,6 @@ services/authApi.ts       # signup, login, refreshAccessToken, sendResetEmail, r
 services/journalApi.ts    # uploadPhoto, generateJournal, saveJournal
 services/subscriptionApi.ts  # fetchSubscription
 ```
-
-**API 폴백 패턴**: 각 화면은 API 실패 시 빈 배열/0으로 폴백합니다. `EXPO_PUBLIC_API_BASE_URL`을 설정하면 실제 API로 전환됩니다 (기본값: `http://localhost:8000`).
 
 ### 현재 연결된 API 엔드포인트
 
@@ -166,10 +160,6 @@ Colors.tealAccent     // '#7BBFD4'
 - `app/_layout.tsx` ThemeRoot: 루트 View에 `themeVars` style로 주입 → 하위 모든 NativeWind 색상 토큰에 반영
 - CSS 변수 레이어는 이미 완성됨 — 남은 작업은 설정 화면에서 `setTheme()` 연결뿐
 
-### 홈 화면 레이아웃 패턴
-
-`home/index.tsx`에서 Calendar 고정 높이(`CALENDAR_HEIGHT_6_ROWS = 440`)를 기반으로 컨테이너 높이를 측정해 `peekHeight`를 계산합니다. BottomSheet는 `position: absolute`로 Calendar 위에 올라가며, 측정 전(`peekHeight === 0`)에는 렌더링하지 않습니다.
-
 캘린더 데이터·타임라인 fetch 로직은 `hooks/useCalendar.ts`로 분리되어 있습니다. `viewDate` 변경 시 `fetchCalendarMonth`, `selectedDate` 변경 시 `fetchTimeline`을 호출합니다.
 
 BottomSheet는 PanResponder로 3단계 스냅 포인트를 구현합니다:
@@ -237,10 +227,6 @@ hooks/useAuth.ts          # 빈 파일 (미구현)
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
 | `formatTimeAgo(iso)` | ISO 8601 → `'방금'` / `'N분 전'` 등 |
-
-### ESLint / 코드 스타일
-
-ESLint 9 flat config (`eslint.config.js`). `eslint-plugin-unused-imports`로 미사용 import는 **error** (warning 아님) — lint 실패 원인 1위. import 순서는 `import/order` warn (외부 → 내부 → 상대경로, 그룹 간 빈 줄 필수).
 
 ### 경로 별칭
 

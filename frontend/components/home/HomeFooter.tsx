@@ -25,9 +25,9 @@ export default function HomeFooter() {
         <TouchableOpacity
           onPress={() => router.push('/(main)/write')}
           disabled={!hasTimeline}
-          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-primary' : 'bg-muted'}`}
+          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-btn-bg' : 'bg-muted'}`}
         >
-          <Text className="text-white text-[13px] font-semibold tracking-[0.5px]">글쓰기</Text>
+          <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">글쓰기</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

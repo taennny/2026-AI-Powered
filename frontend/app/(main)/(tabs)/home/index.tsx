@@ -22,7 +22,7 @@ export default function HomeIndex() {
 
   return (
     <View
-      className="flex-1 bg-white"
+      className="flex-1 bg-surface"
       onLayout={e =>
         setPeekHeight(Math.max(0, e.nativeEvent.layout.height - CALENDAR_HEIGHT_6_ROWS))
       }

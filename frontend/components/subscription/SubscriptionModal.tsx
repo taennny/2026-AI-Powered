@@ -22,7 +22,7 @@ export default function SubscriptionModal({visible, onClose}: Props) {
         style={{backgroundColor: 'rgba(0,0,0,0.45)'}}
         onPress={onClose}
       >
-        <Pressable className="w-[82%] bg-white px-6 pt-5 pb-7">
+        <Pressable className="w-[82%] bg-surface px-6 pt-5 pb-7">
 
           {/* 닫기 */}
           <TouchableOpacity onPress={onClose} className="absolute top-[14px] right-4 p-[6px]">
@@ -40,10 +40,10 @@ export default function SubscriptionModal({visible, onClose}: Props) {
           </Text>
 
           {/* 혜택 박스 */}
-          <View className="bg-primary rounded-2xl py-5 px-5 items-center gap-y-2">
-            <Text className="text-[15px] font-bold text-white mb-1">구독 혜택</Text>
+          <View className="bg-btn-bg rounded-2xl py-5 px-5 items-center gap-y-2">
+            <Text className="text-[15px] font-bold text-btn-text mb-1">구독 혜택</Text>
             {BENEFITS.map(benefit => (
-              <Text key={benefit} className="text-sm text-white">{benefit}</Text>
+              <Text key={benefit} className="text-sm text-btn-text">{benefit}</Text>
             ))}
           </View>
 
