@@ -29,7 +29,7 @@ async def change_subscription(
     """구독 플랜 변경"""
     try:
         subscription = await update_user_subscription(
-            db, current_user.id, request.plan_type
+            db, current_user.id, request.plan_type, request.billing_cycle
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
