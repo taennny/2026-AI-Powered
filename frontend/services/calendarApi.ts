@@ -21,8 +21,8 @@ export type TimelinePlace = {
   place_id: string;
   name: string;
   category: string;
-  arrived_at: string;    // ISO 8601
-  left_at: string;       // ISO 8601
+  arrived_at: string;
+  left_at: string;
   lat: number;
   lng: number;
   photos?: string[];     // 촬영된 사진 url 목록
@@ -94,13 +94,19 @@ export async function fetchCalendarMonth(
   month: number,
 ): Promise<CalendarMonth> {
   if (USE_MOCK) return MOCK_CALENDAR;
-  const {data} = await api.get<CalendarMonth>(`/api/v1/calendar/${year}/${month}`);
+
+  const {data} = await api.get<CalendarMonth>(
+    `/api/v1/calendar/${year}/${month}`,
+  );
   return data;
 }
 
 /** GET /api/v1/calendar/{date}/timeline */
 export async function fetchTimeline(date: string): Promise<TimelineData> {
   if (USE_MOCK && date === '2026-05-07') return MOCK_TIMELINE;
-  const {data} = await api.get<TimelineData>(`/api/v1/calendar/${date}/timeline`);
+
+  const {data} = await api.get<TimelineData>(
+    `/api/v1/calendar/${date}/timeline`,
+  );
   return data;
 }

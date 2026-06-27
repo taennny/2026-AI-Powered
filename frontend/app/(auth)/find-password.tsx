@@ -76,14 +76,6 @@ export default function FindPasswordScreen() {
       <View className="flex-row justify-end mt-[12px]">
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => router.replace('/(auth)/login')}
-          className="w-[58px] h-[22px] rounded-[4px] items-center justify-center bg-[#E5E5EA] mr-[8px]"
-        >
-          <Text className="text-[10px] leading-[10px] text-primary">로그인</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.85}
           disabled={isLoading}
           onPress={handleSendResetEmail}
           className="w-[90px] h-[22px] rounded-[4px] items-center justify-center bg-primary"

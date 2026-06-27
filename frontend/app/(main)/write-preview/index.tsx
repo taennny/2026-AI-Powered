@@ -1,9 +1,6 @@
 /**
  * @file app/(main)/write-preview/index.tsx
  * @description 글쓰기 미리보기/저장 화면
- * - write 화면에서 생성된 title, content, photoUrl을 파라미터로 수신
- * - 제목/내용 수정 후 saveJournal() 호출
- * - 이미지 교체 시 로컬 URI를 uploadPhoto()로 재업로드 후 저장
  */
 
 import React, {useState} from 'react';
@@ -19,42 +16,65 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import {saveJournal, uploadPhoto} from '@/services/journalApi';
+
+import {updateBlog} from '@/services/blogApi';
+import {uploadPhoto} from '@/services/journalApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
+  const tc = useThemeColors();
 
-  const {title, content, photoUrl} = useLocalSearchParams<{
+  const {blogId, title, content, imageUris} = useLocalSearchParams<{
+    blogId?: string;
     title?: string;
     content?: string;
-    photoUrl?: string;
+    imageUris?: string;
   }>();
+
+  const parsedImageUris = imageUris ? JSON.parse(imageUris) : [];
 
   const [journalTitle, setJournalTitle] = useState(title || '');
   const [journalContent, setJournalContent] = useState(content || '');
-  const [selectedImageUri, setSelectedImageUri] = useState(photoUrl || '');
+  const [selectedImageUris, setSelectedImageUris] =
+    useState<string[]>(parsedImageUris);
   const [isSaving, setIsSaving] = useState(false);
-  const tc = useThemeColors();
 
-  const canSave = journalTitle.trim().length > 0 && journalContent.trim().length > 0;
+  const canSave =
+    journalTitle.trim().length > 0 && journalContent.trim().length > 0;
 
   const handleCancelPress = () => {
     Alert.alert('작성 취소', '수정 중인 글을 취소할까요?', [
       {text: '계속 수정', style: 'cancel'},
-      {text: '취소', style: 'destructive', onPress: () => router.replace('/(main)/(tabs)/home')},
+      {
+        text: '취소',
+        style: 'destructive',
+        onPress: () => router.replace('/(main)/(tabs)/home'),
+      },
     ]);
   };
 
-  const handleImageChangePress = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({mediaTypes: ['images'], quality: 0.8});
+  const handleImageAddPress = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+
     if (!result.canceled) {
-      setSelectedImageUri(result.assets[0].uri);
+      const newImageUris = result.assets.map(asset => asset.uri);
+
+      setSelectedImageUris(prevImageUris => [
+        ...prevImageUris,
+        ...newImageUris,
+      ]);
     }
   };
 
-  const handleImageDeletePress = () => {
-    setSelectedImageUri('');
+  const handleImageDeletePress = (targetImageUri: string) => {
+    setSelectedImageUris(prevImageUris =>
+      prevImageUris.filter(imageUri => imageUri !== targetImageUri),
+    );
   };
 
   const handleSavePress = async () => {
@@ -62,23 +82,30 @@ export default function WritePreviewScreen() {
       Alert.alert('알림', '제목과 내용을 입력해주세요.');
       return;
     }
+
+    if (!blogId) {
+      Alert.alert('오류', '저장할 글 정보가 없습니다.');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
-      let finalPhotoUrl: string | undefined;
-      if (selectedImageUri) {
-        if (selectedImageUri.startsWith('http')) {
-          finalPhotoUrl = selectedImageUri;
-        } else {
-          const uploaded = await uploadPhoto(selectedImageUri);
-          finalPhotoUrl = uploaded.photo_url;
-        }
-      }
+      const uploadedPhotoUrls = await Promise.all(
+        selectedImageUris.map(async imageUri => {
+          if (imageUri.startsWith('http')) {
+            return imageUri;
+          }
 
-      await saveJournal({
+          const uploaded = await uploadPhoto(imageUri);
+          return uploaded.photo_url;
+        }),
+      );
+
+      await updateBlog(blogId, {
         title: journalTitle,
         content: journalContent,
-        photoUrl: finalPhotoUrl,
+        photoUrls: uploadedPhotoUrls,
       });
 
       Alert.alert('완료', '글이 저장되었습니다.', [
@@ -93,20 +120,32 @@ export default function WritePreviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
-
-      {/* 헤더 */}
       <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
         <TouchableOpacity onPress={handleCancelPress}>
           <Text className="text-xs text-muted">Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleSavePress} disabled={!canSave || isSaving}>
-          <Text className={`text-xs font-bold${!canSave || isSaving ? ' text-muted' : ' text-primary'}`}>
+
+        <TouchableOpacity
+          onPress={handleSavePress}
+          disabled={!canSave || isSaving}
+        >
+          <Text
+            className={`text-xs font-bold${
+              !canSave || isSaving ? ' text-muted' : ' text-primary'
+            }`}
+          >
             {isSaving ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={{paddingHorizontal: 20, paddingBottom: 40, alignItems: 'center'}}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: 40,
+          alignItems: 'center',
+        }}
+      >
         <TextInput
           className="text-base font-bold text-primary mb-4"
           style={{width: '90%', padding: 0, textAlign: 'center'}}
@@ -117,23 +156,29 @@ export default function WritePreviewScreen() {
           textAlign="center"
         />
 
-        {selectedImageUri ? (
-          <View className="w-full mb-5">
-            <TouchableOpacity onPress={handleImageChangePress}>
-              <Image source={{uri: selectedImageUri}} className="w-full h-[250px]" />
-            </TouchableOpacity>
-            <TouchableOpacity className="mt-2 self-center" onPress={handleImageDeletePress}>
+        <TouchableOpacity
+          className="w-full h-[210px] bg-teal-bg justify-center items-center mb-5"
+          onPress={handleImageAddPress}
+        >
+          <Text className="text-sm text-tertiary">사진 추가</Text>
+        </TouchableOpacity>
+
+        {selectedImageUris.map(imageUri => (
+          <View key={imageUri} className="w-full mb-5">
+            <Image
+              source={{uri: imageUri}}
+              className="w-full h-[250px]"
+              resizeMode="cover"
+            />
+
+            <TouchableOpacity
+              className="mt-2 self-center"
+              onPress={() => handleImageDeletePress(imageUri)}
+            >
               <Text className="text-xs text-tertiary">사진 삭제</Text>
             </TouchableOpacity>
           </View>
-        ) : (
-          <TouchableOpacity
-            className="w-full h-[210px] bg-teal-bg justify-center items-center mb-5"
-            onPress={handleImageChangePress}
-          >
-            <Text className="text-sm text-tertiary">사진 추가</Text>
-          </TouchableOpacity>
-        )}
+        ))}
 
         <TextInput
           className="text-sm text-primary leading-[22px]"
@@ -146,7 +191,6 @@ export default function WritePreviewScreen() {
           textAlign="center"
         />
       </ScrollView>
-
     </SafeAreaView>
   );
 }

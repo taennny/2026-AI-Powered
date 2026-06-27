@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Keyboard,
   TouchableWithoutFeedback,
+  Image,
 } from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
@@ -137,8 +138,14 @@ export default function LoginScreen() {
 
         <TouchableOpacity
           onPress={handleKakaoLogin}
-          className="w-12 h-12 rounded-full bg-[#E5E5EA] self-center mt-6"
-        />
+          className="w-12 h-12 rounded-full bg-[#FEE500] self-center mt-6 items-center justify-center"
+        >
+          <Image
+            source={require('../../assets/images/kakao.png')}
+            style={{width: 55, height: 55}}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
       </View>
     </TouchableWithoutFeedback>
   );
