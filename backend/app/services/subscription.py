@@ -1,9 +1,12 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription import Subscription
+
+PREMIUM_DURATION_DAYS = 30
 
 
 async def get_user_subscription(db: AsyncSession, user_id: uuid.UUID) -> Subscription:
@@ -32,6 +35,13 @@ async def update_user_subscription(
 
     subscription = await get_user_subscription(db, user_id)
     subscription.plan_type = plan_type
+    if plan_type == "premium":
+        subscription.is_active = True
+        subscription.expires_at = datetime.now(timezone.utc) + timedelta(
+            days=PREMIUM_DURATION_DAYS
+        )
+    else:  # free 전환 시 만료일 해제
+        subscription.expires_at = None
     await db.commit()
     await db.refresh(subscription)
     return subscription

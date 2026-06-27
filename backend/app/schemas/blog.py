@@ -2,15 +2,26 @@ import uuid
 from datetime import date, datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 # --- 블로그 생성 요청/응답 ---
 class BlogGenerateRequest(BaseModel):
     daily_record_id: uuid.UUID
+    # 프론트는 writingStyle, 내부/구버전은 style — 둘 다 수용
     style: str = Field(
-        default="casual", description="블로그 스타일 (casual, formal, travel)"
+        default="casual",
+        validation_alias=AliasChoices("style", "writingStyle"),
+        description="블로그 스타일",
     )
+    # 사용자가 직접 쓴 하루 메모 (선택). 프론트 prompt 필드명도 수용
+    user_note: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("user_note", "prompt"),
+        description="사용자 작성 메모 (선택, 없으면 타임라인만으로 생성)",
+    )
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
 
 
 class BlogGenerateResponse(BaseModel):
@@ -45,9 +56,23 @@ class BlogResponse(BaseModel):
 
 
 # --- 블로그 목록 조회 ---
+class BlogListItem(BaseModel):
+    id: uuid.UUID
+    date: date
+    title: str
+    summary: Optional[str] = None
+    thumbnail_url: Optional[str] = None
+    is_published: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class BlogListResponse(BaseModel):
-    blogs: list[BlogResponse]
     total: int
+    page: int
+    size: int
+    blogs: list[BlogListItem]
 
 
 # --- 블로그 수정 ---
