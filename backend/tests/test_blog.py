@@ -36,6 +36,8 @@ async def test_blog_generate_e2e(client, daily_record_id):
     assert blog["content"] != ""
     assert blog["style"] == "casual"
     assert blog["generation_status"] == "completed"
+    # 프론트가 상세 응답에서 blog_id로 읽음 (id와 동일해야)
+    assert blog["blog_id"] == blog["id"] == blog_id
     # is_published 기본값은 PostgreSQL에서 false, SQLite에서는 server_default 차이로 생략
 
 
@@ -190,8 +192,8 @@ async def test_generate_forwards_user_note_and_aliases(client, daily_record_id):
             "/api/v1/blog/generate",
             json={
                 "daily_record_id": str(daily_record_id),
-                "writingStyle": "emotion",  # → style 별칭 → AI 어휘 emotional
-                "prompt": "오랜만에 친구 만난 날",  # → user_note 별칭
+                "writing_style": "emotion",  # 프론트 실제 필드 → style 별칭 → emotional
+                "user_note": "오랜만에 친구 만난 날",
             },
         )
     assert res.status_code == 202
