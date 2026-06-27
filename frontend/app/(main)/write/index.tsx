@@ -16,20 +16,23 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-
-import {Colors} from '@/constants/Colors';
 import {useLocalSearchParams, useRouter} from 'expo-router';
+
 import {
   generateBlog,
   waitForBlogGeneration,
   WritingStyle,
 } from '@/services/blogApi';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WriteScreen() {
-  const {dailyRecordId} = useLocalSearchParams<{
-  dailyRecordId?: string;
-}>();
   const router = useRouter();
+  const tc = useThemeColors();
+
+  const {dailyRecordId} = useLocalSearchParams<{
+    dailyRecordId?: string;
+  }>();
+
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [prompt, setPrompt] = useState('');
   const [imageUris, setImageUris] = useState<string[]>([]);
@@ -65,9 +68,9 @@ export default function WriteScreen() {
     });
 
     if (!result.canceled) {
-      const selectedImageUris = result.assets.map((asset) => asset.uri);
+      const selectedImageUris = result.assets.map(asset => asset.uri);
 
-      setImageUris((prevImageUris) => [
+      setImageUris(prevImageUris => [
         ...prevImageUris,
         ...selectedImageUris,
       ]);
@@ -84,48 +87,49 @@ export default function WriteScreen() {
   };
 
   const handleImageDeletePress = (targetImageUri: string) => {
-    setImageUris((prevImageUris) =>
-      prevImageUris.filter((imageUri) => imageUri !== targetImageUri),
+    setImageUris(prevImageUris =>
+      prevImageUris.filter(imageUri => imageUri !== targetImageUri),
     );
   };
 
   const handleWritePress = async () => {
-  if (!dailyRecordId) {
-    Alert.alert('오류', '날짜 기록 정보가 없습니다.');
-    return;
-  }
+    if (!dailyRecordId) {
+      Alert.alert('오류', '날짜 기록 정보가 없습니다.');
+      return;
+    }
 
-  if (!canSubmit) {
-    Alert.alert('알림', '내용을 입력해야 글을 생성할 수 있습니다.');
-    return;
-  }
+    if (!canSubmit) {
+      Alert.alert('알림', '내용을 입력해야 글을 생성할 수 있습니다.');
+      return;
+    }
 
-  try {
-    setIsLoading(true);
+    try {
+      setIsLoading(true);
 
-    const generateResult = await generateBlog({
-      daily_record_id: dailyRecordId,
-      user_note: prompt.trim(),
-      writing_style: writingStyle,
-    });
+      const generateResult = await generateBlog({
+        daily_record_id: dailyRecordId,
+        user_note: prompt.trim(),
+        writing_style: writingStyle,
+      });
 
-    const blog = await waitForBlogGeneration(generateResult.blog_id);
+      const blog = await waitForBlogGeneration(generateResult.blog_id);
 
-    router.push({
-      pathname: '/(main)/write-preview',
-      params: {
-        blogId: String(blog.blog_id),
-        title: blog.title,
-        content: blog.content,
-        imageUris: JSON.stringify(imageUris),
-      },
-    });
-  } catch {
-    Alert.alert('오류', '글 생성에 실패했습니다. 다시 시도해주세요.');
-  } finally {
-    setIsLoading(false);
-  }
-};
+      router.push({
+        pathname: '/(main)/write-preview',
+        params: {
+          blogId: String(blog.blog_id),
+          title: blog.title,
+          content: blog.content,
+          imageUris: JSON.stringify(imageUris),
+        },
+      });
+    } catch {
+      Alert.alert('오류', '글 생성에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-surface justify-center items-center">
@@ -154,7 +158,7 @@ export default function WriteScreen() {
         <View className="flex-row mx-[22px] h-[34px] bg-teal-bg rounded-[7px] p-0.5">
           <TouchableOpacity
             className={`flex-1 rounded-md justify-center items-center${
-              writingStyle === 'info' ? ' bg-white' : ''
+              writingStyle === 'info' ? ' bg-surface' : ''
             }`}
             onPress={() => setWritingStyle('info')}
           >
@@ -163,7 +167,7 @@ export default function WriteScreen() {
 
           <TouchableOpacity
             className={`flex-1 rounded-md justify-center items-center${
-              writingStyle === 'emotion' ? ' bg-white' : ''
+              writingStyle === 'emotion' ? ' bg-surface' : ''
             }`}
             onPress={() => setWritingStyle('emotion')}
           >
@@ -179,11 +183,11 @@ export default function WriteScreen() {
             onChangeText={setPrompt}
             multiline
             placeholder="내용을 입력하세요"
-            placeholderTextColor={Colors.textTertiary}
+            placeholderTextColor={tc.tertiary}
             textAlignVertical="top"
           />
 
-          {imageUris.map((imageUri) => (
+          {imageUris.map(imageUri => (
             <View key={imageUri} className="mt-4">
               <Image
                 source={{uri: imageUri}}
@@ -208,7 +212,7 @@ export default function WriteScreen() {
           </View>
 
           <TouchableOpacity
-            className={`bg-[#EDEDED] px-[22px] py-[10px] rounded-md${
+            className={`bg-teal px-[22px] py-[10px] rounded-md${
               !canSubmit ? ' opacity-50' : ''
             }`}
             onPress={handleWritePress}

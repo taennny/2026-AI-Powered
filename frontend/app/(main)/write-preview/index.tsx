@@ -16,19 +16,21 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import {Colors} from '@/constants/Colors';
+
 import {updateBlog} from '@/services/blogApi';
 import {uploadPhoto} from '@/services/journalApi';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
+  const tc = useThemeColors();
 
   const {blogId, title, content, imageUris} = useLocalSearchParams<{
-  blogId?: string;
-  title?: string;
-  content?: string;
-  imageUris?: string;
-}>();
+    blogId?: string;
+    title?: string;
+    content?: string;
+    imageUris?: string;
+  }>();
 
   const parsedImageUris = imageUris ? JSON.parse(imageUris) : [];
 
@@ -60,9 +62,9 @@ export default function WritePreviewScreen() {
     });
 
     if (!result.canceled) {
-      const newImageUris = result.assets.map((asset) => asset.uri);
+      const newImageUris = result.assets.map(asset => asset.uri);
 
-      setSelectedImageUris((prevImageUris) => [
+      setSelectedImageUris(prevImageUris => [
         ...prevImageUris,
         ...newImageUris,
       ]);
@@ -70,8 +72,8 @@ export default function WritePreviewScreen() {
   };
 
   const handleImageDeletePress = (targetImageUri: string) => {
-    setSelectedImageUris((prevImageUris) =>
-      prevImageUris.filter((imageUri) => imageUri !== targetImageUri),
+    setSelectedImageUris(prevImageUris =>
+      prevImageUris.filter(imageUri => imageUri !== targetImageUri),
     );
   };
 
@@ -81,11 +83,16 @@ export default function WritePreviewScreen() {
       return;
     }
 
+    if (!blogId) {
+      Alert.alert('오류', '저장할 글 정보가 없습니다.');
+      return;
+    }
+
     try {
       setIsSaving(true);
 
       const uploadedPhotoUrls = await Promise.all(
-        selectedImageUris.map(async (imageUri) => {
+        selectedImageUris.map(async imageUri => {
           if (imageUri.startsWith('http')) {
             return imageUri;
           }
@@ -95,16 +102,11 @@ export default function WritePreviewScreen() {
         }),
       );
 
-      if (!blogId) {
-  Alert.alert('오류', '저장할 글 정보가 없습니다.');
-  return;
-}
-
-await updateBlog(blogId, {
-  title: journalTitle,
-  content: journalContent,
-  photoUrls: uploadedPhotoUrls,
-});
+      await updateBlog(blogId, {
+        title: journalTitle,
+        content: journalContent,
+        photoUrls: uploadedPhotoUrls,
+      });
 
       Alert.alert('완료', '글이 저장되었습니다.', [
         {text: '확인', onPress: () => router.replace('/(main)/(tabs)/home')},
@@ -117,7 +119,7 @@ await updateBlog(blogId, {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-surface">
       <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
         <TouchableOpacity onPress={handleCancelPress}>
           <Text className="text-xs text-muted">Cancel</Text>
@@ -150,18 +152,18 @@ await updateBlog(blogId, {
           value={journalTitle}
           onChangeText={setJournalTitle}
           placeholder="제목"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={tc.tertiary}
           textAlign="center"
         />
 
         <TouchableOpacity
-          className="w-full h-[210px] bg-[#F2F2F2] justify-center items-center mb-5"
+          className="w-full h-[210px] bg-teal-bg justify-center items-center mb-5"
           onPress={handleImageAddPress}
         >
           <Text className="text-sm text-tertiary">사진 추가</Text>
         </TouchableOpacity>
 
-        {selectedImageUris.map((imageUri) => (
+        {selectedImageUris.map(imageUri => (
           <View key={imageUri} className="w-full mb-5">
             <Image
               source={{uri: imageUri}}
@@ -185,7 +187,7 @@ await updateBlog(blogId, {
           onChangeText={setJournalContent}
           multiline
           placeholder="내용"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={tc.tertiary}
           textAlign="center"
         />
       </ScrollView>

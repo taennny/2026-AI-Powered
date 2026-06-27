@@ -8,7 +8,7 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type CalendarDay} from '@/services/calendarApi';
-import {Colors} from '@/constants/Colors';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -32,6 +32,7 @@ export default function Calendar({
   onViewDateChange,
   eventDays = [],
 }: Props) {
+  const tc = useThemeColors();
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
@@ -66,7 +67,7 @@ export default function Calendar({
   };
 
   return (
-    <View className="bg-white px-4 pt-5">
+    <View className="bg-card px-4 pt-5">
 
       {/* 월 헤더 */}
       <View className="flex-row items-center mb-[14px]">
@@ -85,7 +86,7 @@ export default function Calendar({
       <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
           <View key={label} className="flex-1 items-center pb-[6px]">
-            <Text className="text-[11px] font-medium text-tertiary" style={{letterSpacing: 0.4}}>
+            <Text className="text-[11px] font-medium text-dow" style={{letterSpacing: 0.4}}>
               {label}
             </Text>
           </View>
@@ -110,7 +111,7 @@ export default function Calendar({
                   <>
                     <View
                       className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{backgroundColor: highlighted ? Colors.tealAccent : 'transparent'}}
+                      style={{backgroundColor: highlighted ? tc.tealAccent : 'transparent'}}
                     >
                       <Text
                         className={`text-[15px] ${highlighted ? 'font-bold text-white' : 'font-normal text-primary'}`}

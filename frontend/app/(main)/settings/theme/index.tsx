@@ -10,20 +10,20 @@ import {useRef} from 'react';
 import {View, Text, TouchableOpacity, FlatList, Dimensions} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
+import {useState} from 'react';
 
 import {fetchSubscription} from '@/services/subscriptionApi';
 import SubscriptionModal from '@/components/subscription/SubscriptionModal';
 import {useThemeStore} from '@/store/themeStore';
 import {type ThemeId} from '@/constants/themes';
-import {useState} from 'react';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const THEMES = [
-  {id: 'basic'      as ThemeId, label: '베이직',  bg: '#E6F0F1'},
-  {id: 'dark'       as ThemeId, label: '다크',    bg: '#1e1e1e'},
-  {id: 'strawberry' as ThemeId, label: '딸기',    bg: '#FFE4EC'},
-  {id: 'aqua'       as ThemeId, label: '아쿠아',  bg: '#E0F4FF'},
+  {id: 'basic' as ThemeId, label: '베이직', bg: '#E6F0F1'},
+  {id: 'dark' as ThemeId, label: '다크', bg: '#1e1e1e'},
+  {id: 'strawberry' as ThemeId, label: '딸기', bg: '#FFE4EC'},
+  {id: 'aqua' as ThemeId, label: '아쿠아', bg: '#E0F4FF'},
 ];
 
 const PREMIUM_THEMES: ThemeId[] = ['strawberry', 'aqua'];
@@ -56,7 +56,6 @@ export default function ThemeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-
       {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
@@ -65,7 +64,9 @@ export default function ThemeScreen() {
       </View>
 
       {/* 타이틀 */}
-      <Text className="text-[36px] font-extrabold text-primary px-6 pb-4">테마</Text>
+      <Text className="text-[36px] font-extrabold text-primary px-6 pb-4">
+        테마
+      </Text>
 
       {/* 구분선 */}
       <View className="h-px bg-line" />
@@ -80,7 +81,9 @@ export default function ThemeScreen() {
         showsHorizontalScrollIndicator={false}
         style={{height: LIST_H, flexGrow: 0}}
         onMomentumScrollEnd={e => {
-          setCurrentIndex(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH));
+          setCurrentIndex(
+            Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH),
+          );
         }}
         renderItem={({item}) => (
           <View style={{width: SCREEN_WIDTH}} className="px-5 pt-5">
@@ -98,7 +101,13 @@ export default function ThemeScreen() {
             </TouchableOpacity>
 
             {/* 미리보기 (추후 스크린샷으로 교체) */}
-            <View style={{height: PREVIEW_H, borderRadius: 24, backgroundColor: item.bg}} />
+            <View
+              style={{
+                height: PREVIEW_H,
+                borderRadius: 24,
+                backgroundColor: item.bg,
+              }}
+            />
           </View>
         )}
       />
@@ -113,8 +122,10 @@ export default function ThemeScreen() {
         ))}
       </View>
 
-      <SubscriptionModal visible={showModal} onClose={() => setShowModal(false)} />
-
+      <SubscriptionModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+      />
     </SafeAreaView>
   );
 }

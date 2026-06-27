@@ -17,7 +17,14 @@
   "insertPragma": false,
   "overrides": [
     {
-      "files": "*.json, README.md",
+      "files": "*.md",
+      "options": {
+        "proseWrap": "preserve",
+        "printWidth": 99999
+      }
+    },
+    {
+      "files": "*.json",
       "options": {
         "printWidth": 200
       }

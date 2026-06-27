@@ -11,20 +11,20 @@ import {router} from 'expo-router';
 import {useTimelineStore} from '@/store/timelineStore';
 
 export default function HomeFooter() {
-  const totalDistance = useTimelineStore(s => s.totalDistance);
+  const placesCount = useTimelineStore(s => s.placesCount);
+  const hasTimeline = placesCount > 0;
 
   return (
-    <SafeAreaView edges={['bottom']} className="bg-surface">
-      <View className="flex-row items-center justify-between px-5 py-3 bg-surface">
-        <View>
-          <Text className="text-[11px] text-tertiary mb-0.5">이동 거리</Text>
-          <Text className="text-lg font-semibold text-primary">{totalDistance.toFixed(1)}Km</Text>
-        </View>
+    <SafeAreaView edges={['bottom']} className="bg-footer">
+      <View className="flex-row items-center justify-end px-5 py-3 bg-footer">
         <TouchableOpacity
           onPress={() => router.push('/(main)/write')}
-          className="bg-primary px-5 py-[10px] rounded-[20px]"
+          disabled={!hasTimeline}
+          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
         >
-          <Text className="text-white text-[13px] font-semibold tracking-[0.5px]">글쓰기</Text>
+          <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
+            글쓰기
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

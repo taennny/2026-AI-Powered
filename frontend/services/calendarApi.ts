@@ -25,28 +25,88 @@ export type TimelinePlace = {
   left_at: string;
   lat: number;
   lng: number;
-  photos?: string[];
+  photos?: string[];     // 촬영된 사진 url 목록
 };
 
 export type TimelineData = {
-  date: string;
-  polyline: {
-    lat: number;
-    lng: number;
-  }[];
+  date: string;          // 'YYYY-MM-DD'
+  polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
 };
+
+const USE_MOCK = process.env.EXPO_PUBLIC_USE_MOCK === 'true';
+
+const MOCK_CALENDAR: CalendarMonth = {
+  year: 2026,
+  month: 5,
+  days: [
+    {date: '2026-05-07', has_journal: false, has_timeline: true},
+  ],
+};
+
+const MOCK_TIMELINE: TimelineData = {
+  date: '2026-05-07',
+  polyline: [
+    {lat: 37.5577, lng: 126.9250},
+    {lat: 37.5565, lng: 126.9240},
+    {lat: 37.5550, lng: 126.9235},
+    {lat: 37.5538, lng: 126.9225},
+    {lat: 37.5530, lng: 126.9220},
+    {lat: 37.5518, lng: 126.9208},
+  ],
+  places: [
+    {
+      place_id: 'place_001',
+      name: '앤트러사이트 홍대',
+      category: '카페',
+      arrived_at: '2026-05-07T09:02:00.000Z',
+      left_at: '2026-05-07T09:30:00.000Z',
+      lat: 37.5550,
+      lng: 126.9235,
+      photos: ['https://picsum.photos/200/200?random=1'],
+    },
+    {
+      place_id: 'place_002',
+      name: '현대카드 뮤직라이브러리',
+      category: '문화시설',
+      arrived_at: '2026-05-07T09:31:30.000Z',
+      left_at: '2026-05-07T11:00:00.000Z',
+      lat: 37.5530,
+      lng: 126.9220,
+      photos: [],
+    },
+    {
+      place_id: 'place_003',
+      name: '홍대 고기리막국수',
+      category: '음식점',
+      arrived_at: '2026-05-07T11:01:30.000Z',
+      left_at: '2026-05-07T12:30:00.000Z',
+      lat: 37.5518,
+      lng: 126.9208,
+      photos: ['https://picsum.photos/200/200?random=2'],
+    },
+  ],
+};
+
 /** GET /api/v1/calendar/{year}/{month} */
 export async function fetchCalendarMonth(
   year: number,
   month: number,
 ): Promise<CalendarMonth> {
-  const {data} = await api.get<CalendarMonth>(`/api/v1/calendar/${year}/${month}`);
+  if (USE_MOCK) return MOCK_CALENDAR;
+
+  const {data} = await api.get<CalendarMonth>(
+    `/api/v1/calendar/${year}/${month}`,
+  );
   return data;
 }
 
 /** GET /api/v1/calendar/{date}/timeline */
 export async function fetchTimeline(date: string): Promise<TimelineData> {
-  const {data} = await api.get<TimelineData>(`/api/v1/calendar/${date}/timeline`);
+  if (USE_MOCK && date === '2026-05-07') return MOCK_TIMELINE;
+
+  const {data} = await api.get<TimelineData>(
+    `/api/v1/calendar/${date}/timeline`,
+  );
   return data;
 }

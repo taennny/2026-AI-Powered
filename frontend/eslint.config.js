@@ -4,6 +4,8 @@ import importPlugin from "eslint-plugin-import";
 import react from "eslint-plugin-react";
 import hooks from "eslint-plugin-react-hooks";
 import unusedImports from "eslint-plugin-unused-imports";
+import tsParser from "@typescript-eslint/parser";
+import tsPlugin from "@typescript-eslint/eslint-plugin";
 
 export default [
   js.configs.recommended,
@@ -14,6 +16,10 @@ export default [
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
+      parser: tsParser,
+      parserOptions: {
+        ecmaFeatures: {jsx: true},
+      },
     },
 
     plugins: {
@@ -21,6 +27,7 @@ export default [
       "react-hooks": hooks,
       import: importPlugin,
       "unused-imports": unusedImports,
+      "@typescript-eslint": tsPlugin,
     },
 
     rules: {
@@ -40,13 +47,17 @@ export default [
         },
       ],
 
-      // 안쓰는 import 제거 (🔥 핵심)
+      // 안쓰는 import 제거
       "unused-imports/no-unused-imports": "error",
 
-      // 기본
+      // JS no-unused-vars 끄고 TS 버전 사용
       "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+
+      // TS에서 no-undef 오탐 방지
+      "no-undef": "off",
     },
   },
 
-  prettier, // 🔥 Prettier랑 충돌 제거
+  prettier,
 ];

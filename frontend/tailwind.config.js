@@ -16,9 +16,15 @@ module.exports = {
         medium:       'var(--color-medium)',      // text-medium   서브 텍스트
         secondary:    'var(--color-secondary)',   // text-secondary 보조 텍스트
         tertiary:     'var(--color-tertiary)',    // text-tertiary  힌트·레이블
+        dow:          'var(--color-dow)',         // text-dow       캘린더 요일 텍스트
         // 서피스
-        surface:      'var(--color-surface)',     // bg-surface    헤더·푸터·화면 배경
+        surface:      'var(--color-surface)',     // bg-surface    헤더·푸터·탭바 배경(크롬)
+        card:         'var(--color-card)',        // bg-card       홈 콘텐츠 배경·카드(콘텐츠)
+        footer:       'var(--color-footer)',      // bg-footer     홈 푸터 배경
         line:         'var(--color-line)',        // border-line   구분선·테두리
+        // 버튼 전용 (primary와 분리 — dark 테마에서 bg-primary가 흰색이 되는 문제 해결)
+        'btn-bg':     'var(--color-btn-bg)',      // bg-btn-bg     버튼 배경(홈 글쓰기·구독 CTA)
+        'btn-text':   'var(--color-btn-text)',    // text-btn-text 버튼 텍스트(홈 글쓰기·구독 CTA)
         // ─── 정적 토큰 (테마와 무관) ──────────────────────────────────
         muted:        '#CCCCCC',                 // text-muted    비활성 아이콘·화살표
       },

@@ -10,6 +10,7 @@ import {
   type CalendarDay,
   type TimelinePlace,
 } from '@/services/calendarApi';
+import {useTimelineStore} from '@/store/timelineStore';
 import {toDateKey} from '@/utils/formatDate';
 
 export function useCalendar() {
@@ -21,6 +22,7 @@ export function useCalendar() {
 
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [places, setPlaces] = useState<TimelinePlace[]>([]);
+  const setTimeline = useTimelineStore(s => s.setTimeline);
 
   useEffect(() => {
     fetchCalendarMonth(viewDate.getFullYear(), viewDate.getMonth() + 1)
@@ -32,11 +34,13 @@ export function useCalendar() {
     fetchTimeline(toDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
+        setTimeline(data.places.length);
       })
       .catch(() => {
         setPlaces([]);
+        setTimeline(0);
       });
-  }, [selectedDate]);
+  }, [selectedDate, setTimeline]);
 
   return {
     selectedDate,

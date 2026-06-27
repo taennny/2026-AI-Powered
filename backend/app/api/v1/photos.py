@@ -6,21 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.schemas.photos import PhotoResponse
-from app.services.photos import upload_photo, get_photo
+from app.services.photos import upload_photo, get_photo, get_photo_url
 from app.utils.dependencies import get_current_user
-from app.config import settings
-from minio import Minio
 
-router = APIRouter(prefix="/photos", tags=["photos"])
-
-
-def get_minio_client() -> Minio:
-    return Minio(
-        settings.MINIO_ENDPOINT,
-        access_key=settings.MINIO_ACCESS_KEY,
-        secret_key=settings.MINIO_SECRET_KEY,
-        secure=False,
-    )
+router = APIRouter(prefix="/api/v1/photos", tags=["photos"])
 
 
 @router.post("/upload", response_model=PhotoResponse, status_code=200)
@@ -34,24 +23,20 @@ async def upload_photo_api(
         raise HTTPException(status_code=422, detail="지원하지 않는 파일 형식입니다")
 
     file_bytes = await photo.read()
-    minio_client = get_minio_client()
 
     saved = await upload_photo(
         file_bytes=file_bytes,
         content_type=photo.content_type,
         user_id=current_user.id,
         db=db,
-        minio_client=minio_client,
     )
 
-    photo_url = f"http://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/{saved.storage_key}"
+    photo_url = await get_photo_url(saved.storage_key)
 
     return PhotoResponse(
         photo_id=saved.id,
         photo_url=photo_url,
         taken_at=saved.taken_at,
-        latitude=saved.latitude,
-        longitude=saved.longitude,
         created_at=saved.created_at,
     )
 
@@ -66,13 +51,11 @@ async def get_photo_api(
     if not photo:
         raise HTTPException(status_code=404, detail="사진을 찾을 수 없습니다")
 
-    photo_url = f"http://{settings.MINIO_ENDPOINT}/{settings.MINIO_BUCKET_NAME}/{photo.storage_key}"
+    photo_url = await get_photo_url(photo.storage_key)
 
     return PhotoResponse(
         photo_id=photo.id,
         photo_url=photo_url,
         taken_at=photo.taken_at,
-        latitude=photo.latitude,
-        longitude=photo.longitude,
         created_at=photo.created_at,
     )

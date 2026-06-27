@@ -8,13 +8,17 @@
 import {useEffect} from 'react';
 import {useRouter} from 'expo-router';
 import {View, ActivityIndicator} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {usePermissions} from '@/hooks/usePermissions';
 import {useAuthStore} from '@/store/authStore';
+import {useGpsTracking} from '@/hooks/useGpsTracking';
 
 export default function IndexScreen() {
   const router = useRouter();
   const {requestAll} = usePermissions();
   const initialize = useAuthStore(s => s.initialize);
+  const {start: startGps} = useGpsTracking();
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -23,7 +27,14 @@ export default function IndexScreen() {
 
       const {isAuthenticated} = useAuthStore.getState();
       if (isAuthenticated) {
-        router.replace('/(main)/(tabs)/home');
+        await startGps();
+
+        const onboardingDone = await AsyncStorage.getItem('onboarding_done');
+        if (!onboardingDone) {
+          router.replace('/onboarding');
+        } else {
+          router.replace('/(main)/(tabs)/home');
+        }
       } else {
         router.replace('/(auth)/login');
       }
