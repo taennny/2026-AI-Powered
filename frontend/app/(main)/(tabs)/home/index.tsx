@@ -12,28 +12,33 @@ import BottomSheet from '@/components/bottomsheet/BottomSheet';
 import Calendar from '@/components/home/Calendar';
 import {useCalendar} from '@/hooks/useCalendar';
 
-// 달력이 항상 6줄로 고정됨을 가정: paddingTop(20) + 월헤더(48) + 요일레이블(23) + 6주×52.5px(315) = 406
-const CALENDAR_HEIGHT_6_ROWS = 440;
-
 export default function HomeIndex() {
-  const [peekHeight, setPeekHeight] = useState<number | null>(null);
+  // 달력 실제 렌더 높이를 측정 — 5/6줄·이벤트 dot에 따라 높이가 달라지므로 고정값 대신 측정값 사용
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
+  const [calendarHeight, setCalendarHeight] = useState<number | null>(null);
   const {selectedDate, setSelectedDate, viewDate, setViewDate, calendarDays, places} =
     useCalendar();
+
+  // peek 시 보이는 시트 높이 = 전체 - 달력 높이 → 시트 상단이 달력 바로 아래에 위치
+  const peekHeight =
+    containerHeight !== null && calendarHeight !== null
+      ? Math.max(0, containerHeight - calendarHeight)
+      : null;
 
   return (
     <View
       className="flex-1 bg-surface"
-      onLayout={e =>
-        setPeekHeight(Math.max(0, e.nativeEvent.layout.height - CALENDAR_HEIGHT_6_ROWS))
-      }
+      onLayout={e => setContainerHeight(e.nativeEvent.layout.height)}
     >
-      <Calendar
-        selectedDate={selectedDate}
-        onDateSelect={setSelectedDate}
-        viewDate={viewDate}
-        onViewDateChange={setViewDate}
-        eventDays={calendarDays}
-      />
+      <View onLayout={e => setCalendarHeight(e.nativeEvent.layout.height)}>
+        <Calendar
+          selectedDate={selectedDate}
+          onDateSelect={setSelectedDate}
+          viewDate={viewDate}
+          onViewDateChange={setViewDate}
+          eventDays={calendarDays}
+        />
+      </View>
 
       {/* peekHeight 확정 후 렌더링 — 0이면 초기 위치 오류 방지 */}
       {peekHeight !== null && (

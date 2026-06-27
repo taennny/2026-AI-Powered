@@ -52,9 +52,11 @@ export default function BottomSheet({
 }: Props) {
   const sheetHeight = useRef(0);
   const translateY = useRef(new Animated.Value(9999)).current;
-  const HANDLE_HEIGHT = 30;
+  // collapse(가장 아래) 시 footer 위로 남겨둘 노출 높이 — 핸들 + 날짜 헤더가 보이도록
+  const COLLAPSED_PEEK = 64;
   const lastY = useRef(0);
   const peekHeightRef = useRef(peekHeight);
+  const currentSnap = useRef<'expanded' | 'peek' | 'collapsed'>('peek');
 
   const [showMap, setShowMap] = useState(false);
   const [isMapMounted, setIsMapMounted] = useState(false);
@@ -86,16 +88,43 @@ export default function BottomSheet({
     }
   }, [showMap, mapOpacity]);
 
+  // 현재 snap 상태에 해당하는 translateY 위치 계산
+  const snapPositionFor = useCallback(
+    (state: 'expanded' | 'peek' | 'collapsed', h: number) => {
+      if (state === 'expanded') return 0;
+      if (state === 'collapsed') return h - COLLAPSED_PEEK;
+      return h - peekHeightRef.current;
+    },
+    [],
+  );
+
   const onLayout = useCallback(
     (e: LayoutChangeEvent) => {
       const h = e.nativeEvent.layout.height;
       sheetHeight.current = h;
-      const peekOffset = h - peekHeightRef.current;
-      translateY.setValue(peekOffset);
-      lastY.current = peekOffset;
+      // 재레이아웃(월 이동 등) 시에도 현재 snap 상태를 유지 — 항상 peek로 올라오지 않도록
+      const target = snapPositionFor(currentSnap.current, h);
+      translateY.setValue(target);
+      lastY.current = target;
     },
-    [translateY],
+    [translateY, snapPositionFor],
   );
+
+  // 월 이동 등으로 달력 높이(peekHeight)가 바뀌면 ref 갱신 + peek에 머물러 있을 땐 새 위치로 재정렬
+  useEffect(() => {
+    peekHeightRef.current = peekHeight;
+    if (sheetHeight.current > 0 && currentSnap.current === 'peek') {
+      const peek = sheetHeight.current - peekHeight;
+      lastY.current = peek;
+      Animated.spring(translateY, {
+        toValue: peek,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 11,
+        overshootClamping: true,
+      }).start();
+    }
+  }, [peekHeight, translateY]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -104,22 +133,25 @@ export default function BottomSheet({
         translateY.stopAnimation();
       },
       onPanResponderMove: (_, {dy}) => {
-        const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
+        const handleOnly = sheetHeight.current - COLLAPSED_PEEK;
         const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
         translateY.setValue(next);
       },
       onPanResponderRelease: (_, {dy, vy}) => {
         const peek = sheetHeight.current - peekHeightRef.current;
-        const handleOnly = sheetHeight.current - HANDLE_HEIGHT;
+        const handleOnly = sheetHeight.current - COLLAPSED_PEEK;
         const next = Math.max(0, Math.min(handleOnly, lastY.current + dy));
 
         let snapTo: number;
         if (vy < -0.5 || next < peek / 2) {
           snapTo = 0;
+          currentSnap.current = 'expanded';
         } else if (vy > 0.5 || next > (peek + handleOnly) / 2) {
           snapTo = handleOnly;
+          currentSnap.current = 'collapsed';
         } else {
           snapTo = peek;
+          currentSnap.current = 'peek';
         }
 
         lastY.current = snapTo;
@@ -128,6 +160,8 @@ export default function BottomSheet({
           useNativeDriver: true,
           tension: 65,
           friction: 11,
+          // 경계(handleOnly/expanded)를 지나쳤다 되돌아오는 과한 바운스 방지
+          overshootClamping: true,
         }).start();
       },
     }),
@@ -143,21 +177,26 @@ export default function BottomSheet({
       onLayout={onLayout}
       className="absolute left-0 right-0 top-0 bottom-0 bg-teal-bg rounded-tl-[20px] rounded-tr-[20px]"
       style={{transform: [{translateY}]}}
-      {...panResponder.panHandlers}
     >
-      {/* 핸들 */}
-      <View className="items-center pt-[10px] pb-[6px]">
-        <View className="w-9 h-1 rounded-full bg-teal-dark" />
+      {/* 핸들 + 날짜 헤더 — 이 영역 드래그 시에만 시트 전체 이동 */}
+      <View {...panResponder.panHandlers}>
+        {/* 핸들 */}
+        <View className="items-center pt-[10px] pb-[6px]">
+          <View className="w-9 h-1 rounded-full bg-teal-dark" />
+        </View>
+
+        {/* 날짜 헤더 */}
+        <Text className="text-center text-[15px] font-bold text-primary mb-4">
+          {formatDate(selectedDate)}
+        </Text>
       </View>
 
-      {/* 날짜 헤더 */}
-      <Text className="text-center text-[15px] font-bold text-primary mb-4">
-        {formatDate(selectedDate)}
-      </Text>
-
-      {/* 지도 미리보기 */}
+      {/* 지도 미리보기 — 지도 위 드래그도 시트 전체 이동(목록 스크롤 아님) */}
       {isMapMounted && hasPlaces && (
-        <Animated.View style={{opacity: mapOpacity}}>
+        <Animated.View
+          style={{opacity: mapOpacity}}
+          {...panResponder.panHandlers}
+        >
           <MapPreview places={places} />
         </Animated.View>
       )}
