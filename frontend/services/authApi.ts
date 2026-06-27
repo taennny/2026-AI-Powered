@@ -64,11 +64,12 @@ export async function resetPassword(token: string, newPassword: string) {
 
 export interface UserMe {
   email: string;
-  is_kakao_linked: boolean;
+  // 백엔드 /me는 현재 email만 반환 — 카카오 연동 여부는 미구현(추후 확장)
+  is_kakao_linked?: boolean;
 }
 
 export async function fetchMe(): Promise<UserMe> {
-  const response = await api.get('/api/v1/auth/me');
+  const response = await api.get<UserMe>('/api/v1/auth/me');
   return response.data;
 }
 

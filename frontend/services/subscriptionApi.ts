@@ -7,13 +7,10 @@
 import {api} from '@/utils/api';
 
 type SubscriptionResponse = {
-  plan_type: 'free' | 'premium';
+  plan: 'free' | 'premium';
   is_active: boolean;
+  started_at: string | null;
   expires_at: string | null;
-  created_at?: string;
-  updated_at?: string;
-  id?: string;
-  user_id?: string;
 };
 
 export type SubscriptionStatus = {
@@ -26,9 +23,9 @@ export type SubscriptionStatus = {
 export async function fetchSubscription(): Promise<SubscriptionStatus> {
   const {data} = await api.get<SubscriptionResponse>('/api/v1/subscriptions/me');
   return {
-    plan: data.plan_type,
+    plan: data.plan,
     is_active: data.is_active,
-    started_at: data.updated_at ?? null,
+    started_at: data.started_at,
     expires_at: data.expires_at,
   };
 }
