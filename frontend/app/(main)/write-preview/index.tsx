@@ -20,7 +20,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {saveJournal, uploadPhoto} from '@/services/journalApi';
-import {Colors} from '@/constants/Colors';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
@@ -35,6 +35,7 @@ export default function WritePreviewScreen() {
   const [journalContent, setJournalContent] = useState(content || '');
   const [selectedImageUri, setSelectedImageUri] = useState(photoUrl || '');
   const [isSaving, setIsSaving] = useState(false);
+  const tc = useThemeColors();
 
   const canSave = journalTitle.trim().length > 0 && journalContent.trim().length > 0;
 
@@ -91,7 +92,7 @@ export default function WritePreviewScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <SafeAreaView className="flex-1 bg-surface">
 
       {/* 헤더 */}
       <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
@@ -112,7 +113,7 @@ export default function WritePreviewScreen() {
           value={journalTitle}
           onChangeText={setJournalTitle}
           placeholder="제목"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={tc.tertiary}
           textAlign="center"
         />
 
@@ -127,7 +128,7 @@ export default function WritePreviewScreen() {
           </View>
         ) : (
           <TouchableOpacity
-            className="w-full h-[210px] bg-[#F2F2F2] justify-center items-center mb-5"
+            className="w-full h-[210px] bg-teal-bg justify-center items-center mb-5"
             onPress={handleImageChangePress}
           >
             <Text className="text-sm text-tertiary">사진 추가</Text>
@@ -141,7 +142,7 @@ export default function WritePreviewScreen() {
           onChangeText={setJournalContent}
           multiline
           placeholder="내용"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={tc.tertiary}
           textAlign="center"
         />
       </ScrollView>

@@ -1,23 +1,22 @@
-/** @file app/(main)/settings/subscription/index.tsx — 구독 설정 화면 (플랜 조회 + Premium/Free 분기) */
-
 import {useEffect, useState} from 'react';
-import {View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {Alert, View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
-import {fetchSubscription, type SubscriptionStatus} from '@/services/subscriptionApi';
+import {fetchSubscription, subscribePremium, cancelSubscription, type SubscriptionStatus} from '@/services/subscriptionApi';
+import {useThemeStore} from '@/store/themeStore';
 import PremiumView from '@/components/subscription/PremiumView';
 import FreeView from '@/components/subscription/FreeView';
 
-function getNextPaymentDate(startedAt: string): string {
-  const next = new Date(startedAt);
-  next.setDate(next.getDate() + 30);
-  return `${next.getMonth() + 1}월 ${next.getDate()}일`;
+function formatMonthDay(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
 export default function SubscriptionScreen() {
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const setTheme = useThemeStore(s => s.setTheme);
 
   useEffect(() => {
     fetchSubscription()
@@ -28,11 +27,64 @@ export default function SubscriptionScreen() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleSubscribe = () => {
+    Alert.alert(
+      '프리미엄 구독',
+      '로미 프리미엄을 시작할까요?',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '확인',
+          onPress: async () => {
+            try {
+              await subscribePremium();
+              // 백엔드에서 최신 구독 상태 조회
+              const updated = await fetchSubscription();
+              setSubscription(updated);
+              Alert.alert('', '결제가 완료되었습니다.');
+            } catch {
+              Alert.alert('오류', '구독 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancel = () => {
+    Alert.alert(
+      '구독 해지',
+      '정말 로미 프리미엄을 해지하겠어요?',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '해지',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelSubscription();
+              // 백엔드에서 최신 구독 상태 조회
+              const updated = await fetchSubscription();
+              setSubscription(updated);
+              // 테마를 베이직으로 변경
+              setTheme('basic');
+              Alert.alert('', '구독이 해지되었습니다.');
+            } catch {
+              Alert.alert('오류', '구독 해지 중 문제가 발생했어요. 다시 시도해주세요.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const isPremium = subscription?.plan === 'premium' && subscription?.is_active;
 
-  const subtitle = isPremium && subscription?.started_at
-    ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${getNextPaymentDate(subscription.started_at)}`
-    : '베이직 플랜을 이용 중';
+  const subtitle = !isPremium
+    ? '베이직 플랜을 이용 중'
+    : subscription?.expires_at
+      ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${formatMonthDay(subscription.expires_at)}`
+      : '프리미엄 플랜을 이용 중';
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
@@ -61,9 +113,9 @@ export default function SubscriptionScreen() {
           <ActivityIndicator size="small" />
         </View>
       ) : isPremium && subscription ? (
-        <PremiumView subscription={subscription} />
+        <PremiumView subscription={subscription} onCancel={handleCancel} />
       ) : (
-        <FreeView />
+        <FreeView onSubscribe={handleSubscribe} />
       )}
 
     </SafeAreaView>

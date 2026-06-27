@@ -25,11 +25,11 @@ export type TimelinePlace = {
   left_at: string;       // ISO 8601
   lat: number;
   lng: number;
+  photos?: string[];     // 촬영된 사진 url 목록
 };
 
 export type TimelineData = {
   date: string;          // 'YYYY-MM-DD'
-  total_distance: number;
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
 };
@@ -46,7 +46,6 @@ const MOCK_CALENDAR: CalendarMonth = {
 
 const MOCK_TIMELINE: TimelineData = {
   date: '2026-05-07',
-  total_distance: 0.68,
   polyline: [
     {lat: 37.5577, lng: 126.9250},
     {lat: 37.5565, lng: 126.9240},
@@ -64,6 +63,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T09:30:00.000Z',
       lat: 37.5550,
       lng: 126.9235,
+      photos: ['https://picsum.photos/200/200?random=1'],
     },
     {
       place_id: 'place_002',
@@ -73,6 +73,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T11:00:00.000Z',
       lat: 37.5530,
       lng: 126.9220,
+      photos: [],
     },
     {
       place_id: 'place_003',
@@ -82,6 +83,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T12:30:00.000Z',
       lat: 37.5518,
       lng: 126.9208,
+      photos: ['https://picsum.photos/200/200?random=2'],
     },
   ],
 };

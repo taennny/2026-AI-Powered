@@ -37,11 +37,11 @@ export function useCalendar() {
     fetchTimeline(toDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
-        setTimeline(data.total_distance, data.places.length);
+        setTimeline(data.places.length);
       })
       .catch(() => {
         setPlaces([]);
-        setTimeline(0, 0);
+        setTimeline(0);
       });
   }, [selectedDate]);
 
