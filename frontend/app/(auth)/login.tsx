@@ -1,7 +1,15 @@
 import * as WebBrowser from 'expo-web-browser';
-import {View, Text, TextInput, TouchableOpacity, Keyboard, TouchableWithoutFeedback} from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
+
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 
@@ -33,7 +41,7 @@ export default function LoginScreen() {
       const {access_token} = await login({email, password});
       setToken(access_token);
 
-      router.replace('/(main)/(tabs)/home');
+      router.replace('/');
     } catch (error: any) {
       const status = error?.response?.status;
 
@@ -69,67 +77,69 @@ export default function LoginScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View className="flex-1 bg-white px-6 justify-center">
-      <Text className="text-[64px] leading-[64px] font-black text-[#1E1E1E] mb-12">
-        Roa{'\n'}me
-      </Text>
-
-      <View className="space-y-3">
-        <TextInput
-          placeholder="ID"
-          placeholderTextColor="#8E8E93"
-          value={email}
-          onChangeText={text => {
-            setEmail(text);
-            setErrorMessage('');
-          }}
-          className="border border-line rounded-md px-4 py-3 text-[16px]"
-        />
-
-        <TextInput
-          placeholder="PASSWORD"
-          placeholderTextColor="#8E8E93"
-          secureTextEntry
-          value={password}
-          onChangeText={text => {
-            setPassword(text);
-            setErrorMessage('');
-          }}
-          className="border border-line rounded-md px-4 py-3 text-[16px]"
-        />
-
-        {errorMessage ? (
-          <Text className="text-[#FF3B30] text-[12px] mt-1">
-            {errorMessage}
-          </Text>
-        ) : null}
-      </View>
-
-      <TouchableOpacity
-        disabled={isLoading}
-        onPress={handleLoginPress}
-        className="bg-primary rounded-md py-3 mt-5"
-      >
-        <Text className="text-white text-center text-[16px] font-semibold">
-          {isLoading ? '로딩중' : '로그인'}
+      <View className="flex-1 bg-white px-6 justify-center">
+        <Text className="text-[64px] leading-[64px] font-black text-[#1E1E1E] mb-12">
+          Roa{'\n'}me
         </Text>
-      </TouchableOpacity>
 
-      <View className="flex-row justify-center mt-4 space-x-4">
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-          <Text className="text-[#8E8E93] text-[12px]">회원가입</Text>
+        <View className="space-y-3">
+          <TextInput
+            placeholder="ID"
+            placeholderTextColor="#8E8E93"
+            value={email}
+            onChangeText={text => {
+              setEmail(text);
+              setErrorMessage('');
+            }}
+            className="border border-line rounded-md px-4 py-3 text-[16px]"
+          />
+
+          <TextInput
+            placeholder="PASSWORD"
+            placeholderTextColor="#8E8E93"
+            secureTextEntry
+            value={password}
+            onChangeText={text => {
+              setPassword(text);
+              setErrorMessage('');
+            }}
+            className="border border-line rounded-md px-4 py-3 text-[16px]"
+          />
+
+          {errorMessage ? (
+            <Text className="text-[#FF3B30] text-[12px] mt-1">
+              {errorMessage}
+            </Text>
+          ) : null}
+        </View>
+
+        <TouchableOpacity
+          disabled={isLoading}
+          onPress={handleLoginPress}
+          className="bg-primary rounded-md py-3 mt-5"
+        >
+          <Text className="text-white text-center text-[16px] font-semibold">
+            {isLoading ? '로딩중' : '로그인'}
+          </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/find-password')}>
-          <Text className="text-[#8E8E93] text-[12px]">비밀번호 찾기</Text>
-        </TouchableOpacity>
+        <View className="flex-row justify-center mt-4 space-x-4">
+          <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
+            <Text className="text-[#8E8E93] text-[12px]">회원가입</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => router.push('/(auth)/find-password')}
+          >
+            <Text className="text-[#8E8E93] text-[12px]">비밀번호 찾기</Text>
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          onPress={handleKakaoLogin}
+          className="w-12 h-12 rounded-full bg-[#E5E5EA] self-center mt-6"
+        />
       </View>
-
-      <TouchableOpacity
-        onPress={handleKakaoLogin}
-        className="w-12 h-12 rounded-full bg-[#E5E5EA] self-center mt-6"
-      />
-    </View>
     </TouchableWithoutFeedback>
   );
 }
