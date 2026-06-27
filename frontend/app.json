@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Roame-App",
+    "name": "Roame",
     "slug": "Roame-App",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -18,7 +18,7 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "걷는 동안 위치를 기록합니다.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "백그라운드에서도 위치를 기록합니다.",
-"UIBackgroundModes": [
+        "UIBackgroundModes": [
           "location"
         ]
       }

@@ -3,7 +3,8 @@ import {Alert, View, Text, TouchableOpacity, ActivityIndicator} from 'react-nati
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
-import {fetchSubscription, subscribePremium, type SubscriptionStatus} from '@/services/subscriptionApi';
+import {fetchSubscription, subscribePremium, cancelSubscription, type SubscriptionStatus} from '@/services/subscriptionApi';
+import {useThemeStore} from '@/store/themeStore';
 import PremiumView from '@/components/subscription/PremiumView';
 import FreeView from '@/components/subscription/FreeView';
 
@@ -16,6 +17,7 @@ function getNextPaymentDate(startedAt: string): string {
 export default function SubscriptionScreen() {
   const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const setTheme = useThemeStore(s => s.setTheme);
 
   useEffect(() => {
     fetchSubscription()
@@ -37,18 +39,39 @@ export default function SubscriptionScreen() {
           onPress: async () => {
             try {
               await subscribePremium();
-              Alert.alert('', '결제가 완료되었습니다.', [
-                {
-                  text: '확인',
-                  onPress: () => {
-                    setSubscription(prev =>
-                      prev ? {...prev, plan: 'premium', is_active: true} : prev,
-                    );
-                  },
-                },
-              ]);
+              // 백엔드에서 최신 구독 상태 조회
+              const updated = await fetchSubscription();
+              setSubscription(updated);
+              Alert.alert('', '결제가 완료되었습니다.');
             } catch {
               Alert.alert('오류', '구독 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleCancel = () => {
+    Alert.alert(
+      '구독 해지',
+      '정말 로미 프리미엄을 해지하겠어요?',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '해지',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelSubscription();
+              // 백엔드에서 최신 구독 상태 조회
+              const updated = await fetchSubscription();
+              setSubscription(updated);
+              // 테마를 베이직으로 변경
+              setTheme('basic');
+              Alert.alert('', '구독이 해지되었습니다.');
+            } catch {
+              Alert.alert('오류', '구독 해지 중 문제가 발생했어요. 다시 시도해주세요.');
             }
           },
         },
@@ -89,7 +112,7 @@ export default function SubscriptionScreen() {
           <ActivityIndicator size="small" />
         </View>
       ) : isPremium && subscription ? (
-        <PremiumView subscription={subscription} />
+        <PremiumView subscription={subscription} onCancel={handleCancel} />
       ) : (
         <FreeView onSubscribe={handleSubscribe} />
       )}

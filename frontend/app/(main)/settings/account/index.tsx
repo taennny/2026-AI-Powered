@@ -1,5 +1,11 @@
 import {useEffect, useState} from 'react';
-import {Alert, View, Text, TouchableOpacity, ActivityIndicator} from 'react-native';
+import {
+  Alert,
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -39,7 +45,10 @@ export default function AccountScreen() {
               await logout();
               router.replace('/(auth)/login');
             } catch {
-              Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.');
+              Alert.alert(
+                '오류',
+                '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.',
+              );
             }
           },
         },
@@ -60,7 +69,6 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-
       {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
@@ -108,7 +116,9 @@ export default function AccountScreen() {
             ) : user?.is_kakao_linked ? (
               <View className="flex-row items-center gap-x-[10px]">
                 <View className="w-9 h-9 rounded-full bg-[#FEE500] items-center justify-center">
-                  <Text className="text-[15px] font-bold text-[#3C1E1E]">K</Text>
+                  <Text className="text-[15px] font-bold text-[#3C1E1E]">
+                    K
+                  </Text>
                 </View>
                 <Text className="text-sm text-secondary">카카오 연동됨</Text>
               </View>
@@ -119,23 +129,24 @@ export default function AccountScreen() {
                 className="flex-row items-center gap-x-[10px] bg-[#FEE500] py-[10px] px-4 rounded-xl self-start"
               >
                 <Text className="text-sm font-bold text-[#3C1E1E]">K</Text>
-                <Text className="text-sm font-semibold text-[#3C1E1E]">카카오 연동하기</Text>
+                <Text className="text-sm font-semibold text-[#3C1E1E]">
+                  카카오 연동하기
+                </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
 
         {/* 하단 버튼 */}
-        <View className="absolute bottom-12 left-6 gap-y-4">
+        <View className="absolute bottom-20 left-6 gap-y-2">
           <TouchableOpacity onPress={handleLogout} activeOpacity={0.6}>
             <Text className="text-[15px] text-primary">로그아웃</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
-            <Text className="text-sm text-tertiary">회원탈퇴</Text>
+            <Text className="text-[15px] text-tertiary">회원탈퇴</Text>
           </TouchableOpacity>
         </View>
       </View>
-
     </SafeAreaView>
   );
 }

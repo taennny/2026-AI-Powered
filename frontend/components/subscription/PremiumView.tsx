@@ -11,12 +11,12 @@ import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type SubscriptionStatus} from '@/services/subscriptionApi';
 
-type Props = {subscription: SubscriptionStatus};
+type Props = {subscription: SubscriptionStatus; onCancel: () => void};
 type BillingCycle = 'monthly' | 'annual';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
   {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual',  label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
 ];
 
 function getNextPaymentDate(startedAt: string): string {
@@ -30,16 +30,22 @@ function getDaysCount(startedAt: string): number {
   return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
-export default function PremiumView({subscription}: Props) {
+export default function PremiumView({subscription, onCancel}: Props) {
   // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
   const currentBilling: BillingCycle = 'monthly';
 
-  const nextPayment = subscription.started_at ? getNextPaymentDate(subscription.started_at) : '-';
-  const daysCount   = subscription.started_at ? getDaysCount(subscription.started_at) : 0;
+  const nextPayment = subscription.started_at
+    ? getNextPaymentDate(subscription.started_at)
+    : '-';
+  const daysCount = subscription.started_at
+    ? getDaysCount(subscription.started_at)
+    : 0;
 
   return (
     <View className="flex-1 px-6">
-      <Text className="text-base font-bold text-primary mb-5">프리미엄 플랜</Text>
+      <Text className="text-base font-bold text-primary mb-5">
+        프리미엄 플랜
+      </Text>
 
       {/* 플랜 선택 (현재 플랜 표시) */}
       <View className="gap-y-[14px] mb-7">
@@ -55,9 +61,13 @@ export default function PremiumView({subscription}: Props) {
                 className="w-[18px] h-[18px] rounded-full items-center justify-center"
                 style={{borderWidth: 1.5, borderColor: '#9ca3af'}}
               >
-                {isCurrent && <View className="w-[10px] h-[10px] rounded-full bg-tertiary" />}
+                {isCurrent && (
+                  <View className="w-[10px] h-[10px] rounded-full bg-tertiary" />
+                )}
               </View>
-              <Text className={`text-[15px] ${isCurrent ? 'text-secondary' : 'text-primary'}`}>
+              <Text
+                className={`text-[15px] ${isCurrent ? 'text-secondary' : 'text-primary'}`}
+              >
                 {plan.label}
               </Text>
             </TouchableOpacity>
@@ -74,12 +84,12 @@ export default function PremiumView({subscription}: Props) {
       </View>
 
       {/* 하단 버튼 */}
-      <View className="gap-y-4 mt-auto pb-10">
+      <View className="gap-y-2 mt-auto pb-20">
         <TouchableOpacity>
           <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
-        <TouchableOpacity>
-          <Text className="text-sm text-tertiary">구독 해지</Text>
+        <TouchableOpacity onPress={onCancel}>
+          <Text className="text-[15px] text-tertiary">구독 해지</Text>
         </TouchableOpacity>
       </View>
     </View>
