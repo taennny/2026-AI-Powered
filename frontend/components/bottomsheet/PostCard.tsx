@@ -22,7 +22,7 @@ export default function PostCard({data}: Props) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px] flex-row justify-between items-center"
+      className="bg-card rounded-[14px] px-4 py-[14px] mb-[10px] flex-row justify-between items-center"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
       <View className="flex-1">

@@ -8,10 +8,9 @@ import {useThemeStore} from '@/store/themeStore';
 import PremiumView from '@/components/subscription/PremiumView';
 import FreeView from '@/components/subscription/FreeView';
 
-function getNextPaymentDate(startedAt: string): string {
-  const next = new Date(startedAt);
-  next.setDate(next.getDate() + 30);
-  return `${next.getMonth() + 1}월 ${next.getDate()}일`;
+function formatMonthDay(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
 export default function SubscriptionScreen() {
@@ -81,9 +80,11 @@ export default function SubscriptionScreen() {
 
   const isPremium = subscription?.plan === 'premium' && subscription?.is_active;
 
-  const subtitle = isPremium && subscription?.started_at
-    ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${getNextPaymentDate(subscription.started_at)}`
-    : '베이직 플랜을 이용 중';
+  const subtitle = !isPremium
+    ? '베이직 플랜을 이용 중'
+    : subscription?.expires_at
+      ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${formatMonthDay(subscription.expires_at)}`
+      : '프리미엄 플랜을 이용 중';
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">

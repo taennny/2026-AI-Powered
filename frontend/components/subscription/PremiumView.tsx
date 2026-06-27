@@ -10,6 +10,7 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type SubscriptionStatus} from '@/services/subscriptionApi';
+import {useThemeColors} from '@/hooks/useThemeColors';
 
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
 type BillingCycle = 'monthly' | 'annual';
@@ -19,30 +20,22 @@ const PLANS: {id: BillingCycle; label: string}[] = [
   {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
 ];
 
-function getNextPaymentDate(startedAt: string): string {
-  const next = new Date(startedAt);
-  next.setDate(next.getDate() + 30);
-  return `${next.getMonth() + 1}월 ${next.getDate()}일`;
-}
-
 function getDaysCount(startedAt: string): number {
   const diff = Date.now() - new Date(startedAt).getTime();
   return Math.max(1, Math.floor(diff / (1000 * 60 * 60 * 24)));
 }
 
 export default function PremiumView({subscription, onCancel}: Props) {
+  const tc = useThemeColors();
   // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
   const currentBilling: BillingCycle = 'monthly';
 
-  const nextPayment = subscription.started_at
-    ? getNextPaymentDate(subscription.started_at)
-    : '-';
   const daysCount = subscription.started_at
     ? getDaysCount(subscription.started_at)
     : 0;
 
   return (
-    <View className="flex-1 px-6">
+    <View className="flex-1 px-6 pt-5">
       <Text className="text-base font-bold text-primary mb-5">
         프리미엄 플랜
       </Text>
@@ -59,7 +52,7 @@ export default function PremiumView({subscription, onCancel}: Props) {
             >
               <View
                 className="w-[18px] h-[18px] rounded-full items-center justify-center"
-                style={{borderWidth: 1.5, borderColor: '#9ca3af'}}
+                style={{borderWidth: 1.5, borderColor: tc.tertiary}}
               >
                 {isCurrent && (
                   <View className="w-[10px] h-[10px] rounded-full bg-tertiary" />

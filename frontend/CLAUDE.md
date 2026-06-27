@@ -249,10 +249,43 @@ hooks/useAuth.ts          # 빈 파일 (미구현)
 
 ## 백엔드 팀 확인 필요
 
-| 항목 | 내용 |
-|---|---|
-| 캘린더 API | `GET /api/v1/calendar/{year}/{month}`, `GET /api/v1/calendar/{date}/timeline` 구현 여부 |
-| 저널 저장 | `POST /api/v1/blogs` 저장 엔드포인트 맞는지 확인 |
-| GPS 로그 | `POST /api/v1/gps/logs` 프론트가 올리는 방식인지, generate 요청에 GPS 파라미터 포함하는 방식인지 |
-| blog/generate 동기 여부 | 즉시 응답인지 비동기(polling)인지 — `GET /api/v1/blogs/{blog_id}/status` 존재로 비동기 가능성 있음 |
-| 카카오 딥링크 | `source` 파라미터 pass-through 지원 여부 |
+ [프론트 → 백엔드 요청/확인 사항]
+
+  ■ 신규 필드 추가 요청
+  1. 구독 - 프리미엄 시작일 필드 (premium_started_at)
+     - GET /api/v1/subscriptions/me 응답에 추가
+     - free→premium 전환 시점 기록, 갱신(재결제) 시에는 유지(리셋 X)
+     - 용도: "구독한 지 N일" 표시. 현재 started_at(=created_at)은 가입일이라
+  부정확.
+
+  2. 구독 - 결제주기 구분 필드 (billing_cycle: "monthly" | "annual")
+     - GET /api/v1/subscriptions/me 응답 + PUT /api/v1/subscriptions/me 요청
+  양쪽 반영
+     - 용도: 구독 화면 현재 플랜(월/연) 표시. 현재 프론트에서 'monthly' 하드코딩
+  중.
+
+  3. 인증 - GET /api/v1/auth/me 에 카카오 연동 여부 추가 (is_kakao_linked:
+  boolean)
+     - 현재 응답이 {email}만 → 설정>계정의 SNS 연동 상태가 항상 "연동하기"로
+  표시됨
+     - (계정 연동 기능 보류면 스킵 가능)
+
+  ■ 엔드포인트 확인/정렬
+  4. 저널 저장 방식 확정
+     - 프론트는 POST /api/v1/blogs 로 저장 예정인데 백엔드에 해당 엔드포인트가
+  없음
+     - 저장 흐름이 generate(초안 생성) → POST /api/v1/blog/{id}/publish 가
+  맞는지 확인 요청
+
+  5. 카카오 계정 연동 딥링크 (source pass-through)
+     - 프론트가 GET /auth/kakao/link?source=account-link 로 연동 시도 → 콜백에
+  source 그대로 전달 필요
+     - 현재 POST /api/v1/auth/kakao (code 교환)만 있어 '계정 연동' 플로우용
+  엔드포인트 부재
+     - 연동 후 roameapp://kakao-login?...&source=account-link 형태로 리다이렉트
+  지원 여부 확인
+
+  ■ 참고 (확인 완료, 조치 불필요)
+  - 캘린더 API, GPS 로그(배치 업로드+analyze)는 구현 확인됨
+  - blog/generate는 비동기(202+status 폴링) → 프론트에서 폴링 처리 예정
+

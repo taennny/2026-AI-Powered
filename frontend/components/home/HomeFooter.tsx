@@ -15,14 +15,16 @@ export default function HomeFooter() {
   const hasTimeline = placesCount > 0;
 
   return (
-    <SafeAreaView edges={['bottom']} className="bg-surface">
-      <View className="flex-row items-center justify-end px-5 py-3 bg-surface">
+    <SafeAreaView edges={['bottom']} className="bg-footer">
+      <View className="flex-row items-center justify-end px-5 py-3 bg-footer">
         <TouchableOpacity
           onPress={() => router.push('/(main)/write')}
           disabled={!hasTimeline}
-          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-btn-bg' : 'bg-muted'}`}
+          className={`px-5 py-[10px] rounded-[20px] ${hasTimeline ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
         >
-          <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">글쓰기</Text>
+          <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
+            글쓰기
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -74,7 +74,7 @@ export default function JournalListScreen() {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            backgroundColor: tc.surface,
+            backgroundColor: tc.card,
             borderRadius: 20,
             height: 40,
             width: barWidth,

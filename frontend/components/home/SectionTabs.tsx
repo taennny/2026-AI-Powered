@@ -56,7 +56,7 @@ export default function SectionTabs() {
       >
         <TouchableOpacity
           onPress={() => handleTabPress('home')}
-          className="items-center bg-surface rounded-tl-[10px] rounded-tr-[10px] py-2"
+          className="items-center bg-card rounded-tl-[10px] rounded-tr-[10px] py-2"
           style={{
             boxShadow:
               activeTab === 'home'

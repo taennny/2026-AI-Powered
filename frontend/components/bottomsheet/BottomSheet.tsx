@@ -211,7 +211,8 @@ export default function BottomSheet({
             style={{borderLeftWidth: 8, borderLeftColor: tc.teal}}
           >
             <Text className="text-sm text-secondary leading-[22px]">
-              아직 기록된 일기가 없어요.{'\n'}글을 쓰러 가볼까요?
+              기록된 동선이 없습니다.{'\n'}원활한 기록을 위해 위치 권한을
+              허용해주세요.
             </Text>
           </View>
         ) : (

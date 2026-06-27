@@ -27,7 +27,7 @@ export default function HomeIndex() {
 
   return (
     <View
-      className="flex-1 bg-surface"
+      className="flex-1 bg-card"
       onLayout={e => setContainerHeight(e.nativeEvent.layout.height)}
     >
       <View onLayout={e => setCalendarHeight(e.nativeEvent.layout.height)}>

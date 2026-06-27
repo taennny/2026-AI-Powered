@@ -67,7 +67,7 @@ export default function Calendar({
   };
 
   return (
-    <View className="bg-surface px-4 pt-5">
+    <View className="bg-card px-4 pt-5">
 
       {/* 월 헤더 */}
       <View className="flex-row items-center mb-[14px]">
@@ -86,7 +86,7 @@ export default function Calendar({
       <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
           <View key={label} className="flex-1 items-center pb-[6px]">
-            <Text className="text-[11px] font-medium text-tertiary" style={{letterSpacing: 0.4}}>
+            <Text className="text-[11px] font-medium text-dow" style={{letterSpacing: 0.4}}>
               {label}
             </Text>
           </View>

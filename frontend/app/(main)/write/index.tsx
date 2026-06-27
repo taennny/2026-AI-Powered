@@ -163,7 +163,7 @@ export default function WriteScreen() {
             <Text className="ml-2 text-xs font-semibold text-primary">사진</Text>
           </View>
           <TouchableOpacity
-            className={`bg-[#EDEDED] px-[22px] py-[10px] rounded-md${!canSubmit ? ' opacity-50' : ''}`}
+            className={`bg-teal px-[22px] py-[10px] rounded-md${!canSubmit ? ' opacity-50' : ''}`}
             onPress={handleWritePress}
             disabled={!canSubmit}
           >
