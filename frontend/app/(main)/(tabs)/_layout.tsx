@@ -21,7 +21,10 @@ export default function TabsLayout() {
     <View style={{flex: 1}}>
       <HomeHeader />
       <SectionTabs />
-      <Slot />
+      {/* Slot(=바텀시트 포함 화면)을 flex-1 박스로 한정 → 바텀시트 base가 푸터 위에서 끝남 */}
+      <View style={{flex: 1}}>
+        <Slot />
+      </View>
       {isHome && <HomeFooter />}
     </View>
   );
