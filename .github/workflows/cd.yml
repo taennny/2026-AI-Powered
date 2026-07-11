@@ -2,13 +2,14 @@ name: CD
 
 on:
   push:
-    branches: [develop]
+    branches: [main]  # 베타 서버는 검증된 main 머지 시에만 배포
     paths:
       - 'backend/**'
       - '.github/workflows/cd.yml'
+  workflow_dispatch: {}  # 긴급 시 Actions 탭에서 수동 배포 가능
 
 concurrency:
-  group: deploy-develop
+  group: deploy-main
   cancel-in-progress: false
 
 permissions:
