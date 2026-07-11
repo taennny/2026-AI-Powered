@@ -10,8 +10,18 @@ from app.models.subscription import Subscription
 BILLING_DURATION_DAYS = {"monthly": 30, "annual": 365}
 
 
+def _is_expired(expires_at: datetime) -> bool:
+    """만료일이 지났는지 판정. naive datetime(SQLite)은 UTC로 간주."""
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at <= datetime.now(timezone.utc)
+
+
 async def get_user_subscription(db: AsyncSession, user_id: uuid.UUID) -> Subscription:
-    """유저의 구독 정보 조회. 없으면 free 플랜 자동 생성."""
+    """유저의 구독 정보 조회. 없으면 free 플랜 자동 생성.
+
+    프리미엄이 만료됐으면 조회 시점에 free로 강등(lazy expiry).
+    """
     result = await db.execute(
         select(Subscription).where(Subscription.user_id == user_id)
     )
@@ -20,6 +30,17 @@ async def get_user_subscription(db: AsyncSession, user_id: uuid.UUID) -> Subscri
     if not subscription:
         subscription = Subscription(user_id=user_id, plan_type="free", is_active=True)
         db.add(subscription)
+        await db.commit()
+        await db.refresh(subscription)
+    elif (
+        subscription.plan_type == "premium"
+        and subscription.expires_at is not None
+        and _is_expired(subscription.expires_at)
+    ):
+        # 만료 = 해지와 동일 취급: 연속성이 끊기므로 초기화
+        subscription.plan_type = "free"
+        subscription.expires_at = None
+        subscription.premium_started_at = None
         await db.commit()
         await db.refresh(subscription)
 
