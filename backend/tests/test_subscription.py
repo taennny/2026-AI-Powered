@@ -1,6 +1,22 @@
 """구독 API 테스트 — 응답 필드 + 결제주기/프리미엄 시작일 로직."""
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import update
+
+from app.models.subscription import Subscription
+from tests.conftest import TEST_USER_ID, TestingSessionLocal
+
+
+async def _set_expires_at(expires_at: datetime) -> None:
+    """테스트 유저 구독의 만료일을 직접 수정 (만료 상태 재현용)"""
+    async with TestingSessionLocal() as db:
+        await db.execute(
+            update(Subscription)
+            .where(Subscription.user_id == TEST_USER_ID)
+            .values(expires_at=expires_at)
+        )
+        await db.commit()
 
 
 async def test_subscription_default_free(client):
@@ -63,6 +79,31 @@ async def test_premium_started_at_kept_on_renewal_reset_on_cancel(client):
         await client.put("/api/v1/subscriptions/me", json={"plan_type": "free"})
     ).json()
     assert cancel["premium_started_at"] is None
+
+
+async def test_expired_premium_downgraded_on_read(client):
+    """만료된 프리미엄은 조회 시점에 free로 강등 + 만료일·시작일 초기화"""
+    await client.put("/api/v1/subscriptions/me", json={"plan_type": "premium"})
+    await _set_expires_at(datetime.now(timezone.utc) - timedelta(days=1))
+
+    res = await client.get("/api/v1/subscriptions/me")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["plan"] == "free"
+    assert data["expires_at"] is None
+    assert data["premium_started_at"] is None
+
+
+async def test_non_expired_premium_stays_premium(client):
+    """만료 전 프리미엄은 조회해도 그대로 유지"""
+    await client.put("/api/v1/subscriptions/me", json={"plan_type": "premium"})
+
+    res = await client.get("/api/v1/subscriptions/me")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["plan"] == "premium"
+    assert data["expires_at"] is not None
+    assert data["premium_started_at"] is not None
 
 
 async def test_subscription_invalid_plan(client):
