@@ -1,0 +1,9 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.env
+# 로컬 전용 테스트 아티팩트 (이미지에 넣지 않음)
+test_clip.py
+test_images/
