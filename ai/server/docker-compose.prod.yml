@@ -1,0 +1,23 @@
+# AI 추론 서버 전용 EC2 에서 구동하는 compose.
+# 백엔드와 분리된 인스턴스라 GHCR 이미지를 pull 해서 단독 실행한다.
+#
+# 사용:
+#   cp .env.example .env   # KAKAO_API_KEY / OPENAI_API_KEY 채우기
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# ⚠️ 보안: 5000 포트는 인터넷에 열지 말 것.
+#    AI EC2 보안그룹 inbound 5000 은 "백엔드 EC2 보안그룹/프라이빗 IP" 에서만 허용.
+#    백엔드 .env: AI_SERVER_URL=http://<이 서버의 프라이빗 IP>:5000
+
+services:
+  ai:
+    image: ghcr.io/taennny/roame-ai:latest
+    container_name: roame-ai
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 5000
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+    ports:
+      - "5000:5000"
