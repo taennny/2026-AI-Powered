@@ -9,6 +9,7 @@ import {saveTokens, saveAccessToken, getRefreshToken} from '@/utils/tokenStorage
 export interface SignupRequest {
   email: string;
   password: string;
+  nickname: string;
 }
 
 export interface LoginRequest {
@@ -27,8 +28,12 @@ export interface RefreshResponse {
   token_type: string;
 }
 
-export async function signup({email, password}: SignupRequest) {
-  const response = await api.post('/api/v1/auth/register', {email, password});
+export async function signup({email, password, nickname}: SignupRequest) {
+  const response = await api.post('/api/v1/auth/register', {
+    email,
+    password,
+    nickname,
+  });
   return response.data;
 }
 
