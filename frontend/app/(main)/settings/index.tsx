@@ -1,6 +1,6 @@
 /** @file app/(main)/settings/index.tsx — 설정 메인 화면 (계정 / 구독 / 테마) */
 
-import {View, Text, TouchableOpacity, Image} from 'react-native';
+import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
@@ -13,7 +13,6 @@ const MENU_ITEMS = [
 export default function SettingsScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-
       {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
@@ -29,12 +28,10 @@ export default function SettingsScreen() {
           style={{left: '70%'}}
         />
 
-        <View className="pt-10 pl-[5px]">
-          <Image
-            source={require('@/assets/images/logo.png')}
-            style={{height: 78, width: 170}}
-            resizeMode="contain"
-          />
+        <View className="pt-14 pl-[40px]">
+          <Text className="text-[60px] leading-[64px] font-black text-primary">
+            Roa{'\n'}me
+          </Text>
         </View>
 
         {/* 메뉴 목록 */}
@@ -64,7 +61,6 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </View>
-
     </SafeAreaView>
   );
 }

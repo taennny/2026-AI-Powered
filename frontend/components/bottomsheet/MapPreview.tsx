@@ -115,6 +115,7 @@ export default function MapPreview({places}: Props) {
       const res = await RNFetchBlob.config({
         fileCache: true,
         appendExt: 'png',
+        path: RNFetchBlob.fs.dirs.CacheDir + '/map_share.png', // 추가
       }).fetch('GET', saveUrl);
       await Sharing.shareAsync(`file://${res.path()}`, {
         mimeType: 'image/png',
@@ -185,7 +186,11 @@ export default function MapPreview({places}: Props) {
                     onPress={handleShare}
                     disabled={sharing}
                   >
-                    <Text className={sharing ? 'text-muted' : 'font-medium text-primary'}>
+                    <Text
+                      className={
+                        sharing ? 'text-muted' : 'font-medium text-primary'
+                      }
+                    >
                       공유
                     </Text>
                   </TouchableOpacity>

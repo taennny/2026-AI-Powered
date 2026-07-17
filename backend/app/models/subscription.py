@@ -24,6 +24,12 @@ class Subscription(Base):
     is_active: Mapped[bool] = mapped_column(
         Boolean, server_default="true", nullable=False
     )
+    billing_cycle: Mapped[str] = mapped_column(
+        String(10), server_default="monthly", nullable=False
+    )
+    premium_started_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

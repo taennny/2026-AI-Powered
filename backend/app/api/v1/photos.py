@@ -9,7 +9,7 @@ from app.schemas.photos import PhotoResponse
 from app.services.photos import upload_photo, get_photo, get_photo_url
 from app.utils.dependencies import get_current_user
 
-router = APIRouter(prefix="/photos", tags=["photos"])
+router = APIRouter(prefix="/api/v1/photos", tags=["photos"])
 
 
 @router.post("/upload", response_model=PhotoResponse, status_code=200)
@@ -37,8 +37,6 @@ async def upload_photo_api(
         photo_id=saved.id,
         photo_url=photo_url,
         taken_at=saved.taken_at,
-        latitude=saved.latitude,
-        longitude=saved.longitude,
         created_at=saved.created_at,
     )
 
@@ -59,7 +57,5 @@ async def get_photo_api(
         photo_id=photo.id,
         photo_url=photo_url,
         taken_at=photo.taken_at,
-        latitude=photo.latitude,
-        longitude=photo.longitude,
         created_at=photo.created_at,
     )

@@ -21,15 +21,15 @@ export type TimelinePlace = {
   place_id: string;
   name: string;
   category: string;
-  arrived_at: string;    // ISO 8601
-  left_at: string;       // ISO 8601
+  arrived_at: string;
+  left_at: string;
   lat: number;
   lng: number;
+  photos?: string[];     // 촬영된 사진 url 목록
 };
 
 export type TimelineData = {
   date: string;          // 'YYYY-MM-DD'
-  total_distance: number;
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
 };
@@ -46,7 +46,6 @@ const MOCK_CALENDAR: CalendarMonth = {
 
 const MOCK_TIMELINE: TimelineData = {
   date: '2026-05-07',
-  total_distance: 0.68,
   polyline: [
     {lat: 37.5577, lng: 126.9250},
     {lat: 37.5565, lng: 126.9240},
@@ -64,6 +63,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T09:30:00.000Z',
       lat: 37.5550,
       lng: 126.9235,
+      photos: ['https://picsum.photos/200/200?random=1'],
     },
     {
       place_id: 'place_002',
@@ -73,6 +73,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T11:00:00.000Z',
       lat: 37.5530,
       lng: 126.9220,
+      photos: [],
     },
     {
       place_id: 'place_003',
@@ -82,6 +83,7 @@ const MOCK_TIMELINE: TimelineData = {
       left_at: '2026-05-07T12:30:00.000Z',
       lat: 37.5518,
       lng: 126.9208,
+      photos: ['https://picsum.photos/200/200?random=2'],
     },
   ],
 };
@@ -92,13 +94,19 @@ export async function fetchCalendarMonth(
   month: number,
 ): Promise<CalendarMonth> {
   if (USE_MOCK) return MOCK_CALENDAR;
-  const {data} = await api.get<CalendarMonth>(`/api/v1/calendar/${year}/${month}`);
+
+  const {data} = await api.get<CalendarMonth>(
+    `/api/v1/calendar/${year}/${month}`,
+  );
   return data;
 }
 
 /** GET /api/v1/calendar/{date}/timeline */
 export async function fetchTimeline(date: string): Promise<TimelineData> {
   if (USE_MOCK && date === '2026-05-07') return MOCK_TIMELINE;
-  const {data} = await api.get<TimelineData>(`/api/v1/calendar/${date}/timeline`);
+
+  const {data} = await api.get<TimelineData>(
+    `/api/v1/calendar/${date}/timeline`,
+  );
   return data;
 }

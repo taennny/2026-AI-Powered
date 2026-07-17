@@ -105,21 +105,29 @@ async def get_timeline(
     )
     places = places_result.scalars().all()
 
-    place_list = []
-    for place in places:
-        photos_result = await db.execute(
-            select(Photo).where(
-                and_(
-                    Photo.user_id == user_id,
-                    Photo.taken_at >= place.arrived_at,
-                    Photo.taken_at <= place.left_at,
-                )
+    # 사진 한 번에 가져오기 (N+1 제거)
+    photos_result = await db.execute(
+        select(Photo).where(
+            and_(
+                Photo.user_id == user_id,
+                Photo.daily_record_id == record.id,
             )
         )
-        photos = photos_result.scalars().all()
+    )
+    all_photos = photos_result.scalars().all()
 
+    place_list = []
+    for place in places:
+        place_photos = [
+            p
+            for p in all_photos
+            if p.taken_at
+            and place.arrived_at
+            and place.left_at
+            and place.arrived_at <= p.taken_at <= place.left_at
+        ]
         photo_urls = []
-        for photo in photos:
+        for photo in place_photos:
             url = await get_presigned_url(photo.storage_key)
             photo_urls.append(url)
 
