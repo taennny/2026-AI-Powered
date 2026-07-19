@@ -21,7 +21,7 @@ import {type TimelinePlace} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate} from '@/utils/formatDate';
 import PostCard from '@/components/bottomsheet/PostCard';
-import MapPreview from '@/components/bottomsheet/MapPreview';
+//import MapPreview from '@/components/bottomsheet/MapPreview';
 
 type Props = {
   selectedDate?: Date;
@@ -209,14 +209,14 @@ export default function BottomSheet({
         </View>
 
         {/* 지도 미리보기 — 지도 위 드래그도 시트 전체 이동(목록 스크롤 아님) */}
-        {isMapMounted && hasPlaces && (
+        {/*{isMapMounted && hasPlaces && (
           <Animated.View
             style={{opacity: mapOpacity}}
             {...panResponder.panHandlers}
           >
             <MapPreview places={places} />
           </Animated.View>
-        )}
+        )}*/}
 
         <ScrollView
           style={{flex: 1}}

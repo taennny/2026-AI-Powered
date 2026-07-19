@@ -16,7 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import RNFetchBlob from 'react-native-blob-util';
+//import RNFetchBlob from 'react-native-blob-util';
 import * as Sharing from 'expo-sharing';
 
 import {type TimelinePlace} from '@/services/calendarApi';
@@ -108,7 +108,7 @@ export default function MapPreview({places}: Props) {
   const [showModal, setShowModal] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  const handleShare = async () => {
+  /*const handleShare = async () => {
     if (!saveUrl || sharing) return;
     setSharing(true);
     try {
@@ -127,7 +127,7 @@ export default function MapPreview({places}: Props) {
     } finally {
       setSharing(false);
     }
-  };
+  };*/
 
   if (!previewUrl || loadFailed) {
     return (
@@ -181,7 +181,7 @@ export default function MapPreview({places}: Props) {
                     <Text className="text-secondary">닫기</Text>
                   </TouchableOpacity>
                   <View className="w-px bg-line" />
-                  <TouchableOpacity
+                  {/*<TouchableOpacity
                     className="flex-1 items-center py-4"
                     onPress={handleShare}
                     disabled={sharing}
@@ -193,7 +193,7 @@ export default function MapPreview({places}: Props) {
                     >
                       공유
                     </Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity>*/}
                 </View>
               </View>
             </TouchableWithoutFeedback>
