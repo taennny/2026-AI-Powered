@@ -4,6 +4,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://roame:roame1234@db:5432/roame"
+    SQL_ECHO: bool = False  # SQL 로그 출력 여부 (프로덕션은 false)
 
     # MinIO
     MINIO_ENDPOINT: str = "minio:9000"
