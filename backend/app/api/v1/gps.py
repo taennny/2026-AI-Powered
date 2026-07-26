@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -32,5 +32,22 @@ async def analyze_gps_logs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    place_count = await analyze_and_save(db, current_user.id, date)
-    return AnalyzeResponse(message="분석 완료", place_count=place_count)
+    try:
+        daily_record_id, place_count = await analyze_and_save(db, current_user.id, date)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI 서버 호출에 실패했습니다",
+        )
+
+    if daily_record_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 날짜에 분석할 GPS 로그가 없습니다",
+        )
+
+    return AnalyzeResponse(
+        daily_record_id=daily_record_id,
+        message="분석 완료",
+        place_count=place_count,
+    )
