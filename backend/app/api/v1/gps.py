@@ -40,6 +40,12 @@ async def analyze_gps_logs(
             detail="AI 서버 호출에 실패했습니다",
         )
 
+    if daily_record_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 날짜에 분석할 GPS 로그가 없습니다",
+        )
+
     return AnalyzeResponse(
         daily_record_id=daily_record_id,
         message="분석 완료",
