@@ -1,11 +1,11 @@
 import logging
 import math
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -16,6 +16,8 @@ from app.models.place import Place
 from app.schemas.ai import AIAnalyzeRequest, AIAnalyzeResponse, AIGpsLogItem
 
 logger = logging.getLogger(__name__)
+
+KST = timezone(timedelta(hours=9))
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -34,7 +36,7 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 async def analyze_and_save(
     db: AsyncSession, user_id: uuid.UUID, target_date: date
-) -> int:
+) -> tuple[uuid.UUID | None, int]:
     # 1. 해당 날짜 GPS 로그 조회
     start_dt = datetime(
         target_date.year,
@@ -43,8 +45,8 @@ async def analyze_and_save(
         0,
         0,
         0,
-        tzinfo=timezone.utc,
-    )
+        tzinfo=KST,
+    ).astimezone(timezone.utc)
     end_dt = datetime(
         target_date.year,
         target_date.month,
@@ -52,8 +54,8 @@ async def analyze_and_save(
         23,
         59,
         59,
-        tzinfo=timezone.utc,
-    )
+        tzinfo=KST,
+    ).astimezone(timezone.utc)
 
     result = await db.execute(
         select(
@@ -70,7 +72,7 @@ async def analyze_and_save(
 
     if not log_rows:
         logger.info(f"GPS 로그 없음: user={user_id}, date={target_date}")
-        return 0
+        return None, 0
 
     # 2. total_distance 계산
     total_distance = 0.0
@@ -101,7 +103,7 @@ async def analyze_and_save(
         logger.error(
             f"AI 서버 호출 실패: user={user_id}, date={target_date}, error={e}"
         )
-        return 0
+        raise
 
     # 4. daily_record upsert
     photo_result = await db.execute(
@@ -127,14 +129,23 @@ async def analyze_and_save(
             photo_count=photo_count,
         )
         db.add(daily_record)
-        await db.flush()  # id 확보
+        await db.flush()  # id 정보
     else:
         daily_record.total_distance = round(total_distance, 2)
         daily_record.place_count = len(stays)
         daily_record.photo_count = photo_count
         daily_record.updated_at = datetime.now(timezone.utc)
+        await db.flush()
 
-    # 5. places 저장
+    # 5. 해당 날짜 사진들 daily_record에 연결
+    await db.execute(
+        update(Photo)
+        .where(Photo.user_id == user_id)
+        .where(func.date(Photo.taken_at) == target_date)
+        .values(daily_record_id=daily_record.id)
+    )
+
+    # 6. places 저장
     for stay in stays:
         place = Place(
             user_id=user_id,
@@ -149,4 +160,4 @@ async def analyze_and_save(
         db.add(place)
 
     await db.commit()
-    return len(stays)
+    return daily_record.id, len(stays)

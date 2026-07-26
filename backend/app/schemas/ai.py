@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from pydantic import BaseModel
+from uuid import UUID
+from typing import Optional
 
 
 class AIGpsLogItem(BaseModel):
@@ -29,5 +31,6 @@ class AIAnalyzeResponse(BaseModel):
 
 
 class AnalyzeResponse(BaseModel):
+    daily_record_id: Optional[UUID] = None
     message: str
     place_count: int
