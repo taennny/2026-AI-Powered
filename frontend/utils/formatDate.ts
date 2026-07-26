@@ -10,6 +10,18 @@ export function toDateKey(date: Date): string {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
+/**
+ * Date → KST 기준 'YYYY-MM-DD'
+ * 백엔드 analyze(POST /api/v1/gps/logs/{date}/analyze)가 날짜 경계를 KST로
+ * 해석하므로, 기기 타임존과 무관하게 KST 달력 날짜를 보내야 한다.
+ */
+export function toKstDateKey(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getUTCDate()).padStart(2, '0');
+  return `${kst.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 /** Date → 'YY.MM.DD(day)' */
 export function formatDate(date: Date): string {
   const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];

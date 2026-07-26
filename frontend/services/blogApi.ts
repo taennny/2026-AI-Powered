@@ -70,8 +70,9 @@ export async function generateBlog(
 export async function fetchBlogGenerationStatus(
   blogId: string,
 ): Promise<BlogGenerationStatus> {
+  // 주의: 상태 조회만 경로가 복수형(blogs)이다. 백엔드 OpenAPI 기준.
   const {data} = await api.get<BlogGenerationStatus>(
-    `/api/v1/blog/${blogId}/status`,
+    `/api/v1/blogs/${blogId}/status`,
   );
   return data;
 }
