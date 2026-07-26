@@ -13,10 +13,12 @@ import {useRouter} from 'expo-router';
 
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
+import {useGpsTracking} from '@/hooks/useGpsTracking';
 
 export default function LoginScreen() {
   const router = useRouter();
   const setToken = useAuthStore(s => s.setToken);
+  const {start: startGps} = useGpsTracking();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +43,8 @@ export default function LoginScreen() {
 
       const {access_token} = await login({email, password});
       setToken(access_token);
+
+      await startGps();
 
       router.replace('/');
     } catch (error: any) {
