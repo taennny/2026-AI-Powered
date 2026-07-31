@@ -25,14 +25,25 @@ TaskManager.defineTask(GPS_TASK_NAME, async ({data, error}: TaskManager.TaskMana
     // 백엔드 analyze는 날짜 경계를 KST로 해석하므로 UTC(toISOString)가 아닌
     // KST 달력 날짜를 보낸다. — 00~09시 KST 구간이 전날로 밀리는 문제 방지
     // (시뮬레이터 타임존이 KST가 아닐 수 있어 기기 로컬이 아닌 KST로 고정)
-    const latestTimestamp = logs[logs.length - 1]?.timestamp;
-    if (latestTimestamp) {
-      const dateKey = toKstDateKey(new Date(latestTimestamp));
-      const {daily_record_id} = await analyzeGpsLogs(dateKey);
+    //
+    // 배치가 자정을 걸치면 한 배치에 여러 날짜의 로그가 섞여 들어온다.
+    // 마지막 1건의 날짜만 분석하면 앞 날짜는 저장만 되고 분석되지 않으므로,
+    // 배치에 포함된 KST 날짜 전부에 대해 분석을 요청한다.
+    const dateKeys = [
+      ...new Set(logs.map(log => toKstDateKey(new Date(log.timestamp)))),
+    ].sort();
 
-      // 글쓰기 화면이 요구하는 daily_record_id를 스토어에 보관한다.
-      if (daily_record_id) {
-        useTimelineStore.getState().setDailyRecordId(daily_record_id);
+    for (const dateKey of dateKeys) {
+      try {
+        const {daily_record_id} = await analyzeGpsLogs(dateKey);
+
+        // 글쓰기 화면이 요구하는 daily_record_id를 스토어에 보관한다.
+        // 오름차순이라 마지막 반복이 최신 날짜 — 스토어에는 최신 것이 남는다.
+        if (daily_record_id) {
+          useTimelineStore.getState().setDailyRecordId(daily_record_id);
+        }
+      } catch {
+        // 한 날짜가 실패해도 나머지 날짜는 계속 분석한다.
       }
     }
   } catch {
