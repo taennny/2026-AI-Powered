@@ -264,43 +264,111 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 
 `@/`는 프로젝트 루트를 가리킵니다 (`tsconfig.json` 경로 설정).
 
+## 시간·타임존 정책
+
+**현재 상태: 데이터의 "하루"는 KST, 화면의 시각은 기기 로컬.** 두 기준이 섞여 있고,
+백엔드 내부에서도 KST가 일관되게 적용돼 있지 않습니다. **팀 회의로 정책 확정 대기 중입니다.**
+
+### 계층별 현행
+
+| 계층 | 기준 |
+|---|---|
+| DB 저장 | 모든 시각 컬럼 `DateTime(timezone=True)` = timestamptz, **UTC** |
+| "하루"의 경계 | **analyze만 KST로 명시** (`services/ai.py:20,48,57`) |
+| 날짜 컬럼 | `daily_records.target_date`, `blogs.target_date` = `Date` (KST 달력 날짜) |
+| Postgres `TimeZone` | compose에 `TZ` 미설정 → **UTC** |
+| GPS 업로드 | epoch ms 숫자 → pydantic이 UTC aware로 파싱 |
+| 날짜 키 전송 | `toKstDateKey` — 기기 타임존 무관하게 KST 달력 날짜 |
+| 화면 표시 | **전부 기기 로컬** |
+
+### 화면별 차이
+
+| 화면 | 기준 | 해외 기기에서 |
+|---|---|---|
+| 홈 캘린더 (`useCalendar:14,16`) | 기기 로컬 | 오늘이 어긋남 |
+| 바텀시트 날짜 헤더 (`BottomSheet:207`) | 기기 로컬 | 헤더 날짜 ≠ 조회 날짜 |
+| 시간대 그룹 (`BottomSheet:37` `getHours`) | 기기 로컬 | 현지 시각 |
+| `PostCard:19` 체류 시각 | 기기 로컬 | 현지 시각 |
+| 저널 리스트 / `JournalCard:53` (`formatDateStr`) | **타임존 무관** | 정상 ✅ |
+| `JournalCard:54` "N분 전" | 절대 시간차 | 정상 ✅ |
+| 글쓰기 날짜 (`write/index.tsx:43`) | 기기 로컬 "오늘" | 어긋남 + 대상일과 무관 |
+| 구독 (`subscription:12`, `PremiumView:24`) | 기기 로컬 | 최대 1일 오차 |
+
+### 회의 안건 (미결)
+
+1. 표시 기준 — 전부 KST 고정 / 날짜만 KST·시각은 로컬 / 전부 로컬 (실질은 "해외 사용 지원 여부")
+2. 글을 다른 날에 쓸 때 표시할 날짜 — 작성일 / 기록 대상일
+3. 자정 걸친 활동 — 이틀 모두 표시 / 시작일 기준 / 잘라 나누기
+4. "하루"의 경계 시각 — 자정 / 새벽 4~5시 (3의 실질적 해법일 수 있음)
+5. 사진 시각의 기준 — EXIF `DateTimeOriginal`엔 tz가 없음. KST 고정 / `OffsetTimeOriginal` 우선+KST 폴백 / 업로드 시 기기 tz 동봉 ★ **아래 백엔드 1번의 선행 조건**
+6. 저장 규칙 문서화 — "시각은 timestamptz UTC / 날짜 컬럼은 서비스 tz 달력 날짜 / `func.date()` 금지, 반개구간 조회"
+
+**MVP 권장: 전부 KST 고정.** 국내 서비스이고, 현재의 반쪽짜리 상태를 완전히 없앱니다.
+기기 타임존 방식(analyze에 tz 동봉 + `daily_records`에 오프셋 컬럼)은 해외 사용자가
+실제로 생겼을 때 백로그로.
+
+> ⚠️ **표시를 KST 고정으로 바꿀 때 반드시 함께 바꿀 것**: `selectedDate`가 "KST 달력 날짜를
+> 로컬 자정으로 표현한 Date"가 되므로, `useCalendar.ts:34`의 `toKstDateKey`를 **`toDateKey`로
+> 되돌려야** 합니다. 안 그러면 +9h가 두 번 적용돼 UTC+10 이상(예: 뉴질랜드 UTC+13)에서
+> 하루가 밀립니다. `tasks/gpsTask.ts`의 `toKstDateKey`는 순간(instant)을 다루므로 **그대로 둡니다.**
+
 ## 알려진 문제 / 코드의 구멍
 
 수정하지 않고 남겨둔 것들입니다. 담당 영역이 갈리므로 표의 담당을 확인하세요.
 
 | 문제 | 위치 | 영향 | 담당 |
 |---|---|---|---|
-| AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` (15회 × 2.5초) | 생성이 더 걸리면 실제로는 성공했는데 "글 생성 실패"로 표시됨 | 프론트(글쓰기) |
-| `JSON.parse` 방어 없음 | `write-preview/index.tsx` `imageUris` 파싱 | 파라미터가 깨지면 화면 크래시. `useState` 초기값용인데 렌더마다 파싱 | 프론트(글쓰기) |
-| 카카오 OAuth URL 하드코딩 | `login.tsx`, `settings/account/index.tsx` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. 프로덕션 카카오 로그인 실패 가능. 로컬/스테이징 테스트 불가 | 프론트(auth) |
+| **사진 EXIF 시각을 UTC로 오해** | `backend/app/services/photos.py:22-26` — tz 없는 촬영지 벽시계 시각에 `.replace(tzinfo=utc)` | 한국에서 14:00에 찍은 사진이 14:00 UTC(=23:00 KST)로 저장 → `calendar.py:118-124`의 사진↔장소 매칭이 9시간 어긋나 **타임라인에 사진이 안 붙음** | **백엔드** (회의 안건 5 선행) |
+| **타임라인 polyline이 UTC 날짜 기준** | `backend/app/services/calendar.py:89` `func.date(GpsLog.recorded_at)` vs `DailyRecord.target_date`(KST) | `target_date=8/1`일 때 places는 KST 8/1 00:00~23:59, polyline은 **KST 8/1 09:00~8/2 08:59**. 당일 새벽 0~9시 경로 누락 + 다음날 새벽 경로 침입. 낮 활동만 있으면 우연히 정상으로 보임 | **백엔드** |
+| 같은 UTC/KST 혼재 | `backend/app/services/ai.py:112,144` `func.date(Photo.taken_at)` | `photo_count` 집계와 `Photo.daily_record_id` 연결이 UTC 날짜 기준. 위 EXIF 건과 겹쳐 두 번 틀림 | **백엔드** |
+| `KST` 상수가 `ai.py`에만 존재 | `backend/app/services/` | `calendar.py`, `photos.py`는 KST를 모름 → 새 쿼리마다 같은 실수 재발. `app/utils/time.py`에 `KST` + `kst_day_range()` 공용화 필요. 반개구간으로 바꾸면 `ai.py:57`의 `23:59:59`가 놓치는 0.5초 구간도 해결되고 **인덱스도 타게 됨**(`func.date()`는 인덱스 미사용) | **백엔드** |
+| `photoUrls`가 서버에 반영 안 됨 | 프론트는 완료 (`write-preview:129,137` `uploadPhoto` + `photoUrls` 전송) | 백엔드 `BlogUpdateRequest`가 `title/content/visibility`만 받음 → 사진 무시. `BlogResponse`에도 `photo_urls` 없어 리스트에서 열면 비어 보임 | **백엔드** (프론트 몫 완료) |
+| 카카오 OAuth URL 하드코딩 | `login.tsx:75`, `settings/account/index.tsx:62` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. 프로덕션 카카오 로그인 실패 가능. 로컬/스테이징 테스트 불가 | 프론트(auth) |
 | 실패가 조용히 삼켜짐 | `login.tsx`, `settings/account/index.tsx`의 `console.log` | 카카오 로그인·연동 실패 시 사용자에게 아무 표시 없음 | 프론트(auth) |
-| `photoUrls`가 서버에 반영 안 됨 | `write-preview` 저장 | 백엔드 `BlogUpdateRequest`가 `title/content/visibility`만 받음 → 사진이 무시됨. `BlogResponse`에도 `photo_urls` 없어 리스트에서 열면 사진이 비어 보임 | **백엔드** |
-| 백엔드 타임라인의 날짜 기준이 내부적으로 어긋남 | `services/calendar.py:89` `func.date(GpsLog.recorded_at)`(UTC) vs `DailyRecord.target_date`(KST) | 한 응답 안에서 장소는 KST, polyline은 UTC 기준. 새벽 0~9시(KST) 로그가 어긋남. `KST` 상수가 `ai.py`에만 있고 `calendar.py`에는 미적용 | **백엔드** |
+| AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` (15회 × 2.5초) | 생성이 더 걸리면 실제로는 성공했는데 "글 생성 실패"로 표시됨 | 프론트(글쓰기) |
+| `JSON.parse` 방어 없음 | `write-preview/index.tsx:30` `imageUris` 파싱 | 파라미터가 깨지면 화면 크래시. `useState` 초기값용인데 렌더마다 파싱 | 프론트(글쓰기) |
+| PostCard가 눌리는데 아무 일도 안 함 | `PostCard.tsx:23` | `TouchableOpacity`에 `activeOpacity`만 있고 `onPress` 없음 → 눌리는 반응은 나는데 무동작. 사용자는 고장으로 느낌 | 프론트 (아래 TODO 참고) |
+| 자정 걸친 배치가 앞 날짜를 분석 안 함 | `tasks/gpsTask.ts:29-30` — 마지막 로그 1건의 날짜로만 analyze | 23:50~00:10 배치는 **어제 분이 analyze되지 않음**. 배치에 포함된 KST 날짜 집합 각각에 호출 필요 | 프론트 |
+| 자정 걸친 체류가 조각남 | `ai/server/modules/gps.py` | 백엔드가 KST 하루로 잘라 보내므로 23:30~00:30 체류는 30분씩 쪼개져 **양쪽 다 `MIN_STAY_MINUTES` 미달로 버려질 수 있음** | 회의 안건 3·4 |
+| GPS `timestamp`가 숫자 epoch ms | `gpsTask.ts:18` → `backend/app/schemas/gps.py:10` | pydantic의 "2e10 초과면 ms" 휴리스틱에 의존. 동작은 하지만 계약이 암묵적. `toISOString()`이면 명시적 | 프론트 (낮음) |
 | 미사용 변수 | `find-password.tsx:9` `router` | lint 경고 1건 | 프론트(auth) |
-| `exhaustive-deps` 경고 2건 | `kakao-login.tsx:42`, `SectionTabs.tsx:41` | 마운트 1회 실행이 의도라 동작은 정상. 의도를 주석으로 명시하면 해소 | 프론트 |
+| `exhaustive-deps` 경고 1건 | `kakao-login.tsx:42` | 마운트 1회 실행이 의도라 동작은 정상. 의도를 주석으로 명시하면 해소 | 프론트(auth) |
 
 ## 미구현 / TODO 항목
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| PostCard 탭 → write-preview 이동 | `PostCard.tsx` | JournalCard와 동일 방식 (`blogId`만 전달) |
-| write-preview 저장 후 홈 대신 리스트로 이동 | `write-preview/index.tsx` | |
-| 사진 저장 연결 | `write-preview/index.tsx` | 백엔드 `BlogUpdateRequest`에 `photoUrls` 필드 없음 — 현재 무시됨 |
-| GPS 시작 호출 중복 | `(auth)/login.tsx`, `hooks/useBootstrap.ts` | 로그인 후 `/`로 이동하면 useBootstrap이 다시 `startGps()` 호출. 로그인 쪽 제거 검토 (리팩토링 C-2) |
-| ImagePicker 로직 중복 | `write/index.tsx`, `write-preview/index.tsx` | 거의 동일한 코드 — `useImagePicker` 훅으로 추출 검토 (리팩토링 C-5) |
+| PostCard 탭 동작 **미정** | `PostCard.tsx` | ~~write-preview로 이동~~ — `TimelinePlace`에 `blogId`가 없어 **구현 불가한 잘못된 TODO였음**. 장소와 저널은 다른 개념. 사진 뷰어 / 장소 상세 / 장소명 수정(백엔드에 `Place.is_corrected` 컬럼 존재) 중 **기획 결정 필요**. 결정 전까지는 `TouchableOpacity` → `View`로 바꿔 눌리지 않게 하는 것도 방법 |
+| write-preview 저장 후 홈 대신 리스트로 이동 | `write-preview/index.tsx:141` | |
 | 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글이 프로덕션 코드에 상주. `!__DEV__`로 교체 검토 (실기기 테스트 이후) |
-| 구독 버튼 → `PUT /api/v1/subscriptions/me` 연결 | `FreeView.tsx`, `SubscriptionModal.tsx` | `{"plan_type": "premium"}` 요청 |
-| 구독 해지 모달 | `PremiumView.tsx` | 확인 모달 + API 연결 |
-| 회원탈퇴 확인 모달 + API | `settings/account/index.tsx` | |
-| GET /api/v1/users/me | `settings/account/index.tsx` | 이메일·카카오 연동 여부 동적 처리 (현재 MOCK) |
-| Google Static Maps 실기기 테스트 | `MapPreview.tsx` | `EXPO_PUBLIC_GOOGLE_MAPS_KEY` 사용. URL 생성은 `utils/staticMapUrl.ts` |
-| 카카오 OAuth URL 하드코딩 | `login.tsx`, `settings/account/index.tsx` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. `EXPO_PUBLIC_API_BASE_URL` 기준으로 교체 필요 |
-| ScrollView ↔ BottomSheet 제스처 충돌 | `BottomSheet.tsx` | PanResponder 충돌 미해결 |
-| 테마 UI 토글 연결 | `settings/theme/index.tsx` | CSS 변수 레이어 완성됨 — `setTheme()` UI 연결 + `bg-primary + text-white` 버튼 색상 설계 필요 |
+| MapPreview **공유 기능** 실기기 테스트 | `MapPreview.tsx:52-70` | 지도 표시 자체는 시뮬레이터로 검증 가능. 실기기가 필요한 건 꾹 눌러 나오는 **공유** — `react-native-blob-util`이 네이티브 모듈이고, 시뮬레이터는 공유 시트에 앱이 없어(AirDrop도 불가) 검증 자체가 불가능. 버그 의심이 아니라 검증 경로 문제 |
+| 카카오 OAuth URL 하드코딩 | `login.tsx:75`, `settings/account/index.tsx:62` | `EXPO_PUBLIC_API_BASE_URL` 기준으로 교체 필요 |
+| `is_kakao_linked` 미연동 | `settings/account/index.tsx` | `fetchMe()` 연결은 완료. 백엔드 `/auth/me`가 `email`만 반환해 SNS 연동 상태가 항상 정적 |
+| GPS 시작 호출 중복 (낮음) | `(auth)/login.tsx:47`, `hooks/useBootstrap.ts` | `useGpsTracking.start()`에 `hasStartedLocationUpdatesAsync` 가드가 있어 **두 번째 호출은 무동작 — 기능상 무해**. 순수 가독성 정리 |
+
+### 완료된 항목 (2026-08-01 확인)
+
+문서에 남아 있던 아래 항목들은 실제로 구현이 끝났습니다.
+
+- 구독 결제 연결 — `subscribePremium()` + `FreeView.onSubscribe` + 확인 Alert
+- 구독 해지 — `cancelSubscription()` + 확인 Alert + 해지 시 테마 basic 복귀
+- 회원탈퇴 — `deleteAccount()` + 확인 Alert (`account/index.tsx:35-50`)
+- `GET /api/v1/auth/me` — `fetchMe()` 연결
+- 테마 UI 토글 — `setTheme()` 연결 (`theme/index.tsx:42,48`)
+- `SectionTabs.tsx` exhaustive-deps 경고 해소 (`0891133`)
+- ScrollView ↔ BottomSheet 제스처 충돌 (`f4424b7`) — `panHandlers`가 핸들+날짜 헤더(`:195`)와
+  지도(`:215`)에만 붙고 `ScrollView(:221)`엔 없어 **충돌이 발생할 수 없는 구조**
 
 ## 백엔드 팀 확인 필요
 
  [프론트 → 백엔드 요청/확인 사항]
+
+  ■ 시간 관련 버그 (2·3·4는 정책과 무관한 명백한 버그 — 회의 전 진행 가능)
+  0-1. 🔴 사진 EXIF 시각을 UTC로 오해 — `app/services/photos.py:22-26`
+  0-2. 🔴 타임라인 polyline이 UTC 날짜 기준 — `app/services/calendar.py:89`
+  0-3. 🟠 같은 문제 — `app/services/ai.py:112,144`
+  0-4. 🟠 `KST` 상수 공용화 — `app/utils/time.py`에 `kst_day_range()` 추가
+       → 상세는 위 "알려진 문제 / 코드의 구멍" 표 참고
 
   ■ 신규 필드 추가 요청
   1. 구독 - 프리미엄 시작일 필드 (premium_started_at)

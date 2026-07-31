@@ -1,8 +1,9 @@
 /**
  * 바텀시트 타임라인 장소 카드
  *
- * ## 다음 연결 작업
- * - [ ] 카드 탭 시 write-preview로 이동 (JournalCard와 동일 방식)
+ * TODO: 탭 동작 미정. 현재 TouchableOpacity에 onPress가 없어 눌리는 반응만 나고
+ * 아무 일도 일어나지 않는다. TimelinePlace에는 blogId가 없으므로 저널 화면으로
+ * 보낼 수는 없다 — 사진 뷰어 / 장소 상세 / 장소명 수정 중 기획 결정 필요.
  */
 
 import {View, Text, Image, TouchableOpacity} from 'react-native';
