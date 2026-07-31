@@ -1,6 +1,5 @@
 import {useEffect, useState} from 'react';
 
-import {usePermissions} from '@/hooks/usePermissions';
 import {useGpsTracking} from '@/hooks/useGpsTracking';
 import {useAuthStore} from '@/store/authStore';
 import {isOnboardingDone} from '@/utils/onboardingStorage';
@@ -12,7 +11,6 @@ export type BootstrapRoute =
 
 export function useBootstrap(): BootstrapRoute | null {
   const [route, setRoute] = useState<BootstrapRoute | null>(null);
-  const {requestAll} = usePermissions();
   const initialize = useAuthStore(s => s.initialize);
   const {start: startGps} = useGpsTracking();
 
@@ -20,7 +18,6 @@ export function useBootstrap(): BootstrapRoute | null {
     let isActive = true;
 
     const bootstrap = async () => {
-      await requestAll();
       await initialize();
 
       if (!useAuthStore.getState().isAuthenticated) {

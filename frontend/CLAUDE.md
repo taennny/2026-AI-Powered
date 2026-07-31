@@ -49,7 +49,6 @@ app/
 
 ```
 앱 시작 → app/index.tsx → hooks/useBootstrap.ts (준비 작업은 전부 여기에)
-    ├── usePermissions().requestAll()
     ├── authStore.initialize()          # tokenStorage → authStore 동기화
     ├── 미인증 → /(auth)/login
     └── 인증   → useGpsTracking().start() → 온보딩 여부에 따라 /onboarding 또는 홈
@@ -122,6 +121,24 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 
 테마는 4개 프리셋(basic, dark, strawberry, aqua)이 있고 `themeStore.setTheme(id)`로 전환합니다.
 
+### 권한 정책
+
+권한 관련 로직은 전부 `hooks/usePermissions.ts`에 있고, 문구는 `constants/permissionMessages.ts`에 있습니다.
+화면은 함수를 호출만 합니다.
+
+| 함수 | 호출부 | 시점 |
+|---|---|---|
+| `useLocationPermissionGuard()` | `app/(main)/_layout.tsx` | 앱 진입 + `AppState` `'active'` 복귀마다 |
+| `ensureMediaLibraryPermission()` | `write`, `write-preview`의 사진 버튼 | 사진 첨부 직전 |
+
+- **요청 시점**: 앱 진입 직후가 아니라 `(main)` 진입 시. 온보딩은 `(main)` 바깥이라
+  신규 사용자는 자동으로 "온보딩 완료 후" 요청을 받습니다.
+- **카메라 권한은 요청하지 않습니다** — `launchImageLibraryAsync`만 쓰고 카메라는 호출하지 않습니다.
+- **거부 시**: 아직 물어볼 수 있으면(`canAskAgain`) 시스템 다이얼로그, 이미 거부됐으면
+  불이익 + 설정 경로를 담은 `Alert` → `Linking.openSettings()`.
+- 설정에서 뒤늦게 허용하면 `AppState` 복귀 시 감지해 `startGpsTracking()`이 살아납니다.
+- `isAlertOpen` / `isCheckingLocation` 모듈 플래그로 안내가 겹쳐 쌓이는 것을 막습니다.
+
 ### 데이터 재조회 정책
 
 캘린더·타임라인 fetch는 `hooks/useCalendar.ts`에 모여 있습니다. **자동 폴링은 하지 않습니다.**
@@ -158,8 +175,8 @@ store/themeStore.ts     themeId, themeVars / setTheme, initialize
 ### 훅
 
 ```
-hooks/useBootstrap.ts     앱 시작 준비 — 권한 → 토큰 복원 → 진입 화면 결정
-hooks/usePermissions.ts   requestAll() — 위치·미디어·카메라
+hooks/useBootstrap.ts     앱 시작 준비 — 토큰 복원 → 진입 화면 결정
+hooks/usePermissions.ts   권한 확인·요청·거부 안내 (아래 "권한 정책" 참고)
 hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)

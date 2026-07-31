@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
 import {fetchBlogDetail, updateBlog, uploadPhoto} from '@/services/blogApi';
+import {ensureMediaLibraryPermission} from '@/hooks/usePermissions';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
@@ -81,6 +82,8 @@ export default function WritePreviewScreen() {
   };
 
   const handleImageAddPress = async () => {
+    if (!(await ensureMediaLibraryPermission())) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,

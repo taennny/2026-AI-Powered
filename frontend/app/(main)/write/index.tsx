@@ -16,6 +16,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
+import {ensureMediaLibraryPermission} from '@/hooks/usePermissions';
 import {
   generateBlog,
   waitForBlogGeneration,
@@ -59,6 +60,8 @@ export default function WriteScreen() {
   };
 
   const handleImagePick = async () => {
+    if (!(await ensureMediaLibraryPermission())) return;
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       quality: 0.8,
