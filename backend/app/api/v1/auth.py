@@ -98,6 +98,7 @@ async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+
 @router.get("/kakao/callback")
 async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
     """카카오 로그인 콜백"""
@@ -106,12 +107,13 @@ async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
         access_token = result["access_token"]
         refresh_token = result["refresh_token"]
         is_new_user = result["is_new_user"]
-        
+
         # 프론트 딥링크로 리다이렉트
         redirect_url = f"roameapp://kakao-login?accessToken={access_token}&refreshToken={refresh_token}&isNewUser={is_new_user}"
         return RedirectResponse(url=redirect_url)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
+
 
 @router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user)):
