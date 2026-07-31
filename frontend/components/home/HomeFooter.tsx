@@ -1,8 +1,3 @@
-/**
- * 홈 하단 푸터 (글쓰기 버튼)
- * - 체류 장소와 daily_record_id를 모두 확보했을 때만 활성화 (timelineStore)
- */
-
 import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
@@ -12,7 +7,6 @@ import {useTimelineStore} from '@/store/timelineStore';
 export default function HomeFooter() {
   const placesCount = useTimelineStore(s => s.placesCount);
   const dailyRecordId = useTimelineStore(s => s.dailyRecordId);
-  // 글 생성 API가 daily_record_id를 필수로 요구하므로 확보 전에는 비활성화한다.
   const hasTimeline = placesCount > 0 && !!dailyRecordId;
 
   return (

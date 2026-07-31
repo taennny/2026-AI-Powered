@@ -1,11 +1,3 @@
-/**
- * 테마 선택 화면
- *
- * ## 다음 연결 작업
- * - [ ] 각 테마 미리보기 실제 스크린샷으로 교체
- * - [ ] 구독하기 버튼 → 결제 플로우 연결
- */
-
 import {useRef} from 'react';
 import {View, Text, TouchableOpacity, FlatList, Dimensions} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -56,22 +48,18 @@ export default function ThemeScreen() {
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-      {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Text className="text-2xl font-normal text-muted">{'<'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 타이틀 */}
       <Text className="text-[36px] font-extrabold text-primary px-6 pb-4">
         테마
       </Text>
 
-      {/* 구분선 */}
       <View className="h-px bg-line" />
 
-      {/* 캐러셀 */}
       <FlatList
         ref={flatListRef}
         data={THEMES}
@@ -100,7 +88,6 @@ export default function ThemeScreen() {
               <Text className="text-[15px] text-primary">{item.label}</Text>
             </TouchableOpacity>
 
-            {/* 미리보기 (추후 스크린샷으로 교체) */}
             <View
               style={{
                 height: PREVIEW_H,
@@ -112,7 +99,6 @@ export default function ThemeScreen() {
         )}
       />
 
-      {/* 페이지네이션 닷 */}
       <View className="flex-row justify-center gap-x-[6px] py-3">
         {THEMES.map((_, i) => (
           <View

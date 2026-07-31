@@ -1,9 +1,3 @@
-/**
- * 저널 리스트 화면
- * - 검색 바: 아이콘 탭 → 확장 애니메이션, X 탭 → 축소
- * - 검색 대상: 제목, 본문 미리보기, 날짜
- */
-
 import {useState, useRef, useEffect} from 'react';
 import {
   View,
@@ -68,7 +62,6 @@ export default function JournalListScreen() {
   return (
     <View className="flex-1 bg-teal">
 
-      {/* 검색 바 */}
       <View className="px-4 mt-3 mb-3 flex-row justify-end">
         <Animated.View
           style={{

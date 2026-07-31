@@ -1,9 +1,3 @@
-/**
- * 바텀시트 expanded 상태에서 표시되는 정적 지도 이미지
- * - 꾹 누르면 3:4 비율 미리보기 모달 → 공유
- * - URL 생성·줌 계산은 utils/staticMapUrl.ts
- */
-
 import {useState} from 'react';
 import {
   Alert,

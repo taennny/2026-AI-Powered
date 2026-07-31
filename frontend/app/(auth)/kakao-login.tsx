@@ -1,12 +1,3 @@
-/**
- * 카카오 OAuth 딥링크 콜백 처리 화면
- * - roameapp://kakao-login?accessToken=...&refreshToken=... 딥링크 수신
- * - tokenStorage 저장 + authStore 업데이트 후 홈으로 이동
- *
- * ## 다음 연결 작업
- * - [ ] 백엔드가 source 파라미터를 딥링크로 pass-through 하는지 확인 필요
- */
-
 import {useEffect} from 'react';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {View, ActivityIndicator} from 'react-native';

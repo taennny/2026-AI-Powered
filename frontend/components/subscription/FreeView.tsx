@@ -24,7 +24,6 @@ export default function FreeView({onSubscribe}: Props) {
     <View className="flex-1 px-6 pt-5">
       <Text className="text-base font-bold text-primary mb-5">프리미엄 플랜</Text>
 
-      {/* 플랜 선택 */}
       <View className="gap-y-[14px] mb-6">
         {PLANS.map(plan => {
           const isSelected = plan.id === selected;
@@ -50,7 +49,6 @@ export default function FreeView({onSubscribe}: Props) {
         })}
       </View>
 
-      {/* 구독 혜택 */}
       <View className="bg-teal-bg rounded-2xl py-[18px] px-5 mb-7 gap-y-2">
         <Text className="text-[13px] text-secondary mb-1">구독 혜택</Text>
         {BENEFITS.map(benefit => (
@@ -60,7 +58,6 @@ export default function FreeView({onSubscribe}: Props) {
         ))}
       </View>
 
-      {/* 구독 버튼 */}
       <TouchableOpacity activeOpacity={0.85} onPress={onSubscribe} className="bg-btn-bg rounded-[28px] py-4 items-center">
         <Text className="text-[15px] font-bold text-btn-text">로미 프리미엄 시작하기</Text>
       </TouchableOpacity>

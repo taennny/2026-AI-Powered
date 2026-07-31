@@ -29,8 +29,7 @@ export function useCalendar() {
   }, [viewDate]);
 
   const loadTimeline = useCallback(() => {
-    // 조회 키는 KST 기준으로 보낸다 — analyze가 daily_records.target_date를
-    // KST 날짜로 기록하므로, 기기 타임존이 달라도 같은 하루를 가리키게 된다.
+    // 조회 키는 KST — analyze가 target_date를 KST 날짜로 기록한다
     fetchTimeline(toKstDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
@@ -42,7 +41,6 @@ export function useCalendar() {
       });
   }, [selectedDate, setTimeline]);
 
-  // 월 변경 / 날짜 선택 / 강제 재조회(refreshKey) 시 다시 불러온다.
   useEffect(() => {
     loadCalendar();
   }, [loadCalendar, refreshKey]);
@@ -51,8 +49,7 @@ export function useCalendar() {
     loadTimeline();
   }, [loadTimeline, refreshKey]);
 
-  // 앱이 백그라운드에서 돌아오면 그 사이 쌓인 기록을 반영한다.
-  // (화면 재마운트가 아니라 상태가 유지되므로 위 effect들은 다시 돌지 않는다)
+  // 백그라운드 복귀 시 그사이 쌓인 기록 반영 (재마운트가 없어 위 effect는 안 돈다)
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {

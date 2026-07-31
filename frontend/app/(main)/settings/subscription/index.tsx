@@ -38,7 +38,6 @@ export default function SubscriptionScreen() {
           onPress: async () => {
             try {
               await subscribePremium();
-              // 백엔드에서 최신 구독 상태 조회
               const updated = await fetchSubscription();
               setSubscription(updated);
               Alert.alert('', '결제가 완료되었습니다.');
@@ -66,7 +65,6 @@ export default function SubscriptionScreen() {
               // 백엔드에서 최신 구독 상태 조회
               const updated = await fetchSubscription();
               setSubscription(updated);
-              // 테마를 베이직으로 변경
               setTheme('basic');
               Alert.alert('', '구독이 해지되었습니다.');
             } catch {
@@ -89,14 +87,12 @@ export default function SubscriptionScreen() {
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
 
-      {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Text className="text-2xl font-normal text-muted">{'<'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 타이틀 */}
       <View className="px-6 pb-4">
         <Text className="text-[36px] font-extrabold text-primary">구독</Text>
         {!loading && (
@@ -104,10 +100,8 @@ export default function SubscriptionScreen() {
         )}
       </View>
 
-      {/* 구분선 */}
       <View className="h-px bg-line" />
 
-      {/* 콘텐츠 */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="small" />

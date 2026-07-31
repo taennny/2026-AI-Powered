@@ -5,12 +5,7 @@ export type GpsLog = {
   lng: number;
   accuracy: number;
   speed: number;
-  /**
-   * ISO 8601 UTC 문자열 (`2026-08-01T04:00:00.000Z`).
-   * epoch 숫자로 보내면 백엔드 pydantic이 "초 단위" 기본 규칙 대신
-   * "200억 초과면 밀리초"라는 내부 휴리스틱으로 해석해야 파싱이 맞는다 —
-   * 라이브러리 구현에 기대는 암묵적 계약이라 문자열로 명시한다.
-   */
+  /** ISO 8601 UTC 문자열 (`2026-08-01T04:00:00.000Z`) */
   timestamp: string;
 };
 

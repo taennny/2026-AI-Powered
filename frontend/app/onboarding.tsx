@@ -1,9 +1,3 @@
-/**
- * 온보딩 화면 — 최초 로그인 시 안내 후 홈으로 이동
- * - 터치 시 다음 페이지로 이동, 마지막 페이지에서 홈으로 이동
- * - 완료 여부는 onboardingStorage에 저장되어 재진입 시 건너뜀
- */
-
 import {useState, useRef} from 'react';
 import {
   View,

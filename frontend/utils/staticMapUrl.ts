@@ -1,7 +1,4 @@
-/**
- * Google Static Maps URL 생성 — 모든 마커가 한 시야에 들어오도록 zoom·center를 계산한다.
- * UI와 분리된 순수 함수라 단독으로 검증할 수 있다.
- */
+/** Google Static Maps URL 생성 — 모든 마커가 한 시야에 들어오도록 zoom·center를 계산한다 */
 
 import {type TimelinePlace} from '@/services/calendarApi';
 
@@ -9,14 +6,12 @@ const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? '';
 
 const BASE = 'https://maps.googleapis.com/maps/api/staticmap';
 
-/** 좌표가 없을 때 보여줄 기본 위치 (서울시청) */
 const FALLBACK_CENTER = '37.5665,126.9780';
 const FALLBACK_ZOOM = 12;
 
 /** 마커 하나뿐이면 bounds를 계산할 수 없으므로 고정 줌을 쓴다. */
 const SINGLE_PLACE_ZOOM = 15;
 
-/** 웹 메르카토르 기준 타일 크기 */
 const WORLD_PX = 256;
 const MAX_ZOOM = 16;
 

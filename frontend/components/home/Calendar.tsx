@@ -1,10 +1,3 @@
-/**
- * 홈 화면 월간 캘린더
- * - 선택된 날짜만 하이라이트 (teal-accent 원)
- * - has_journal: tealAccent dot / has_timeline: tealDark dot (최대 2개)
- * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동 — useCalendar 훅)
- */
-
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type CalendarDay} from '@/services/calendarApi';
@@ -69,7 +62,6 @@ export default function Calendar({
   return (
     <View className="bg-card px-4 pt-5">
 
-      {/* 월 헤더 */}
       <View className="flex-row items-center mb-[14px]">
         <TouchableOpacity onPress={goToPrevMonth} className="pr-[10px]">
           <Text className="text-[22px] font-medium text-teal-accent">{'<'}</Text>
@@ -82,7 +74,6 @@ export default function Calendar({
         </TouchableOpacity>
       </View>
 
-      {/* 요일 레이블 */}
       <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
           <View key={label} className="flex-1 items-center pb-[6px]">
@@ -93,7 +84,6 @@ export default function Calendar({
         ))}
       </View>
 
-      {/* 날짜 그리드 */}
       {weeks.map((week, wi) => (
         <View key={wi} className="flex-row border-t-[0.5px] border-line">
           {week.map((day, di) => {

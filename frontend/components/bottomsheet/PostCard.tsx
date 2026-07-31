@@ -1,11 +1,4 @@
-/**
- * 바텀시트 타임라인 장소 카드
- *
- * 탭 동작이 정해지기 전까지는 눌리지 않는 View다 — TouchableOpacity로 두면
- * 눌리는 반응만 나고 아무 일도 일어나지 않아 고장으로 보인다.
- * TimelinePlace에는 blogId가 없어 저널 화면으로는 보낼 수 없다.
- * 사진 뷰어 / 장소 상세 / 장소명 수정 중 기획 결정 후 다시 Touchable로 바꾼다.
- */
+/** 탭 동작 미정 — 눌리는 반응만 나고 아무 일도 안 일어나지 않도록 View로 둔다 */
 
 import {View, Text, Image} from 'react-native';
 

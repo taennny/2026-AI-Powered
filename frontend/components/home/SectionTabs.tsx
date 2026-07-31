@@ -1,9 +1,3 @@
-/**
- * 홈 네비게이션 탭 (Home ↔ Journal List)
- * - 활성 탭 52% / 비활성 48% spring 너비 애니메이션
- * - 활성 탭에 boxShadow 카드 효과
- */
-
 import {View, Text, TouchableOpacity, Animated} from 'react-native';
 import {useRef, useEffect} from 'react';
 import {router, usePathname} from 'expo-router';
@@ -41,7 +35,6 @@ export default function SectionTabs() {
         friction: 14,
       }),
     ]).start();
-    // homeFlex/journalFlex는 useRef 값이라 정체성이 바뀌지 않는다 — 재실행 유발 없음
   }, [activeTab, homeFlex, journalFlex]);
 
   const handleTabPress = (tab: Tab) => {

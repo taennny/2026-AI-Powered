@@ -1,8 +1,3 @@
-/**
- * 앱 시작 시 한 번 수행하는 준비 작업 — 권한 요청 → 토큰 복원 → 진입 화면 결정
- * 화면(app/index.tsx)은 반환된 목적지로 이동만 한다.
- */
-
 import {useEffect, useState} from 'react';
 
 import {usePermissions} from '@/hooks/usePermissions';
@@ -15,7 +10,6 @@ export type BootstrapRoute =
   | '/onboarding'
   | '/(auth)/login';
 
-/** 준비가 끝나기 전에는 null을 반환한다. */
 export function useBootstrap(): BootstrapRoute | null {
   const [route, setRoute] = useState<BootstrapRoute | null>(null);
   const {requestAll} = usePermissions();

@@ -1,14 +1,4 @@
-/**
- * 인증 상태 관리 store
- *
- * tokenStorage = 디스크 저장 (앱 재시작 후에도 유지)
- * authStore   = 메모리 상태 (컴포넌트가 로그인/로그아웃 변화를 즉시 감지)
- *
- * 사용 패턴:
- *   로그인  → saveTokens() + authStore.setToken()
- *   로그아웃 → removeTokens() + authStore.clearToken()
- *   앱 시작 → authStore.initialize() (tokenStorage → store 동기화)
- */
+/** 토큰의 디스크 저장은 tokenStorage, 이 store는 리렌더용 메모리 상태 — 둘 다 갱신해야 한다 */
 
 import {create} from 'zustand';
 
@@ -33,13 +23,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
   clearToken: () =>
     set({accessToken: null, isAuthenticated: false}),
 
-  // 앱 시작 시 tokenStorage에서 읽어와 store 동기화
   initialize: async () => {
     const token = await getAccessToken();
     set({accessToken: token, isAuthenticated: !!token});
   },
 
-  // 로그아웃: tokenStorage 삭제 + store 초기화
   logout: async () => {
     await removeTokens();
     set({accessToken: null, isAuthenticated: false});

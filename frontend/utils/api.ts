@@ -1,9 +1,3 @@
-/**
- * axios 인스턴스 — 모든 API 요청은 이 인스턴스를 사용
- * - 요청 인터셉터: Authorization 헤더에 액세스 토큰 자동 첨부
- * - 응답 인터셉터: 401 시 리프레시 토큰으로 재발급 후 재시도
- */
-
 import axios from 'axios';
 
 import {
@@ -16,13 +10,9 @@ import {useAuthStore} from '@/store/authStore';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
 
-/** 일반 JSON 요청 기준 */
 const DEFAULT_TIMEOUT_MS = 15000;
 
-/**
- * 사진 업로드처럼 본문이 큰 요청용. 모바일 네트워크에서 멀티파트 전송은
- * 기본 타임아웃을 쉽게 넘기므로 호출부에서 개별 지정한다.
- */
+/** 업로드용 — 멀티파트 전송은 기본 타임아웃을 쉽게 넘긴다 */
 export const UPLOAD_TIMEOUT_MS = 60000;
 
 export const api = axios.create({
