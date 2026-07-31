@@ -1,12 +1,13 @@
 /**
  * 바텀시트 타임라인 장소 카드
  *
- * TODO: 탭 동작 미정. 현재 TouchableOpacity에 onPress가 없어 눌리는 반응만 나고
- * 아무 일도 일어나지 않는다. TimelinePlace에는 blogId가 없으므로 저널 화면으로
- * 보낼 수는 없다 — 사진 뷰어 / 장소 상세 / 장소명 수정 중 기획 결정 필요.
+ * 탭 동작이 정해지기 전까지는 눌리지 않는 View다 — TouchableOpacity로 두면
+ * 눌리는 반응만 나고 아무 일도 일어나지 않아 고장으로 보인다.
+ * TimelinePlace에는 blogId가 없어 저널 화면으로는 보낼 수 없다.
+ * 사진 뷰어 / 장소 상세 / 장소명 수정 중 기획 결정 후 다시 Touchable로 바꾼다.
  */
 
-import {View, Text, Image, TouchableOpacity} from 'react-native';
+import {View, Text, Image} from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {formatTimeFromISO} from '@/utils/formatDate';
@@ -21,8 +22,7 @@ export default function PostCard({data}: Props) {
   const firstPhoto = photos?.[0];
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <View
       className="bg-card rounded-[14px] px-4 py-[14px] mb-[10px] flex-row justify-between items-center"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
@@ -37,6 +37,6 @@ export default function PostCard({data}: Props) {
           className="w-[60px] h-[60px] rounded-[10px] ml-3"
         />
       )}
-    </TouchableOpacity>
+    </View>
   );
 }

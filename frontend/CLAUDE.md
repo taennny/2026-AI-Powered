@@ -327,7 +327,6 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 | 실패가 조용히 삼켜짐 | `login.tsx`, `settings/account/index.tsx`의 `console.log` | 카카오 로그인·연동 실패 시 사용자에게 아무 표시 없음 | 프론트(auth) |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` (15회 × 2.5초) | 생성이 더 걸리면 실제로는 성공했는데 "글 생성 실패"로 표시됨 | 프론트(글쓰기) |
 | `JSON.parse` 방어 없음 | `write-preview/index.tsx:30` `imageUris` 파싱 | 파라미터가 깨지면 화면 크래시. `useState` 초기값용인데 렌더마다 파싱 | 프론트(글쓰기) |
-| PostCard가 눌리는데 아무 일도 안 함 | `PostCard.tsx:23` | `TouchableOpacity`에 `activeOpacity`만 있고 `onPress` 없음 → 눌리는 반응은 나는데 무동작. 사용자는 고장으로 느낌 | 프론트 (아래 TODO 참고) |
 | 자정 걸친 배치가 앞 날짜를 분석 안 함 | `tasks/gpsTask.ts:29-30` — 마지막 로그 1건의 날짜로만 analyze | 23:50~00:10 배치는 **어제 분이 analyze되지 않음**. 배치에 포함된 KST 날짜 집합 각각에 호출 필요 | 프론트 |
 | 자정 걸친 체류가 조각남 | `ai/server/modules/gps.py` | 백엔드가 KST 하루로 잘라 보내므로 23:30~00:30 체류는 30분씩 쪼개져 **양쪽 다 `MIN_STAY_MINUTES` 미달로 버려질 수 있음** | 회의 안건 3·4 |
 | GPS `timestamp`가 숫자 epoch ms | `gpsTask.ts:18` → `backend/app/schemas/gps.py:10` | pydantic의 "2e10 초과면 ms" 휴리스틱에 의존. 동작은 하지만 계약이 암묵적. `toISOString()`이면 명시적 | 프론트 (낮음) |
@@ -338,7 +337,7 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| PostCard 탭 동작 **미정** | `PostCard.tsx` | ~~write-preview로 이동~~ — `TimelinePlace`에 `blogId`가 없어 **구현 불가한 잘못된 TODO였음**. 장소와 저널은 다른 개념. 사진 뷰어 / 장소 상세 / 장소명 수정(백엔드에 `Place.is_corrected` 컬럼 존재) 중 **기획 결정 필요**. 결정 전까지는 `TouchableOpacity` → `View`로 바꿔 눌리지 않게 하는 것도 방법 |
+| PostCard 탭 동작 **미정** | `PostCard.tsx` | ~~write-preview로 이동~~ — `TimelinePlace`에 `blogId`가 없어 **구현 불가한 잘못된 TODO였음**. 장소와 저널은 다른 개념. 사진 뷰어 / 장소 상세 / 장소명 수정(백엔드에 `Place.is_corrected` 컬럼 존재) 중 **기획 결정 필요**. 결정 전까지는 `View`로 두어 눌리지 않게 처리함 |
 | write-preview 저장 후 홈 대신 리스트로 이동 | `write-preview/index.tsx:141` | |
 | 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글이 프로덕션 코드에 상주. `!__DEV__`로 교체 검토 (실기기 테스트 이후) |
 | MapPreview **공유 기능** 실기기 테스트 | `MapPreview.tsx:52-70` | 지도 표시 자체는 시뮬레이터로 검증 가능. 실기기가 필요한 건 꾹 눌러 나오는 **공유** — `react-native-blob-util`이 네이티브 모듈이고, 시뮬레이터는 공유 시트에 앱이 없어(AirDrop도 불가) 검증 자체가 불가능. 버그 의심이 아니라 검증 경로 문제 |
