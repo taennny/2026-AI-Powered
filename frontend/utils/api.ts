@@ -16,9 +16,18 @@ import {useAuthStore} from '@/store/authStore';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
 
+/** 일반 JSON 요청 기준 */
+const DEFAULT_TIMEOUT_MS = 15000;
+
+/**
+ * 사진 업로드처럼 본문이 큰 요청용. 모바일 네트워크에서 멀티파트 전송은
+ * 기본 타임아웃을 쉽게 넘기므로 호출부에서 개별 지정한다.
+ */
+export const UPLOAD_TIMEOUT_MS = 60000;
+
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },

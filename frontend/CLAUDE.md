@@ -83,6 +83,7 @@ app/index.tsx는 useBootstrap이 반환한 목적지로 replace만 한다.
 
 ```
 utils/api.ts              # axios 인스턴스 (baseURL: EXPO_PUBLIC_API_BASE_URL)
+                          # 기본 타임아웃 15초, UPLOAD_TIMEOUT_MS(60초)는 업로드용으로 export
                           # 요청 인터셉터: Authorization Bearer 토큰 자동 첨부
                           # 응답 인터셉터: 401 시 refresh 토큰으로 재발급 후 재시도
 utils/tokenStorage.ts     # AsyncStorage 기반 토큰 저장/조회/삭제
@@ -168,7 +169,20 @@ tc.tealAccent
 - `app/_layout.tsx` ThemeRoot: 루트 View에 `themeVars` style로 주입 → 하위 모든 NativeWind 색상 토큰에 반영
 - CSS 변수 레이어는 이미 완성됨 — 남은 작업은 설정 화면에서 `setTheme()` 연결뿐
 
-캘린더 데이터·타임라인 fetch 로직은 `hooks/useCalendar.ts`로 분리되어 있습니다. `viewDate` 변경 시 `fetchCalendarMonth`, `selectedDate` 변경 시 `fetchTimeline`을 호출합니다.
+### 데이터 재조회 정책
+
+캘린더·타임라인 fetch는 `hooks/useCalendar.ts`에 모여 있습니다. **자동 폴링은 하지 않습니다** (배터리·요청량 대비 이득이 적음). 다시 불러오는 시점은 아래가 전부입니다:
+
+| 시점 | 트리거 |
+|---|---|
+| 월 변경 | `viewDate` 변경 |
+| 날짜 선택 | `selectedDate` 변경 |
+| 저널 탭 → 홈 탭 | `router.replace`로 홈이 리마운트 |
+| 글쓰기·저장 후 홈 복귀 | 위와 동일 |
+| **홈에서 홈 탭 재탭** | `timelineStore.requestRefresh()` → `refreshKey` 증가 |
+| **앱 백그라운드 → 복귀** | `AppState` `'active'` 리스너 |
+
+**의도적으로 갱신하지 않는 경우**: 홈 화면에 머무는 동안 GPS analyze가 새 장소를 만들어도 화면은 그대로입니다. 확인하려면 홈 탭을 다시 누르면 됩니다.
 
 BottomSheet는 PanResponder로 3단계 스냅 포인트를 구현합니다:
 - `0` — expanded (전체 화면)
@@ -214,6 +228,8 @@ store/timelineStore.ts
   - setTimeline(count)           # fetchTimeline 응답 후 호출
   - dailyRecordId: string | null # analyze 응답에서 받아 보관 — 글 생성 요청에 필수
   - setDailyRecordId(id)         # tasks/gpsTask.ts에서 호출
+  - refreshKey: number           # 강제 재조회 신호 (useCalendar가 구독)
+  - requestRefresh()             # 홈 탭 재탭 시 SectionTabs에서 호출
 
 store/themeStore.ts
   - themeId: ThemeId
@@ -247,6 +263,21 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 ### 경로 별칭
 
 `@/`는 프로젝트 루트를 가리킵니다 (`tsconfig.json` 경로 설정).
+
+## 알려진 문제 / 코드의 구멍
+
+수정하지 않고 남겨둔 것들입니다. 담당 영역이 갈리므로 표의 담당을 확인하세요.
+
+| 문제 | 위치 | 영향 | 담당 |
+|---|---|---|---|
+| AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` (15회 × 2.5초) | 생성이 더 걸리면 실제로는 성공했는데 "글 생성 실패"로 표시됨 | 프론트(글쓰기) |
+| `JSON.parse` 방어 없음 | `write-preview/index.tsx` `imageUris` 파싱 | 파라미터가 깨지면 화면 크래시. `useState` 초기값용인데 렌더마다 파싱 | 프론트(글쓰기) |
+| 카카오 OAuth URL 하드코딩 | `login.tsx`, `settings/account/index.tsx` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. 프로덕션 카카오 로그인 실패 가능. 로컬/스테이징 테스트 불가 | 프론트(auth) |
+| 실패가 조용히 삼켜짐 | `login.tsx`, `settings/account/index.tsx`의 `console.log` | 카카오 로그인·연동 실패 시 사용자에게 아무 표시 없음 | 프론트(auth) |
+| `photoUrls`가 서버에 반영 안 됨 | `write-preview` 저장 | 백엔드 `BlogUpdateRequest`가 `title/content/visibility`만 받음 → 사진이 무시됨. `BlogResponse`에도 `photo_urls` 없어 리스트에서 열면 사진이 비어 보임 | **백엔드** |
+| 타임라인 조회 날짜 기준 불일치 | `useCalendar`는 `toDateKey`(기기 로컬), analyze는 `toKstDateKey`(KST) | 기기 타임존이 KST가 아니면 조회 날짜와 분석 날짜가 어긋남. 시뮬레이터 테스트 시 주의 | 프론트 |
+| 미사용 변수 | `find-password.tsx:9` `router` | lint 경고 1건 | 프론트(auth) |
+| `exhaustive-deps` 경고 2건 | `kakao-login.tsx:42`, `SectionTabs.tsx:41` | 마운트 1회 실행이 의도라 동작은 정상. 의도를 주석으로 명시하면 해소 | 프론트 |
 
 ## 미구현 / TODO 항목
 

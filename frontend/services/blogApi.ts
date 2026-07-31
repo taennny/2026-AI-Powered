@@ -1,4 +1,4 @@
-import {api} from '@/utils/api';
+import {api, UPLOAD_TIMEOUT_MS} from '@/utils/api';
 
 export type JournalData = {
   id: string;
@@ -125,7 +125,10 @@ export async function uploadPhoto(imageUri: string): Promise<UploadedPhoto> {
   const {data} = await api.post<UploadedPhoto>(
     '/api/v1/photos/upload',
     formData,
-    {headers: {'Content-Type': 'multipart/form-data'}},
+    {
+      headers: {'Content-Type': 'multipart/form-data'},
+      timeout: UPLOAD_TIMEOUT_MS,
+    },
   );
   return data;
 }

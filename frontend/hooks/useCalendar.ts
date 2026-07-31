@@ -1,4 +1,5 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useCallback} from 'react';
+import {AppState} from 'react-native';
 
 import {
   fetchCalendarMonth,
@@ -19,14 +20,15 @@ export function useCalendar() {
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [places, setPlaces] = useState<TimelinePlace[]>([]);
   const setTimeline = useTimelineStore(s => s.setTimeline);
+  const refreshKey = useTimelineStore(s => s.refreshKey);
 
-  useEffect(() => {
+  const loadCalendar = useCallback(() => {
     fetchCalendarMonth(viewDate.getFullYear(), viewDate.getMonth() + 1)
       .then(data => setCalendarDays(data.days))
       .catch(() => setCalendarDays([]));
   }, [viewDate]);
 
-  useEffect(() => {
+  const loadTimeline = useCallback(() => {
     fetchTimeline(toDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
@@ -37,6 +39,28 @@ export function useCalendar() {
         setTimeline(0);
       });
   }, [selectedDate, setTimeline]);
+
+  // 월 변경 / 날짜 선택 / 강제 재조회(refreshKey) 시 다시 불러온다.
+  useEffect(() => {
+    loadCalendar();
+  }, [loadCalendar, refreshKey]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [loadTimeline, refreshKey]);
+
+  // 앱이 백그라운드에서 돌아오면 그 사이 쌓인 기록을 반영한다.
+  // (화면 재마운트가 아니라 상태가 유지되므로 위 effect들은 다시 돌지 않는다)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        loadCalendar();
+        loadTimeline();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [loadCalendar, loadTimeline]);
 
   return {
     selectedDate,

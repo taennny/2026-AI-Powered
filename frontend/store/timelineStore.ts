@@ -6,6 +6,12 @@ type TimelineStore = {
   /** analyze 응답으로 받은 오늘의 daily_record id — 글쓰기 요청에 필요 */
   dailyRecordId: string | null;
   setDailyRecordId: (id: string | null) => void;
+  /**
+   * 강제 재조회 신호. 홈 탭을 다시 눌렀을 때처럼 화면 이동 없이
+   * 최신 데이터를 다시 받아야 할 때 증가시킨다. (useCalendar가 구독)
+   */
+  refreshKey: number;
+  requestRefresh: () => void;
 };
 
 export const useTimelineStore = create<TimelineStore>(set => ({
@@ -13,4 +19,6 @@ export const useTimelineStore = create<TimelineStore>(set => ({
   setTimeline: (count) => set({placesCount: count}),
   dailyRecordId: null,
   setDailyRecordId: (id) => set({dailyRecordId: id}),
+  refreshKey: 0,
+  requestRefresh: () => set(s => ({refreshKey: s.refreshKey + 1})),
 }));
