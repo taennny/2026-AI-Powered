@@ -3,8 +3,8 @@
  * - PanResponder 3단계 스냅: expanded ↔ peek ↔ handleOnly
  * - expanded 시 MapPreview 페이드인
  *
- * ## 다음 연결 작업
- * - [ ] ScrollView 스크롤 ↔ 드래그 제스처 충돌 처리 검토
+ * panHandlers는 핸들+날짜 헤더와 지도 영역에만 붙는다 — ScrollView에는 붙이지 않아
+ * "핸들·지도 드래그 = 시트 이동 / 카드 목록 = 스크롤"로 역할이 갈린다.
  */
 
 import {useRef, useCallback, useState, useEffect} from 'react';
