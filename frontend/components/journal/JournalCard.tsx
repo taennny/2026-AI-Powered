@@ -1,11 +1,11 @@
 /**
  * @file components/journal/JournalCard.tsx — 저널 리스트 카드
- *
- * ## 다음 연결 작업
- * - [ ] 카드 탭 시 journal-detail 화면으로 이동
+ * - 카드 탭 → write-preview(미리보기·저장 화면)로 이동, blogId만 넘기면
+ *   해당 화면이 상세를 조회해 채운다.
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';
+import {router} from 'expo-router';
 
 import {type JournalData} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
@@ -40,6 +40,12 @@ export default function JournalCard({data, query = ''}: Props) {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
+      onPress={() =>
+        router.push({
+          pathname: '/(main)/write-preview',
+          params: {blogId: data.id},
+        })
+      }
       className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px]"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >

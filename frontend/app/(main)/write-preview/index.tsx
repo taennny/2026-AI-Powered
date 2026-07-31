@@ -3,8 +3,9 @@
  * @description 글쓰기 미리보기/저장 화면
  */
 
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -17,7 +18,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
-import {updateBlog} from '@/services/blogApi';
+import {fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {uploadPhoto} from '@/services/journalApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
@@ -40,6 +41,36 @@ export default function WritePreviewScreen() {
     useState<string[]>(parsedImageUris);
   const [isSaving, setIsSaving] = useState(false);
 
+  // 리스트에서 진입한 경우 blogId만 넘어오므로 상세를 조회해 채운다.
+  // (글 생성 직후 진입은 title/content가 파라미터로 함께 오므로 조회하지 않는다.)
+  const needsFetch = !!blogId && !title;
+  const [isLoading, setIsLoading] = useState(needsFetch);
+
+  useEffect(() => {
+    if (!needsFetch || !blogId) return;
+
+    let isActive = true;
+
+    fetchBlogDetail(blogId)
+      .then(detail => {
+        if (!isActive) return;
+        setJournalTitle(detail.title);
+        setJournalContent(detail.content);
+        setSelectedImageUris(detail.photo_urls ?? []);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        Alert.alert('오류', '글을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [blogId, needsFetch]);
+
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
 
@@ -49,7 +80,11 @@ export default function WritePreviewScreen() {
       {
         text: '취소',
         style: 'destructive',
-        onPress: () => router.replace('/(main)/(tabs)/home'),
+        onPress: () =>
+          // 리스트에서 들어온 경우 리스트로 되돌아가고, 그 외엔 홈으로 보낸다.
+          router.canGoBack()
+            ? router.back()
+            : router.replace('/(main)/(tabs)/home'),
       },
     ]);
   };
@@ -117,6 +152,14 @@ export default function WritePreviewScreen() {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface justify-center items-center">
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
