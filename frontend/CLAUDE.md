@@ -253,8 +253,8 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 
 | 함수 | 변환 |
 |---|---|
-| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` (기기 로컬 기준) |
-| `toKstDateKey(date)` | `Date` → KST 기준 `'YYYY-MM-DD'` — analyze 요청 전용 (백엔드가 날짜 경계를 KST로 해석) |
+| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` (기기 로컬 기준) — **화면 표시용** |
+| `toKstDateKey(date)` | `Date` → KST 기준 `'YYYY-MM-DD'` — **서버에 보내는 날짜 키는 전부 이것** (analyze, 타임라인 조회) |
 | `formatDate(date)` | `Date` → `'YY.MM.DD(day)'` |
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
@@ -275,7 +275,7 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 | 카카오 OAuth URL 하드코딩 | `login.tsx`, `settings/account/index.tsx` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. 프로덕션 카카오 로그인 실패 가능. 로컬/스테이징 테스트 불가 | 프론트(auth) |
 | 실패가 조용히 삼켜짐 | `login.tsx`, `settings/account/index.tsx`의 `console.log` | 카카오 로그인·연동 실패 시 사용자에게 아무 표시 없음 | 프론트(auth) |
 | `photoUrls`가 서버에 반영 안 됨 | `write-preview` 저장 | 백엔드 `BlogUpdateRequest`가 `title/content/visibility`만 받음 → 사진이 무시됨. `BlogResponse`에도 `photo_urls` 없어 리스트에서 열면 사진이 비어 보임 | **백엔드** |
-| 타임라인 조회 날짜 기준 불일치 | `useCalendar`는 `toDateKey`(기기 로컬), analyze는 `toKstDateKey`(KST) | 기기 타임존이 KST가 아니면 조회 날짜와 분석 날짜가 어긋남. 시뮬레이터 테스트 시 주의 | 프론트 |
+| 백엔드 타임라인의 날짜 기준이 내부적으로 어긋남 | `services/calendar.py:89` `func.date(GpsLog.recorded_at)`(UTC) vs `DailyRecord.target_date`(KST) | 한 응답 안에서 장소는 KST, polyline은 UTC 기준. 새벽 0~9시(KST) 로그가 어긋남. `KST` 상수가 `ai.py`에만 있고 `calendar.py`에는 미적용 | **백엔드** |
 | 미사용 변수 | `find-password.tsx:9` `router` | lint 경고 1건 | 프론트(auth) |
 | `exhaustive-deps` 경고 2건 | `kakao-login.tsx:42`, `SectionTabs.tsx:41` | 마운트 1회 실행이 의도라 동작은 정상. 의도를 주석으로 명시하면 해소 | 프론트 |
 

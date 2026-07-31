@@ -8,7 +8,7 @@ import {
   type TimelinePlace,
 } from '@/services/calendarApi';
 import {useTimelineStore} from '@/store/timelineStore';
-import {toDateKey} from '@/utils/formatDate';
+import {toKstDateKey} from '@/utils/formatDate';
 
 export function useCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -29,7 +29,9 @@ export function useCalendar() {
   }, [viewDate]);
 
   const loadTimeline = useCallback(() => {
-    fetchTimeline(toDateKey(selectedDate))
+    // 조회 키는 KST 기준으로 보낸다 — analyze가 daily_records.target_date를
+    // KST 날짜로 기록하므로, 기기 타임존이 달라도 같은 하루를 가리키게 된다.
+    fetchTimeline(toKstDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
         setTimeline(data.places.length);

@@ -41,7 +41,8 @@ export default function SectionTabs() {
         friction: 14,
       }),
     ]).start();
-  }, [activeTab]);
+    // homeFlex/journalFlex는 useRef 값이라 정체성이 바뀌지 않는다 — 재실행 유발 없음
+  }, [activeTab, homeFlex, journalFlex]);
 
   const handleTabPress = (tab: Tab) => {
     if (tab === activeTab) {
