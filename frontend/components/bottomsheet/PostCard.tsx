@@ -1,8 +1,8 @@
 /**
- * @file components/bottomsheet/PostCard.tsx — 바텀시트 타임라인 장소 카드
+ * 바텀시트 타임라인 장소 카드
  *
  * ## 다음 연결 작업
- * - [ ] 카드 탭 시 journal-detail 화면으로 이동
+ * - [ ] 카드 탭 시 write-preview로 이동 (JournalCard와 동일 방식)
  */
 
 import {View, Text, Image, TouchableOpacity} from 'react-native';

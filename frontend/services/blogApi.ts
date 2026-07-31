@@ -1,9 +1,3 @@
-/**
- * @file services/blogApi.ts
- * @description 저널(블로그) 목록 API 및 타입 정의
- * GET /api/v1/blogs
- */
-
 import {api} from '@/utils/api';
 
 export type JournalData = {
@@ -113,5 +107,25 @@ export async function updateBlog(
   body: UpdateBlogRequest,
 ): Promise<BlogDetail> {
   const {data} = await api.put<BlogDetail>(`/api/v1/blog/${blogId}`, body);
+  return data;
+}
+
+export type UploadedPhoto = {
+  photo_url: string;
+};
+
+export async function uploadPhoto(imageUri: string): Promise<UploadedPhoto> {
+  const formData = new FormData();
+  formData.append('photo', {
+    uri: imageUri,
+    name: 'photo.jpg',
+    type: 'image/jpeg',
+  } as any);
+
+  const {data} = await api.post<UploadedPhoto>(
+    '/api/v1/photos/upload',
+    formData,
+    {headers: {'Content-Type': 'multipart/form-data'}},
+  );
   return data;
 }

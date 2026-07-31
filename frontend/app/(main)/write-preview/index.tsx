@@ -1,8 +1,3 @@
-/**
- * @file app/(main)/write-preview/index.tsx
- * @description 글쓰기 미리보기/저장 화면
- */
-
 import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
@@ -18,8 +13,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
-import {fetchBlogDetail, updateBlog} from '@/services/blogApi';
-import {uploadPhoto} from '@/services/journalApi';
+import {fetchBlogDetail, updateBlog, uploadPhoto} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {

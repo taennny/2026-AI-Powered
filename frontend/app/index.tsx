@@ -1,47 +1,24 @@
 /**
- * @file app/index.tsx
- * @description 앱 진입점 — 권한 요청 + 인증 토큰 확인 후 화면 분기
- * - 토큰 있음 → /(main)/(tabs)/home
+ * 앱 진입점 — useBootstrap이 정한 화면으로 이동만 한다.
+ * - 토큰 있음 → 온보딩 완료 여부에 따라 /onboarding 또는 홈
  * - 토큰 없음 → /(auth)/login
  */
 
 import {useEffect} from 'react';
 import {useRouter} from 'expo-router';
 import {View, ActivityIndicator} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import {usePermissions} from '@/hooks/usePermissions';
-import {useAuthStore} from '@/store/authStore';
-import {useGpsTracking} from '@/hooks/useGpsTracking';
+import {useBootstrap} from '@/hooks/useBootstrap';
 
 export default function IndexScreen() {
   const router = useRouter();
-  const {requestAll} = usePermissions();
-  const initialize = useAuthStore(s => s.initialize);
-  const {start: startGps} = useGpsTracking();
+  const route = useBootstrap();
 
   useEffect(() => {
-    const bootstrap = async () => {
-      await requestAll();
-      await initialize();
-
-      const {isAuthenticated} = useAuthStore.getState();
-      if (isAuthenticated) {
-        await startGps();
-
-        const onboardingDone = await AsyncStorage.getItem('onboarding_done');
-        if (!onboardingDone) {
-          router.replace('/onboarding');
-        } else {
-          router.replace('/(main)/(tabs)/home');
-        }
-      } else {
-        router.replace('/(auth)/login');
-      }
-    };
-
-    bootstrap();
-  }, []);
+    if (route) {
+      router.replace(route);
+    }
+  }, [route, router]);
 
   return (
     <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>

@@ -1,7 +1,6 @@
 /**
- * @file components/home/HomeFooter.tsx — 홈 하단 푸터 (이동 거리 + 글쓰기 버튼)
- * - 이동 거리: timelineStore에서 읽음
- * - 글쓰기 버튼: /(main)/write 이동
+ * 홈 하단 푸터 (글쓰기 버튼)
+ * - 체류 장소와 daily_record_id를 모두 확보했을 때만 활성화 (timelineStore)
  */
 
 import {View, Text, TouchableOpacity} from 'react-native';

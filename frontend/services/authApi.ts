@@ -1,8 +1,3 @@
-/**
- * @file services/authApi.ts
- * @description 인증 관련 API
- */
-
 import {api} from '@/utils/api';
 import {saveTokens, saveAccessToken, getRefreshToken} from '@/utils/tokenStorage';
 

@@ -1,5 +1,5 @@
 /**
- * @file app/(main)/settings/theme/index.tsx — 테마 선택 화면
+ * 테마 선택 화면
  *
  * ## 다음 연결 작업
  * - [ ] 각 테마 미리보기 실제 스크린샷으로 교체

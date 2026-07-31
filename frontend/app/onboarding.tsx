@@ -1,8 +1,7 @@
 /**
- * @file onboarding.tsx
- * @description 온보딩 화면 — 최초 로그인 시 3페이지 안내 후 홈으로 이동
+ * 온보딩 화면 — 최초 로그인 시 안내 후 홈으로 이동
  * - 터치 시 다음 페이지로 이동, 마지막 페이지에서 홈으로 이동
- * - AsyncStorage에 'onboarding_done' 키를 저장하여 재진입 시 건너뜀
+ * - 완료 여부는 onboardingStorage에 저장되어 재진입 시 건너뜀
  */
 
 import {useState, useRef} from 'react';
@@ -14,7 +13,8 @@ import {
   Dimensions,
 } from 'react-native';
 import {router} from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import {markOnboardingDone} from '@/utils/onboardingStorage';
 
 const {width, height} = Dimensions.get('window');
 
@@ -39,7 +39,7 @@ export default function OnboardingScreen() {
       flatListRef.current?.scrollToIndex({index: next});
       setCurrentIndex(next);
     } else {
-      await AsyncStorage.setItem('onboarding_done', 'true');
+      await markOnboardingDone();
       router.replace('/(main)/(tabs)/home');
     }
   };

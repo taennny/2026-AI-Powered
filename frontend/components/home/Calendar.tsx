@@ -1,5 +1,5 @@
 /**
- * @file components/home/Calendar.tsx — 홈 화면 월간 캘린더
+ * 홈 화면 월간 캘린더
  * - 선택된 날짜만 하이라이트 (teal-accent 원)
  * - has_journal: tealAccent dot / has_timeline: tealDark dot (최대 2개)
  * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동 — useCalendar 훅)

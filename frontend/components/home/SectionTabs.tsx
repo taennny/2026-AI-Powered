@@ -1,5 +1,5 @@
 /**
- * @file components/home/SectionTabs.tsx — 홈 네비게이션 탭 (Home ↔ Journal List)
+ * 홈 네비게이션 탭 (Home ↔ Journal List)
  * - 활성 탭 52% / 비활성 48% spring 너비 애니메이션
  * - 활성 탭에 boxShadow 카드 효과
  */

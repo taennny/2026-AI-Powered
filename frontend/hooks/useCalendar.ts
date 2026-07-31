@@ -1,9 +1,5 @@
-/**
- * @file hooks/useCalendar.ts
- * @description 캘린더 데이터 및 타임라인 fetch 로직
- */
-
 import {useState, useEffect} from 'react';
+
 import {
   fetchCalendarMonth,
   fetchTimeline,

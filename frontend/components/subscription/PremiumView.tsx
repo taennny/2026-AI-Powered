@@ -1,5 +1,5 @@
 /**
- * @file components/subscription/PremiumView.tsx — 구독 화면 프리미엄 사용자 뷰
+ * 구독 화면 프리미엄 사용자 뷰
  *
  * ## 다음 연결 작업
  * - [ ] 결제 수단 변경 → 결제 플로우 연결

@@ -1,5 +1,5 @@
 /**
- * @file components/bottomsheet/BottomSheet.tsx — 홈 바텀시트
+ * 홈 바텀시트
  * - PanResponder 3단계 스냅: expanded ↔ peek ↔ handleOnly
  * - expanded 시 MapPreview 페이드인
  *

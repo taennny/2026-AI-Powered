@@ -1,6 +1,5 @@
 /**
- * @file store/authStore.ts
- * @description 인증 상태 관리 store
+ * 인증 상태 관리 store
  *
  * tokenStorage = 디스크 저장 (앱 재시작 후에도 유지)
  * authStore   = 메모리 상태 (컴포넌트가 로그인/로그아웃 변화를 즉시 감지)
@@ -12,6 +11,7 @@
  */
 
 import {create} from 'zustand';
+
 import {getAccessToken, removeTokens} from '@/utils/tokenStorage';
 
 type AuthStore = {

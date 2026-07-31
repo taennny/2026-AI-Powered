@@ -1,5 +1,3 @@
-/** @file app/(main)/write/index.tsx — 프롬프트 입력 + AI 글 생성 화면 */
-
 import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,

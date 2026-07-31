@@ -1,5 +1,5 @@
 /**
- * @file components/subscription/SubscriptionModal.tsx — 미구독 사용자 구독 유도 팝업
+ * 미구독 사용자 구독 유도 팝업
  *
  * ## 다음 연결 작업
  * - [ ] 구독하기 버튼 → 결제 플로우 연결

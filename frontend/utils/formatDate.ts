@@ -1,8 +1,3 @@
-/**
- * @file utils/formatDate.ts
- * @description 날짜 포맷 유틸 함수
- */
-
 /** Date → 'YYYY-MM-DD' (데이터 날짜 키) */
 export function toDateKey(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, '0');

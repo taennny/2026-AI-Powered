@@ -43,8 +43,7 @@ app/
     │   ├── home/index.tsx           # 홈 탭 (Calendar + BottomSheet)
     │   └── journal-list/index.tsx   # 저널 리스트 탭 (검색 + ScrollView)
     ├── write/index.tsx              # 글쓰기 (프롬프트 입력 → AI 생성)
-    ├── write-preview/index.tsx      # 글쓰기 미리보기/저장
-    ├── journal-detail/index.tsx     # 저널 상세 화면 (미구현 — 빈 템플릿)
+    ├── write-preview/index.tsx      # 미리보기/저장 — 생성 직후 진입, 리스트에서 진입 시 상세 조회
     └── settings/
         ├── index.tsx                # 설정 메인
         ├── account/index.tsx        # 계정 설정
@@ -56,11 +55,14 @@ app/
 
 ```
 앱 시작
-└── app/index.tsx
+└── app/index.tsx → hooks/useBootstrap.ts (준비 작업은 전부 여기에)
     ├── usePermissions().requestAll()   # 위치·미디어·카메라 권한 요청
     ├── authStore.initialize()          # tokenStorage → authStore 동기화
-    ├── isAuthenticated → true  → /(main)/(tabs)/home
-    └── isAuthenticated → false → /(auth)/login
+    ├── isAuthenticated → false → /(auth)/login
+    └── isAuthenticated → true  → useGpsTracking().start()
+        └── onboardingStorage 확인 → /onboarding 또는 /(main)/(tabs)/home
+
+app/index.tsx는 useBootstrap이 반환한 목적지로 replace만 한다.
 
 로그인 성공
 └── authApi.login() → saveTokens() + authStore.setToken()
@@ -86,9 +88,10 @@ utils/api.ts              # axios 인스턴스 (baseURL: EXPO_PUBLIC_API_BASE_UR
 utils/tokenStorage.ts     # AsyncStorage 기반 토큰 저장/조회/삭제
 
 services/calendarApi.ts   # fetchCalendarMonth, fetchTimeline + 관련 타입
-services/blogApi.ts       # fetchBlogs + 관련 타입
+services/blogApi.ts       # fetchBlogs, generateBlog, waitForBlogGeneration,
+                          # fetchBlogDetail, updateBlog, uploadPhoto + 관련 타입
 services/authApi.ts       # signup, login, refreshAccessToken, sendResetEmail, resetPassword
-services/journalApi.ts    # uploadPhoto, generateJournal, saveJournal
+services/gpsApi.ts        # uploadGpsLogs, analyzeGpsLogs
 services/subscriptionApi.ts  # fetchSubscription
 ```
 
@@ -104,9 +107,13 @@ services/subscriptionApi.ts  # fetchSubscription
 | `GET /api/v1/calendar/{year}/{month}` | `fetchCalendarMonth` | `hooks/useCalendar.ts` |
 | `GET /api/v1/calendar/{date}/timeline` | `fetchTimeline` | `hooks/useCalendar.ts` |
 | `GET /api/v1/blogs` | `fetchBlogs` | `journal-list/index.tsx` |
-| `POST /photos/upload` | `uploadPhoto` | `(main)/write/index.tsx` |
-| `POST /api/v1/blog/generate` | `generateJournal` | `(main)/write/index.tsx` |
-| `POST /api/v1/blogs` | `saveJournal` | `(main)/write-preview/index.tsx` |
+| `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` |
+| `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` |
+| `POST /api/v1/photos/upload` | `uploadPhoto` | `(main)/write-preview/index.tsx` |
+| `POST /api/v1/blog/generate` | `generateBlog` | `(main)/write/index.tsx` |
+| `GET /api/v1/blogs/{id}/status` | `fetchBlogGenerationStatus` | `waitForBlogGeneration` 폴링 |
+| `GET /api/v1/blog/{id}` | `fetchBlogDetail` | `(main)/write-preview/index.tsx` |
+| `PUT /api/v1/blog/{id}` | `updateBlog` | `(main)/write-preview/index.tsx` |
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription/index.tsx`, `settings/theme/index.tsx` |
 
 ### 스타일링
@@ -124,7 +131,7 @@ NativeWind v4 (Tailwind CSS for React Native)로 전체 스타일링. `StyleShee
 style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
 ```
 
-**prop 값** (`placeholderTextColor`, Ionicons `color` 등 className 불가한 곳): `constants/Colors.ts`의 `Colors` 객체 사용.
+**prop 값** (`placeholderTextColor`, Ionicons `color` 등 className 불가한 곳): `useThemeColors()` 훅 사용 — 현재 테마 색상을 반환하므로 테마 전환에 함께 반응합니다.
 
 ### 색상 시스템
 
@@ -148,10 +155,11 @@ style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
 | `border-line` | `--color-line` | `#e5e7eb` | 구분선·테두리 |
 | `text-muted` | (정적) | `#CCCCCC` | 비활성 텍스트 |
 
-**2. `constants/Colors.ts`** — prop 값 전용 (placeholderTextColor, icon color 등):
+**2. `hooks/useThemeColors.ts`** — prop 값 전용 (placeholderTextColor, icon color 등):
 ```ts
-Colors.textTertiary   // '#9ca3af'
-Colors.tealAccent     // '#7BBFD4'
+const tc = useThemeColors();
+tc.tertiary     // 현재 테마의 tertiary
+tc.tealAccent
 ```
 
 **테마 시스템** (인프라 완성, UI 토글 미구현):
@@ -179,12 +187,15 @@ translateY가 `sheetHeight * 0.45` 미만일 때 MapPreview가 페이드인됩�
 ### 글쓰기 플로우
 
 ```
-HomeFooter 글쓰기 버튼 → /(main)/write
+HomeFooter 글쓰기 버튼 → /(main)/write (dailyRecordId 전달)
 ├── 프롬프트 입력 + 글쓰기 스타일 (정보 위주 / 감성적)
-├── 사진 선택 (선택) → POST /photos/upload
-├── POST /api/v1/blog/generate → AI 글 생성
-└── /(main)/write-preview (title, content, photoUrl 파라미터 전달)
-    └── 제목/내용 수정 후 POST /api/v1/blogs → 저장 → 홈 이동
+├── POST /api/v1/blog/generate → 202 + blog_id
+├── waitForBlogGeneration: GET /api/v1/blogs/{id}/status 폴링 → completed 시 상세 조회
+└── /(main)/write-preview (blogId, title, content 전달)
+    └── 수정 후 사진 업로드 → PUT /api/v1/blog/{id} → 저장 → 홈 이동
+
+저널 리스트에서 카드 탭 → /(main)/write-preview (blogId만 전달)
+└── 해당 화면이 GET /api/v1/blog/{id}로 제목·본문을 채움
 ```
 
 ### 상태 관리 (Zustand)
@@ -199,8 +210,10 @@ store/authStore.ts
   - logout()            # removeTokens() + clearToken() 일괄 처리
 
 store/timelineStore.ts
-  - totalDistance: number
-  - setTotalDistance(distance)   # fetchTimeline 응답 후 호출
+  - placesCount: number
+  - setTimeline(count)           # fetchTimeline 응답 후 호출
+  - dailyRecordId: string | null # analyze 응답에서 받아 보관 — 글 생성 요청에 필수
+  - setDailyRecordId(id)         # tasks/gpsTask.ts에서 호출
 
 store/themeStore.ts
   - themeId: ThemeId
@@ -213,16 +226,19 @@ store/themeStore.ts
 ### 훅
 
 ```
+hooks/useBootstrap.ts     # 앱 시작 준비 — 권한 → 토큰 복원 → 진입 화면 결정 (app/index.tsx가 사용)
 hooks/usePermissions.ts   # requestAll() — 위치·미디어·카메라 권한 일괄 요청
 hooks/useCalendar.ts      # selectedDate, viewDate, calendarDays, places + fetch 로직
-hooks/useAuth.ts          # 빈 파일 (미구현)
+hooks/useGpsTracking.ts   # start()/stop() — 위치 추적 시작·중지
+hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
 
 | 함수 | 변환 |
 |---|---|
-| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` |
+| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` (기기 로컬 기준) |
+| `toKstDateKey(date)` | `Date` → KST 기준 `'YYYY-MM-DD'` — analyze 요청 전용 (백엔드가 날짜 경계를 KST로 해석) |
 | `formatDate(date)` | `Date` → `'YY.MM.DD(day)'` |
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
@@ -236,14 +252,18 @@ hooks/useAuth.ts          # 빈 파일 (미구현)
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| journal-detail 화면 구현 | `journal-detail/index.tsx` | `GET /api/v1/blog/{blog_id}` + `PUT` 수정 |
-| JournalCard / PostCard 탭 → journal-detail 이동 | `JournalCard.tsx`, `PostCard.tsx` | |
+| PostCard 탭 → write-preview 이동 | `PostCard.tsx` | JournalCard와 동일 방식 (`blogId`만 전달) |
 | write-preview 저장 후 홈 대신 리스트로 이동 | `write-preview/index.tsx` | |
+| 사진 저장 연결 | `write-preview/index.tsx` | 백엔드 `BlogUpdateRequest`에 `photoUrls` 필드 없음 — 현재 무시됨 |
+| GPS 시작 호출 중복 | `(auth)/login.tsx`, `hooks/useBootstrap.ts` | 로그인 후 `/`로 이동하면 useBootstrap이 다시 `startGps()` 호출. 로그인 쪽 제거 검토 (리팩토링 C-2) |
+| ImagePicker 로직 중복 | `write/index.tsx`, `write-preview/index.tsx` | 거의 동일한 코드 — `useImagePicker` 훅으로 추출 검토 (리팩토링 C-5) |
+| 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글이 프로덕션 코드에 상주. `!__DEV__`로 교체 검토 (실기기 테스트 이후) |
 | 구독 버튼 → `PUT /api/v1/subscriptions/me` 연결 | `FreeView.tsx`, `SubscriptionModal.tsx` | `{"plan_type": "premium"}` 요청 |
 | 구독 해지 모달 | `PremiumView.tsx` | 확인 모달 + API 연결 |
 | 회원탈퇴 확인 모달 + API | `settings/account/index.tsx` | |
 | GET /api/v1/users/me | `settings/account/index.tsx` | 이메일·카카오 연동 여부 동적 처리 (현재 MOCK) |
-| Kakao Static Map 실기기 테스트 | `MapPreview.tsx` | 엔드포인트 `/v2/maps/static.png` |
+| Google Static Maps 실기기 테스트 | `MapPreview.tsx` | `EXPO_PUBLIC_GOOGLE_MAPS_KEY` 사용. URL 생성은 `utils/staticMapUrl.ts` |
+| 카카오 OAuth URL 하드코딩 | `login.tsx`, `settings/account/index.tsx` | `https://api.roame.com/...` — 실제 도메인 `api.roame.co.kr`와 불일치. `EXPO_PUBLIC_API_BASE_URL` 기준으로 교체 필요 |
 | ScrollView ↔ BottomSheet 제스처 충돌 | `BottomSheet.tsx` | PanResponder 충돌 미해결 |
 | 테마 UI 토글 연결 | `settings/theme/index.tsx` | CSS 변수 레이어 완성됨 — `setTheme()` UI 연결 + `bg-primary + text-white` 버튼 색상 설계 필요 |
 

@@ -1,6 +1,5 @@
 /**
- * @file app/(auth)/kakao-login.tsx
- * @description 카카오 OAuth 딥링크 콜백 처리 화면
+ * 카카오 OAuth 딥링크 콜백 처리 화면
  * - roameapp://kakao-login?accessToken=...&refreshToken=... 딥링크 수신
  * - tokenStorage 저장 + authStore 업데이트 후 홈으로 이동
  *
@@ -11,6 +10,7 @@
 import {useEffect} from 'react';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {View, ActivityIndicator} from 'react-native';
+
 import {saveTokens} from '@/utils/tokenStorage';
 import {useAuthStore} from '@/store/authStore';
 

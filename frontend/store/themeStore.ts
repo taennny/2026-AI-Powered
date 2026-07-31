@@ -1,5 +1,5 @@
 /**
- * @file store/themeStore.ts — 활성 테마 상태. _layout.tsx 루트 View에 themeVars를 적용해 전역 색상 전환
+ * 활성 테마 상태. _layout.tsx 루트 View에 themeVars를 적용해 전역 색상 전환
  *
  * themeId는 AsyncStorage에 저장되어 앱 재시작 후에도 유지됩니다.
  *   테마 변경 → setTheme() (메모리 + 디스크 저장)
@@ -9,6 +9,7 @@
 import {create} from 'zustand';
 import {vars} from 'nativewind';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import {THEMES, type ThemeId} from '@/constants/themes';
 
 const THEME_KEY = 'themeId';

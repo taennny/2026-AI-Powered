@@ -1,5 +1,3 @@
-/** @file app/(main)/settings/index.tsx — 설정 메인 화면 (계정 / 구독 / 테마) */
-
 import {View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';

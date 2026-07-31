@@ -1,5 +1,5 @@
 /**
- * @file components/journal/JournalCard.tsx — 저널 리스트 카드
+ * 저널 리스트 카드
  * - 카드 탭 → write-preview(미리보기·저장 화면)로 이동, blogId만 넘기면
  *   해당 화면이 상세를 조회해 채운다.
  */

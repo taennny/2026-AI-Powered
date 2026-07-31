@@ -1,6 +1,5 @@
 /**
- * @file app/_layout.tsx
- * @description 앱 전체 루트 레이아웃
+ * 앱 전체 루트 레이아웃
  * - 폰트 로드 완료 전까지 스플래시 스크린 유지
  * - 인증 분기 및 권한 요청은 app/index.tsx에서 처리
  * - 하위 라우팅: (auth) 그룹(로그인/회원가입), (main) 그룹(홈/탭/설정)
@@ -13,6 +12,7 @@ import {useFonts} from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import {useEffect, useState} from 'react';
 import {View} from 'react-native';
+
 import {useThemeStore} from '@/store/themeStore';
 
 SplashScreen.preventAutoHideAsync();

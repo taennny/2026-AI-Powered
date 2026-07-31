@@ -1,6 +1,5 @@
 /**
- * @file app/(main)/(tabs)/home/index.tsx
- * @description 홈 인덱스 화면
+ * 홈 인덱스 화면
  * - 배경: Calendar 컴포넌트
  * - 전경: BottomSheet 컴포넌트 (드래그로 peek ↔ expanded 전환)
  */

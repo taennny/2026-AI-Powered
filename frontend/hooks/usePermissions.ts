@@ -1,6 +1,5 @@
 /**
- * @file hooks/usePermissions.ts
- * @description 앱 필수 권한 요청 훅
+ * 앱 필수 권한 요청 훅
  * - 위치(foreground), 미디어 라이브러리, 카메라
  * - 앱 최초 진입 시 한 번 호출
  */
