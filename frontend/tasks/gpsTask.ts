@@ -15,7 +15,7 @@ TaskManager.defineTask(GPS_TASK_NAME, async ({data, error}: TaskManager.TaskMana
     lng: loc.coords.longitude,
     accuracy: loc.coords.accuracy ?? 0,
     speed: loc.coords.speed ?? 0,
-    timestamp: loc.timestamp,
+    timestamp: new Date(loc.timestamp).toISOString(),
   }));
   try {
     await uploadGpsLogs(logs);

@@ -253,7 +253,7 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 
 | 함수 | 변환 |
 |---|---|
-| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` (기기 로컬 기준) — **화면 표시용** |
+| `toDateKey(date)` | `Date` → `'YYYY-MM-DD'` (기기 로컬 기준) — **현재 미사용**. 회의 ①이 "KST 고정"으로 정해지면 `useCalendar:34`가 이걸 쓰게 되고, "전부 로컬"이면 삭제 대상 |
 | `toKstDateKey(date)` | `Date` → KST 기준 `'YYYY-MM-DD'` — **서버에 보내는 날짜 키는 전부 이것** (analyze, 타임라인 조회) |
 | `formatDate(date)` | `Date` → `'YY.MM.DD(day)'` |
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
@@ -277,9 +277,10 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 | "하루"의 경계 | **analyze만 KST로 명시** (`services/ai.py:20,48,57`) |
 | 날짜 컬럼 | `daily_records.target_date`, `blogs.target_date` = `Date` (KST 달력 날짜) |
 | Postgres `TimeZone` | compose에 `TZ` 미설정 → **UTC** |
-| GPS 업로드 | epoch ms 숫자 → pydantic이 UTC aware로 파싱 |
+| GPS 업로드 | **ISO 8601 UTC 문자열** (`toISOString()`) |
 | 날짜 키 전송 | `toKstDateKey` — 기기 타임존 무관하게 KST 달력 날짜 |
 | 화면 표시 | **전부 기기 로컬** |
+| 체류 판정 | `STAY_RADIUS_M = 50`, `MIN_STAY_MINUTES = 3` (`ai/server/modules/gps.py:35-36`) |
 
 ### 화면별 차이
 
@@ -294,14 +295,32 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 | 글쓰기 날짜 (`write/index.tsx:43`) | 기기 로컬 "오늘" | 어긋남 + 대상일과 무관 |
 | 구독 (`subscription:12`, `PremiumView:24`) | 기기 로컬 | 최대 1일 오차 |
 
+**①에서 "KST 고정"으로 결정될 경우 수정 대상은 6곳**입니다 — `useCalendar:14,16` /
+`BottomSheet:49` / `BottomSheet:37`(`getHours`) / `formatTimeFromISO` /
+`subscription/index.tsx:12` / `PremiumView:24`. (`write/index.tsx:43`은 글쓰기 담당 영역)
+
 ### 회의 안건 (미결)
 
-1. 표시 기준 — 전부 KST 고정 / 날짜만 KST·시각은 로컬 / 전부 로컬 (실질은 "해외 사용 지원 여부")
-2. 글을 다른 날에 쓸 때 표시할 날짜 — 작성일 / 기록 대상일
-3. 자정 걸친 활동 — 이틀 모두 표시 / 시작일 기준 / 잘라 나누기
-4. "하루"의 경계 시각 — 자정 / 새벽 4~5시 (3의 실질적 해법일 수 있음)
-5. 사진 시각의 기준 — EXIF `DateTimeOriginal`엔 tz가 없음. KST 고정 / `OffsetTimeOriginal` 우선+KST 폴백 / 업로드 시 기기 tz 동봉 ★ **아래 백엔드 1번의 선행 조건**
-6. 저장 규칙 문서화 — "시각은 timestamptz UTC / 날짜 컬럼은 서비스 tz 달력 날짜 / `func.date()` 금지, 반개구간 조회"
+1. **표시 기준** — 전부 KST 고정 / 날짜만 KST·시각은 로컬 / 전부 로컬
+   (실질은 "해외 사용 지원 여부". 결정 시 위 6곳 수정)
+2. **글을 다른 날에 쓸 때 표시할 날짜** — 작성일 / 기록 대상일
+3. **자정 걸친 활동** — 이틀 모두 표시 / 시작일 기준 / 잘라 나누기
+   > ⚠️ 전제 정정: `MIN_STAY_MINUTES = 3`이라 30분 조각은 **양쪽 다 통과**한다.
+   > 증상은 "기록 소실"이 아니라 **"한 곳을 두 번 방문한 것으로 중복 계상"**이며
+   > `place_count` 통계가 부풀려진다. (로그가 드문 구간이면 3분 미달로 소실도 가능)
+4. **"하루"의 경계 시각** — 자정 / 새벽 4~5시 (3의 실질적 해법. 새벽 4시로 하면 애초에 안 쪼개짐)
+5. **사진 시각의 기준** — EXIF `DateTimeOriginal`엔 tz가 없음.
+   KST 고정 / `OffsetTimeOriginal` 우선+KST 폴백 / 업로드 시 기기 tz 동봉
+   ★ **아래 백엔드 EXIF 건의 선행 조건**
+   → 하위 결정: **EXIF가 아예 없는 사진**(스크린샷·카톡 저장본)은 현재 `photos.py:41`에서
+     **업로드 시각**으로 저장된다. 몰아서 올리면 엉뚱한 장소에 붙거나 어디에도 안 붙는다.
+6. **저장 규칙 문서화** — "시각은 timestamptz UTC / 날짜 컬럼은 서비스 tz 달력 날짜 /
+   `func.date()` 금지, 반개구간 조회" (논쟁거리가 아니라 합의하고 박아두는 항목)
+7. **기존 데이터를 재분석할 것인가** — 전체 재분석 / 시행일 이후만 / 과거는 감수
+   이미 저장된 `daily_records`·`places`는 **자정 경계 + UTC 기준 버그가 있는 상태**로 계산된
+   값이다. 4를 바꾸거나 백엔드 버그를 고치기만 해도 **과거 타임라인 표시가 달라진다.**
+   재분석 시 `daily_records`의 `(user_id, target_date)` unique 제약과 충돌할 수 있어
+   마이그레이션 스크립트가 필요할 수도 있다. **백엔드 수정 배포 시점과 함께 정해야 한다.**
 
 **MVP 권장: 전부 KST 고정.** 국내 서비스이고, 현재의 반쪽짜리 상태를 완전히 없앱니다.
 기기 타임존 방식(analyze에 tz 동봉 + `daily_records`에 오프셋 컬럼)은 해외 사용자가
@@ -327,8 +346,9 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 | 실패가 조용히 삼켜짐 | `login.tsx`, `settings/account/index.tsx`의 `console.log` | 카카오 로그인·연동 실패 시 사용자에게 아무 표시 없음 | 프론트(auth) |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` (15회 × 2.5초) | 생성이 더 걸리면 실제로는 성공했는데 "글 생성 실패"로 표시됨 | 프론트(글쓰기) |
 | `JSON.parse` 방어 없음 | `write-preview/index.tsx:30` `imageUris` 파싱 | 파라미터가 깨지면 화면 크래시. `useState` 초기값용인데 렌더마다 파싱 | 프론트(글쓰기) |
-| 자정 걸친 체류가 조각남 | `ai/server/modules/gps.py` | 백엔드가 KST 하루로 잘라 보내므로 23:30~00:30 체류는 30분씩 쪼개져 **양쪽 다 `MIN_STAY_MINUTES` 미달로 버려질 수 있음** | 회의 안건 3·4 |
-| GPS `timestamp`가 숫자 epoch ms | `gpsTask.ts:18` → `backend/app/schemas/gps.py:10` | pydantic의 "2e10 초과면 ms" 휴리스틱에 의존. 동작은 하지만 계약이 암묵적. `toISOString()`이면 명시적 | 프론트 (낮음) |
+| 자정 걸친 체류가 **중복 계상됨** | `ai/server/modules/gps.py` | 백엔드가 KST 하루로 잘라 보내 23:30~00:30 체류가 8/1에 30분 + 8/2에 30분으로 쪼개짐. `MIN_STAY_MINUTES = 3`이라 **양쪽 다 통과** → 한 곳을 두 번 방문한 것으로 기록되고 `place_count`가 부풀려짐 (로그가 드문 구간이면 3분 미달로 소실도 가능) | 회의 안건 3·4 |
+| EXIF 없는 사진이 업로드 시각으로 저장됨 | `backend/app/services/photos.py:41` `taken_at = exif["taken_at"] or datetime.now(utc)` | 스크린샷·카톡 저장본 등 EXIF가 없는 사진은 **업로드한 시각**이 촬영 시각이 됨. 나중에 몰아서 올리면 엉뚱한 시간대 장소에 붙거나 어디에도 안 붙음 | **백엔드** (회의 안건 5 하위) |
+| 기존 데이터가 옛 기준으로 계산돼 있음 | `daily_records`, `places` 전체 | 자정 경계 + UTC 기준 버그 상태로 저장된 값. 백엔드 시간 버그를 고치면 **과거 타임라인 표시가 달라짐**. 재분석 시 `(user_id, target_date)` unique 제약과 충돌 가능 | **백엔드** (회의 안건 7) |
 | 미사용 변수 | `find-password.tsx:9` `router` | lint 경고 1건 | 프론트(auth) |
 | `exhaustive-deps` 경고 1건 | `kakao-login.tsx:42` | 마운트 1회 실행이 의도라 동작은 정상. 의도를 주석으로 명시하면 해소 | 프론트(auth) |
 
@@ -356,6 +376,8 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
 - `SectionTabs.tsx` exhaustive-deps 경고 해소 (`0891133`)
 - 자정 걸친 배치의 앞 날짜 미분석 — `gpsTask.ts`가 배치에 포함된 KST 날짜 전부에 analyze 요청
 - PostCard 무동작 탭 — 탭 동작 확정 전까지 `View`로 두어 눌리지 않게 처리
+- GPS `timestamp`를 ISO 8601 UTC 문자열로 전송 — pydantic의 "200억 초과면 ms" 내부
+  휴리스틱에 기대던 암묵적 계약 제거
 - ScrollView ↔ BottomSheet 제스처 충돌 (`f4424b7`) — `panHandlers`가 핸들+날짜 헤더(`:195`)와
   지도(`:215`)에만 붙고 `ScrollView(:221)`엔 없어 **충돌이 발생할 수 없는 구조**
 
@@ -368,6 +390,11 @@ hooks/useThemeColors.ts   # 현재 테마의 색상 값 (prop 용)
   0-2. 🔴 타임라인 polyline이 UTC 날짜 기준 — `app/services/calendar.py:89`
   0-3. 🟠 같은 문제 — `app/services/ai.py:112,144`
   0-4. 🟠 `KST` 상수 공용화 — `app/utils/time.py`에 `kst_day_range()` 추가
+  0-5. 🟠 EXIF 없는 사진이 업로드 시각으로 저장됨 — `photos.py:41`
+  0-6. (확인) Postgres `TimeZone` — compose에 `TZ` 미설정이라 UTC로 가정함.
+       `docker exec roame-db psql -U roame -d roame -c "show timezone;"`
+  0-7. (배포 조율) 위 수정은 **과거 타임라인 표시를 바꾼다** — 회의 안건 7(기존 데이터
+       재분석 여부)과 함께 배포 시점을 잡아야 함
        → 상세는 위 "알려진 문제 / 코드의 구멍" 표 참고
 
   ■ 신규 필드 추가 요청
