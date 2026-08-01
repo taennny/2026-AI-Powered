@@ -50,16 +50,17 @@ services:
         condition: service_started
 
   # HTTPS 리버스 프록시 — api.roame.co.kr(443) → backend:8000
+  # 경로 라우팅: /roame-photos/* 는 MinIO로 (presigned URL 사진 접근), 나머지는 backend (Caddyfile 참조)
   # Let's Encrypt 인증서 자동 발급·갱신 (도메인 A레코드가 이 서버를 가리켜야 발급됨)
   caddy:
     image: caddy:2-alpine
     container_name: roame-caddy
     restart: unless-stopped
-    command: caddy reverse-proxy --from api.roame.co.kr --to backend:8000
     ports:
       - "80:80"
       - "443:443"
     volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - roame-caddy-data:/data  # 인증서 영속화 (재기동 시 재발급/rate limit 방지)
       - roame-caddy-config:/config
     depends_on:
