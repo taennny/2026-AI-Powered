@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.models.photos import Photo
 from app.services.storage import upload_file, get_presigned_url
+from app.utils.timezone import KST
 
 
 def _parse_exif(file_bytes: bytes) -> dict:
@@ -21,7 +22,7 @@ def _parse_exif(file_bytes: bytes) -> dict:
         if dt_bytes:
             dt_str = dt_bytes.decode("utf-8")
             result["taken_at"] = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S").replace(
-                tzinfo=timezone.utc
+                tzinfo=KST
             )
 
     except Exception:
