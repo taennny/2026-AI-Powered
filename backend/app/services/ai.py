@@ -19,7 +19,6 @@ from app.utils.timezone import KST
 logger = logging.getLogger(__name__)
 
 
-
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """두 좌표 간 거리 계산 (km)"""
     R = 6371.0
