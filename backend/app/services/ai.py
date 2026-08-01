@@ -1,7 +1,7 @@
 import logging
 import math
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
