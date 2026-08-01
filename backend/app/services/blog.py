@@ -18,6 +18,14 @@ from app.services.timeline_serializer import build_timeline_data, map_style
 logger = logging.getLogger(__name__)
 
 
+class BlogConflictError(Exception):
+    """생성 진행 중 충돌 (409)"""
+
+
+class BlogStateError(Exception):
+    """상태 전이 오류 (400)"""
+
+
 async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
     """블로그의 하루 기록 + 유저 + 장소들을 timeline_data로 직렬화."""
     daily_record = (
@@ -60,6 +68,21 @@ async def create_blog_generation(
     if not daily_record:
         raise ValueError("해당 하루 기록을 찾을 수 없습니다")
 
+    # 같은 하루 기록으로 생성이 진행 중이면 중복 요청 거절 (완료/실패 건은 허용)
+    in_progress = (
+        await db.execute(
+            select(Blog.id).where(
+                Blog.user_id == user_id,
+                Blog.daily_record_id == daily_record_id,
+                Blog.generation_status.in_(
+                    [GenerationStatus.PENDING, GenerationStatus.GENERATING]
+                ),
+            )
+        )
+    ).first()
+    if in_progress:
+        raise BlogConflictError("이미 생성이 진행 중입니다")
+
     blog = Blog(
         user_id=user_id,
         daily_record_id=daily_record_id,
@@ -94,7 +117,8 @@ async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) 
                 user_note=user_note,
             )
 
-            blog.title = ai_result.get("title", "제목 없음")
+            # AI 프롬프트는 25자 권장이지만 강제가 아님 — DB 컬럼(255) 초과 방지 절단
+            blog.title = ai_result.get("title", "제목 없음")[:255]
             blog.content = ai_result.get("content", "")
             blog.generation_status = GenerationStatus.COMPLETED
 
@@ -161,6 +185,12 @@ async def update_blog(
     """블로그 수정"""
     blog = await get_blog_by_id(db, blog_id, user_id)
 
+    if blog.generation_status in (
+        GenerationStatus.PENDING,
+        GenerationStatus.GENERATING,
+    ):
+        raise BlogConflictError("생성이 진행 중인 글은 수정할 수 없습니다")
+
     if title is not None:
         blog.title = title
     if content is not None:
@@ -180,7 +210,7 @@ async def publish_blog(
     blog = await get_blog_by_id(db, blog_id, user_id)
 
     if blog.generation_status != GenerationStatus.COMPLETED:
-        raise ValueError("생성이 완료된 블로그만 발행할 수 있습니다")
+        raise BlogStateError("생성이 완료된 블로그만 발행할 수 있습니다")
 
     blog.is_published = True
     blog.visibility = "public"
