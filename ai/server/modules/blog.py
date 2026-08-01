@@ -23,7 +23,9 @@ daily_record 표준 형식 (백엔드가 places + photos 를 조립해 전달해
   }
 """
 
+import json
 import logging
+import re
 from datetime import datetime
 
 from flask import request
@@ -97,6 +99,17 @@ def serialize(data: dict) -> str:
 
 USER_NOTE_MAX_LEN = 1000  # 과도한 입력 방지 (초과분은 잘림)
 
+# 모델이 제목/본문을 JSON 으로 깔끔하게 분리해 반환하도록 강제하는 지시.
+# response_format=json_object 사용을 위해 프롬프트에 "JSON" 이 포함돼야 한다.
+OUTPUT_INSTRUCTION = (
+    "\n\n[출력 형식] 아래 JSON 하나만 출력하세요 (코드블록·설명 없이):\n"
+    '{"title": "제목", "content": "본문"}\n'
+    "- title: 위 스타일의 제목 지시를 따르되 하루를 아우르는 간결한 제목. "
+    "한 문장 또는 짧은 문구(25자 이내 권장), 마침표로 끝내지 말고 "
+    "따옴표·해시(#)·'제목:' 같은 접두어를 넣지 마세요.\n"
+    "- content: 본문만 담고, 제목을 본문 첫 줄에 반복하지 마세요."
+)
+
 
 def compose_user_prompt(daily_record: dict, style: str, user_note: str = "") -> str:
     """타임라인 직렬화 + (선택) 사용자 메모를 합쳐 LLM user 프롬프트를 만든다."""
@@ -108,7 +121,52 @@ def compose_user_prompt(daily_record: dict, style: str, user_note: str = "") -> 
             "\n\n[작성자 메모] 아래 내용을 글에 자연스럽게 반영하세요. "
             "단, 메모에 없는 사실을 지어내지는 마세요:\n" + note
         )
-    return user_prompt
+    return user_prompt + OUTPUT_INSTRUCTION
+
+
+_TITLE_PREFIXES = ("제목:", "제목 :", "title:")
+
+
+def _clean_title(title: str) -> str:
+    """제목에서 접두어·따옴표·해시·끝 마침표 등 군더더기를 반복 제거한다."""
+    t = (title or "").strip()
+    prev = None
+    while t and t != prev:
+        prev = t
+        t = t.strip().strip("#").strip("\"'“”").strip()
+        for prefix in _TITLE_PREFIXES:
+            if t.lower().startswith(prefix):
+                t = t[len(prefix):].strip()
+        t = t.rstrip("。.").strip()
+    return t
+
+
+def _strip_code_fence(text: str) -> str:
+    """```json ... ``` 형태의 코드블록 펜스를 벗겨 안쪽 내용만 반환한다."""
+    fence = re.match(r"^```(?:json)?\s*(.*?)\s*```$", text, re.DOTALL)
+    return fence.group(1).strip() if fence else text
+
+
+def parse_generation(raw: str) -> tuple[str, str]:
+    """모델 응답에서 (title, content) 추출.
+
+    1순위: JSON({"title","content"}) 파싱.
+    실패 시 폴백: 첫 줄=제목, 나머지=본문 (구버전 방식).
+    """
+    text = _strip_code_fence((raw or "").strip())
+    try:
+        obj = json.loads(text)
+        title = str(obj.get("title", "")).strip()
+        content = str(obj.get("content", "")).strip()
+        if title or content:
+            return _clean_title(title), content
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        pass
+
+    lines = text.splitlines()
+    title = _clean_title(lines[0]) if lines else ""
+    content = "\n".join(lines[1:]).strip() if len(lines) > 1 else text
+    return title, content
 
 
 generate_input = ns.model(
@@ -162,12 +220,11 @@ class Generate(Resource):
                 ],
                 temperature=0.8,
                 max_tokens=2000,
+                response_format={"type": "json_object"},
             )
 
             raw = response.choices[0].message.content or ""
-            lines = raw.strip().splitlines()
-            title = lines[0].lstrip("# ").strip() if lines else ""
-            content = "\n".join(lines[1:]).strip() if len(lines) > 1 else raw
+            title, content = parse_generation(raw)
 
             logger.info("블로그 생성 완료 | title=%s", title)
             return {"title": title, "content": content}, 200

@@ -12,10 +12,12 @@ async def get_kakao_token(code: str) -> dict:
                 "client_id": settings.KAKAO_REST_API_KEY,
                 "redirect_uri": settings.KAKAO_REDIRECT_URI,
                 "code": code,
+                "client_secret": settings.KAKAO_CLIENT_SECRET,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
     if response.status_code != 200:
+        print(f"카카오 토큰 오류: {response.status_code} {response.text}")
         raise ValueError("유효하지 않은 인가 코드입니다")
     return response.json()
 

@@ -86,7 +86,8 @@ async def get_timeline(
         .where(
             and_(
                 GpsLog.user_id == user_id,
-                func.date(GpsLog.recorded_at) == target_date,
+                func.date(func.timezone("Asia/Seoul", GpsLog.recorded_at))
+                == target_date,
             )
         )
         .order_by(GpsLog.recorded_at)
