@@ -1,7 +1,7 @@
 import logging
 import math
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
@@ -14,10 +14,9 @@ from app.models.gps_log import GpsLog
 from app.models.photos import Photo
 from app.models.place import Place
 from app.schemas.ai import AIAnalyzeRequest, AIAnalyzeResponse, AIGpsLogItem
+from app.utils.timezone import KST
 
 logger = logging.getLogger(__name__)
-
-KST = timezone(timedelta(hours=9))
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -109,7 +108,7 @@ async def analyze_and_save(
     photo_result = await db.execute(
         select(func.count(Photo.id))
         .where(Photo.user_id == user_id)
-        .where(func.date(Photo.taken_at) == target_date)
+        .where(func.date(func.timezone("Asia/Seoul", Photo.taken_at)) == target_date)
     )
     photo_count = photo_result.scalar() or 0
 
@@ -141,7 +140,7 @@ async def analyze_and_save(
     await db.execute(
         update(Photo)
         .where(Photo.user_id == user_id)
-        .where(func.date(Photo.taken_at) == target_date)
+        .where(func.date(func.timezone("Asia/Seoul", Photo.taken_at)) == target_date)
         .values(daily_record_id=daily_record.id)
     )
 
