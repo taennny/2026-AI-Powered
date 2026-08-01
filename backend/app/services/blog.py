@@ -94,7 +94,8 @@ async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) 
                 user_note=user_note,
             )
 
-            blog.title = ai_result.get("title", "제목 없음")
+            # AI 프롬프트는 25자 권장이지만 강제가 아님 — DB 컬럼(255) 초과 방지 절단
+            blog.title = ai_result.get("title", "제목 없음")[:255]
             blog.content = ai_result.get("content", "")
             blog.generation_status = GenerationStatus.COMPLETED
 
