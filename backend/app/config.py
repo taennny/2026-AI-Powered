@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = "minioadmin"
     MINIO_SECRET_KEY: str = "minioadmin123"
     MINIO_BUCKET_NAME: str = "roame-photos"
+    # presigned URL용 공개 주소 (예: https://api.roame.co.kr). 빈 값이면 내부 주소로 서명(로컬용)
+    MINIO_PUBLIC_ENDPOINT: str = ""
 
     # AI Server
     AI_SERVER_URL: str = ""

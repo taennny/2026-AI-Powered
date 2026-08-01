@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, computed_field
 
@@ -9,8 +9,10 @@ from pydantic import AliasChoices, BaseModel, Field, computed_field
 class BlogGenerateRequest(BaseModel):
     daily_record_id: uuid.UUID
     # 프론트는 writing_style/writingStyle, 내부/구버전은 style — 모두 수용
+    # 255/20은 DB 컬럼 한계(기술적 제한) — 정책 결정 시 조정
     style: str = Field(
         default="casual",
+        max_length=20,
         validation_alias=AliasChoices("style", "writingStyle", "writing_style"),
         description="블로그 스타일",
     )
@@ -83,9 +85,9 @@ class BlogListResponse(BaseModel):
 
 # --- 블로그 수정 ---
 class BlogUpdateRequest(BaseModel):
-    title: Optional[str] = None
+    title: Optional[str] = Field(default=None, max_length=255)
     content: Optional[str] = None
-    visibility: Optional[str] = None
+    visibility: Optional[Literal["private", "public"]] = None
 
 
 # --- 블로그 발행 ---

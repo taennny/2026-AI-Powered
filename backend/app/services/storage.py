@@ -2,11 +2,13 @@ import asyncio
 import functools
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from app.config import settings
 
 _s3_client = None
+_presign_client = None
 
 
 def get_s3_client():
@@ -21,6 +23,23 @@ def get_s3_client():
             region_name="us-east-1",
         )
     return _s3_client
+
+
+def get_presign_client():
+    """presigned URL 서명용 클라이언트. 공개 엔드포인트가 설정되면 그 호스트로 서명한다."""
+    global _presign_client
+    if not settings.MINIO_PUBLIC_ENDPOINT:
+        return get_s3_client()
+    if _presign_client is None:
+        _presign_client = boto3.client(
+            "s3",
+            endpoint_url=settings.MINIO_PUBLIC_ENDPOINT,
+            aws_access_key_id=settings.MINIO_ACCESS_KEY,
+            aws_secret_access_key=settings.MINIO_SECRET_KEY,
+            region_name="us-east-1",
+            config=Config(s3={"addressing_style": "path"}),
+        )
+    return _presign_client
 
 
 async def _run_sync(func, *args, **kwargs):
@@ -55,7 +74,7 @@ async def upload_file(
 
 async def get_presigned_url(file_key: str, expires_in: int = 3600) -> str:
     """presigned URL 생성 (기본 1시간)"""
-    client = get_s3_client()
+    client = get_presign_client()
     return await _run_sync(
         client.generate_presigned_url,
         "get_object",
