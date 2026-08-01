@@ -18,6 +18,10 @@ from app.services.timeline_serializer import build_timeline_data, map_style
 logger = logging.getLogger(__name__)
 
 
+class BlogConflictError(Exception):
+    """생성 진행 중 충돌 (409)"""
+
+
 async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
     """블로그의 하루 기록 + 유저 + 장소들을 timeline_data로 직렬화."""
     daily_record = (
@@ -59,6 +63,21 @@ async def create_blog_generation(
     daily_record = result.scalar_one_or_none()
     if not daily_record:
         raise ValueError("해당 하루 기록을 찾을 수 없습니다")
+
+    # 같은 하루 기록으로 생성이 진행 중이면 중복 요청 거절 (완료/실패 건은 허용)
+    in_progress = (
+        await db.execute(
+            select(Blog.id).where(
+                Blog.user_id == user_id,
+                Blog.daily_record_id == daily_record_id,
+                Blog.generation_status.in_(
+                    [GenerationStatus.PENDING, GenerationStatus.GENERATING]
+                ),
+            )
+        )
+    ).first()
+    if in_progress:
+        raise BlogConflictError("이미 생성이 진행 중입니다")
 
     blog = Blog(
         user_id=user_id,

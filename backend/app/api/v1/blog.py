@@ -17,6 +17,7 @@ from app.schemas.blog import (
     BlogUpdateRequest,
 )
 from app.services.blog import (
+    BlogConflictError,
     create_blog_generation,
     get_blog_by_id,
     get_blog_list,
@@ -69,6 +70,8 @@ async def generate_blog(
         blog = await create_blog_generation(
             db, current_user.id, request.daily_record_id, request.style
         )
+    except BlogConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
