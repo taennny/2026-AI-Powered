@@ -6,3 +6,4 @@ from app.models.daily_record import DailyRecord as DailyRecord
 from app.models.place import Place as Place
 from app.models.photos import Photo as Photo
 from app.models.blog import Blog as Blog
+from app.models.payment import Payment as Payment

@@ -19,3 +19,17 @@ class SubscriptionUpdateRequest(BaseModel):
     plan_type: str
     # 프론트가 월/연 선택을 보내지 않으면 monthly로 처리 (하위호환)
     billing_cycle: str = "monthly"
+
+
+class PaymentVerifyRequest(BaseModel):
+    # 실결제 도입 전까지는 mock 검증기만 지원
+    provider: str = "mock"
+    receipt: str
+
+
+class PaymentVerifyResponse(BaseModel):
+    transaction_id: str
+    plan: str
+    billing_cycle: str
+    already_processed: bool
+    message: str
