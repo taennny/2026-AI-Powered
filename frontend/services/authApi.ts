@@ -81,3 +81,18 @@ export async function fetchMe(): Promise<UserMe> {
 export async function deleteAccount(): Promise<void> {
   await api.delete('/api/v1/auth/me');
 }
+
+// export interface KakaoLoginRequest {
+//   code: string;
+// }
+
+// export async function kakaoLogin(code: string): Promise<LoginResponse> {
+//   const response = await api.post('/api/v1/auth/kakao', {
+//     code,
+//   });
+
+//   const { access_token, refresh_token } = response.data;
+//   await saveTokens(access_token, refresh_token);
+
+//   return response.data;
+// }

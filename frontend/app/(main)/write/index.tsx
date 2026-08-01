@@ -4,18 +4,15 @@ import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
@@ -35,10 +32,8 @@ export default function WriteScreen() {
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [prompt, setPrompt] = useState('');
-  const [imageUris, setImageUris] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const hasPhoto = imageUris.length > 0;
   const canSubmit = prompt.trim().length > 0 && !!dailyRecordId;
 
   const dateStr = useMemo(() => {
@@ -46,6 +41,7 @@ export default function WriteScreen() {
     const yy = String(today.getFullYear()).slice(2);
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const dd = String(today.getDate()).padStart(2, '0');
+
     return `${yy}.${mm}.${dd}`;
   }, []);
 
@@ -58,38 +54,6 @@ export default function WriteScreen() {
         onPress: () => router.replace('/(main)/(tabs)/home'),
       },
     ]);
-  };
-
-  const handleImagePick = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-      allowsMultipleSelection: true,
-    });
-
-    if (!result.canceled) {
-      const selectedImageUris = result.assets.map(asset => asset.uri);
-
-      setImageUris(prevImageUris => [
-        ...prevImageUris,
-        ...selectedImageUris,
-      ]);
-    }
-  };
-
-  const handlePhotoToggle = async (value: boolean) => {
-    if (value) {
-      await handleImagePick();
-      return;
-    }
-
-    setImageUris([]);
-  };
-
-  const handleImageDeletePress = (targetImageUri: string) => {
-    setImageUris(prevImageUris =>
-      prevImageUris.filter(imageUri => imageUri !== targetImageUri),
-    );
   };
 
   const handleWritePress = async () => {
@@ -120,7 +84,6 @@ export default function WriteScreen() {
           blogId: String(blog.blog_id),
           title: blog.title,
           content: blog.content,
-          imageUris: JSON.stringify(imageUris),
         },
       });
     } catch {
@@ -134,6 +97,7 @@ export default function WriteScreen() {
     return (
       <SafeAreaView className="flex-1 bg-surface justify-center items-center">
         <ActivityIndicator size="large" />
+
         <Text className="mt-[14px] text-sm text-tertiary">
           로미가 열심히 적고 있어요.
         </Text>
@@ -186,31 +150,9 @@ export default function WriteScreen() {
             placeholderTextColor={tc.tertiary}
             textAlignVertical="top"
           />
-
-          {imageUris.map(imageUri => (
-            <View key={imageUri} className="mt-4">
-              <Image
-                source={{uri: imageUri}}
-                className="w-full h-[210px] rounded-[10px]"
-                resizeMode="cover"
-              />
-
-              <TouchableOpacity
-                className="mt-2 self-end"
-                onPress={() => handleImageDeletePress(imageUri)}
-              >
-                <Text className="text-xs text-muted">삭제</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
         </ScrollView>
 
-        <View className="h-[72px] border-t border-line bg-surface px-[22px] flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <Switch value={hasPhoto} onValueChange={handlePhotoToggle} />
-            <Text className="ml-2 text-xs font-semibold text-primary">사진</Text>
-          </View>
-
+        <View className="h-[72px] border-t border-line bg-surface px-[22px] items-end justify-center">
           <TouchableOpacity
             className={`bg-teal px-[22px] py-[10px] rounded-md${
               !canSubmit ? ' opacity-50' : ''

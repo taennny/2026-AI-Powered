@@ -2,11 +2,15 @@ import * as Location from 'expo-location';
 
 import {GPS_TASK_NAME} from '@/tasks/gpsTask';
 
+import { Platform } from 'react-native';
 const INTERVAL_MS = 30_000;
 const BG_GPS_ENABLED = process.env.EXPO_PUBLIC_BG_GPS !== 'false';
 
 export function useGpsTracking() {
   const start = async () => {
+    if (Platform.OS === 'web') {
+    return;
+  }
     const {status: fg} = await Location.getForegroundPermissionsAsync();
     if (fg !== 'granted') return;
 

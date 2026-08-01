@@ -1,3 +1,5 @@
+import * as Linking from 'expo-linking';
+import { saveTokens } from '@/utils/tokenStorage';
 import * as WebBrowser from 'expo-web-browser';
 import {
   View,
@@ -31,7 +33,7 @@ export default function LoginScreen() {
     }
 
     if (!email || !password) {
-      setErrorMessage('아이디 또는 비밀번호를 입력해주세요.');
+      setErrorMessage('이메일 또는 비밀번호를 입력해주세요.');
       return;
     }
 
@@ -64,17 +66,59 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
+const handleKakaoLogin = async () => {
+  try {
+    const CLIENT_ID = 'fe4f73594264f90fbda73e9847a0c218';
+    const REDIRECT_URI = 'https://api.roame.co.kr/api/v1/auth/kakao/callback';
 
-  const handleKakaoLogin = async () => {
-    try {
-      await WebBrowser.openAuthSessionAsync(
-        'https://api.roame.com/auth/kakao/login',
-        'roameapp://kakao-login',
-      );
-    } catch (error) {
-      console.log('kakao login error', error);
+    const authUrl =
+      `https://kauth.kakao.com/oauth/authorize` +
+      `?client_id=${CLIENT_ID}` +
+      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+      `&response_type=code`;
+
+    const result = await WebBrowser.openAuthSessionAsync(
+      authUrl,
+      REDIRECT_URI,
+    );
+
+    if (result.type !== 'success') {
+      return;
     }
-  };
+
+    if (!result.url) {
+      throw new Error('Redirect URL이 없습니다.');
+    }
+
+    const { queryParams } = Linking.parse(result.url);
+
+const accessToken = queryParams?.accessToken;
+const refreshToken = queryParams?.refreshToken;
+const isNewUser = queryParams?.isNewUser;
+
+if (
+  typeof accessToken !== 'string' ||
+  typeof refreshToken !== 'string'
+) {
+  throw new Error('토큰을 받지 못했습니다.');
+}
+
+// authApi의 login()처럼 토큰 저장
+await saveTokens(accessToken, refreshToken);
+
+setToken(accessToken);
+
+// 필요하면 신규 회원 분기
+if (isNewUser === 'true') {
+  router.replace('/');
+  // 추후 회원정보 입력 화면으로 변경 가능
+} else {
+  router.replace('/');
+}
+  } catch (error) {
+    console.log('kakao login error', error);
+  }
+};
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
