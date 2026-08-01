@@ -181,6 +181,12 @@ async def update_blog(
     """블로그 수정"""
     blog = await get_blog_by_id(db, blog_id, user_id)
 
+    if blog.generation_status in (
+        GenerationStatus.PENDING,
+        GenerationStatus.GENERATING,
+    ):
+        raise BlogConflictError("생성이 진행 중인 글은 수정할 수 없습니다")
+
     if title is not None:
         blog.title = title
     if content is not None:
