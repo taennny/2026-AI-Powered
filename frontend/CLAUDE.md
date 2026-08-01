@@ -197,44 +197,52 @@ hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 
 `@/`는 프로젝트 루트를 가리킵니다.
 
-## 시간·타임존 정책 (회의 대기 중)
+## 시간·타임존 정책
 
-**현재: 데이터의 "하루"는 KST, 화면에 찍히는 시각은 기기 로컬.** 두 기준이 섞여 있습니다.
+**방향 확정: 해외 지원 (기기 로컬 기준).** 저장은 UTC 그대로 두고, 날짜 계산 시 앱이 tz를 파라미터로 보냅니다.
 
-- 시각은 전부 UTC로 저장·전송 (GPS `timestamp`는 ISO 8601 UTC 문자열)
-- 날짜 키(`analyze`, 타임라인 조회)는 `toKstDateKey`로 KST 달력 날짜
-- 화면 표시는 전부 기기 로컬 → 해외 기기에서 어긋남
+원칙은 두 값을 섞지 않는 것입니다.
 
-**MVP 권장: 표시도 전부 KST 고정.** 결정 시 수정 대상 6곳:
-`useCalendar:14,16` / `BottomSheet` 날짜 헤더 · `getHours` / `formatTimeFromISO` /
-`subscription/index.tsx:12` / `PremiumView:24`.
+- **순간(instant)** — 언제 일어났나: 전부 UTC (`timestamptz`, GPS `timestamp`는 ISO 8601 UTC)
+- **달력 날짜(civil date)** — 며칠의 기록인가: 그 기록이 속한 tz가 필요
 
-> ⚠️ 표시를 KST 고정으로 바꿀 때 `useCalendar.ts`의 `toKstDateKey`를 **`toDateKey`로 되돌려야**
-> 합니다. `selectedDate` 자체가 KST 날짜가 되므로 +9h가 두 번 적용됩니다.
-> `tasks/gpsTask.ts`는 순간(instant)을 다루므로 그대로 둡니다.
+### 현재 상태 (KST 고정 단계)
 
-### 회의 안건
+날짜 키는 `toKstDateKey`로 KST, 화면 표시는 기기 로컬. 백엔드도 KST로 통일돼 있어
+**국내에서는 앞뒤가 맞습니다.** 해외 기기에서만 어긋납니다.
 
-1. 표시 기준 — 전부 KST / 날짜만 KST / 전부 로컬 (= 해외 사용 지원 여부)
-2. 다른 날에 쓴 글의 날짜 — 작성일 / 기록 대상일
-3. 자정 걸친 활동 — `MIN_STAY_MINUTES = 3`이라 쪼개진 조각이 양쪽 다 통과해 **중복 계상**됨
-4. "하루"의 경계 시각 — 자정 / 새벽 4~5시 (3의 실질적 해법)
-5. 사진 시각 기준 — EXIF `DateTimeOriginal`엔 tz가 없음. EXIF가 아예 없는 사진은 업로드 시각으로 저장됨
-6. 저장 규칙 문서화 — 시각은 timestamptz UTC / 날짜 컬럼은 KST 달력 날짜 / `func.date()` 금지
-7. 기존 데이터 재분석 여부 — 백엔드 시간 버그를 고치면 과거 타임라인 표시가 달라짐
+### 기기 tz로 넘어갈 때
+
+| 대상 | 변경 |
+|---|---|
+| `daily_records` | `timezone` 컬럼 추가 (IANA 문자열) — **선행 조건** |
+| GPS 업로드 | 배치에 `timezone` 동봉 |
+| analyze | 클라가 tz 전달 → 백엔드가 그 tz로 하루 경계 계산 |
+| 타임라인 응답 | `utc_offset_minutes` 동봉 |
+| `formatTimeFromISO` | 저장된 오프셋으로 포맷 (기록 당시 현지 시각 고정 표시) |
+| `toKstDateKey` | 기기 tz 기준으로 교체 |
+| 캘린더 "오늘" | 그대로 — 지금 여기 기준이 맞음 |
+
+기기 tz는 `Intl.DateTimeFormat().resolvedOptions().timeZone`. 실기기에서 값 확인 필요하고,
+안 되면 `expo-localization` 추가.
+
+### 미결
+
+1. 다른 날에 쓴 글의 날짜 — 작성일 / 기록 대상일 (`write/index.tsx:43`이 항상 오늘로 표시 중)
+2. 자정 걸친 활동 — `MIN_STAY_MINUTES = 3`이라 쪼개진 조각이 양쪽 다 통과해 **중복 계상**됨
+3. "하루"의 경계 시각 — 자정 / 새벽 4~5시 (2의 실질적 해법)
+4. EXIF `OffsetTimeOriginal` 우선 사용 여부 — 해외에서 찍은 사진은 KST 고정이면 다시 어긋남
 
 ## 알려진 문제
 
 | 문제 | 위치 | 영향 | 담당 |
 |---|---|---|---|
-| 사진 EXIF 시각을 UTC로 오해 | `backend/app/services/photos.py:22-26` | 사진↔장소 매칭이 9시간 어긋나 타임라인에 사진이 안 붙음 | 백엔드 |
-| 타임라인 polyline이 UTC 날짜 기준 | `backend/app/services/calendar.py:89` | 당일 새벽 경로 누락 + 다음날 새벽 경로 침입 | 백엔드 |
-| 같은 UTC/KST 혼재 | `backend/app/services/ai.py:112,144` | `photo_count` 집계와 사진 연결이 UTC 날짜 기준 | 백엔드 |
-| `KST` 상수가 `ai.py`에만 존재 | `backend/app/services/` | 새 쿼리마다 같은 실수 재발. `app/utils/time.py`로 공용화 + 반개구간(인덱스 사용) 필요 | 백엔드 |
-| EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:41` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
+| 기존 사진의 `taken_at`이 9시간 밀린 채 저장돼 있음 | `photos` 테이블 | EXIF 파서는 고쳐졌지만 저장된 행은 그대로. EXIF 유래 행과 `now()` 폴백 행이 섞여 있어 일괄 `-9h` 불가 | 백엔드 |
+| `daily_records.timezone` 컬럼 없음 | `backend/app/models/daily_record.py` | 해외 지원(기기 tz)의 전제. 나중에 넣으면 과거 기록의 tz를 알 수 없음 | 백엔드 |
+| 날짜 비교가 인덱스를 못 탐 | `calendar.py:89`, `ai.py:111,143` | `func.date(func.timezone(...))`로 컬럼을 감쌈. 같은 파일 `ai.py:40-57`은 범위 비교라 방식이 섞여 있음 | 백엔드 |
+| EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:42` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
 | `photoUrls`가 서버에 반영 안 됨 | 프론트는 완료 | `BlogUpdateRequest`가 `title/content/visibility`만 받고 `BlogResponse`에 `photo_urls` 없음 | 백엔드 |
 | 자정 걸친 체류가 중복 계상 | `ai/server/modules/gps.py` | `place_count`가 부풀려짐 | 회의 안건 3·4 |
-| 기존 데이터가 옛 기준으로 계산됨 | `daily_records`, `places` | 재분석 시 `(user_id, target_date)` unique 제약과 충돌 가능 | 백엔드 (안건 7) |
 | 카카오 OAuth URL 하드코딩 | `login.tsx:75`, `settings/account/index.tsx:62` | `api.roame.com` ≠ 실제 `api.roame.co.kr`. 프로덕션 로그인 실패 가능 | 프론트(auth) |
 | 카카오 실패가 조용히 삼켜짐 | 위 두 파일의 `console.log` | 사용자에게 아무 표시 없음 | 프론트(auth) |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
@@ -255,11 +263,13 @@ hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 
 ## 백엔드 팀 확인 필요
 
-**시간 버그** (위 표 참고 — 2·3·4는 정책과 무관한 명백한 버그라 회의 전 진행 가능)
-- `photos.py:22-26`, `calendar.py:89`, `ai.py:112,144`, `photos.py:41`
-- `app/utils/time.py`에 `KST` + `kst_day_range()` 공용화
+**시간** — EXIF·polyline·photo_count의 KST 통일과 `app/utils/timezone.py` 공용화는 완료됨. 남은 것:
+- 기존 `photos.taken_at` 보정 (테스트 데이터뿐이면 테이블을 비우는 편이 깨끗)
+- `daily_records.timezone` 컬럼 추가 + 기존 행 `'Asia/Seoul'` 백필 → **해외 지원의 전제**
+- 날짜 비교를 반개구간으로 통일 (인덱스 사용. `ai.py`의 `23:59:59` 경계 누락도 함께 해소)
+- 해외 지원 시 tz 파라미터는 오프셋 숫자가 아닌 **IANA 문자열**(`Asia/Seoul`) — 서머타임 대응
+- EXIF `OffsetTimeOriginal`이 있으면 우선 사용 (없을 때만 그날의 tz 폴백)
 - Postgres `TimeZone` 확인 — compose에 `TZ` 미설정이라 UTC로 가정 중
-- 배포 조율: 위 수정은 과거 타임라인 표시를 바꿈 (회의 안건 7)
 
 **신규 필드**
 1. `GET /subscriptions/me`에 `premium_started_at` — 갱신 시 리셋 X. "구독한 지 N일" 표시용
