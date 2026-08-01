@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Kakao
     KAKAO_REST_API_KEY: str = ""
     KAKAO_REDIRECT_URI: str = ""
+    KAKAO_CLIENT_SECRET: str = ""
 
     class Config:
         env_file = ".env"

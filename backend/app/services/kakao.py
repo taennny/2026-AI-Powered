@@ -12,6 +12,7 @@ async def get_kakao_token(code: str) -> dict:
                 "client_id": settings.KAKAO_REST_API_KEY,
                 "redirect_uri": settings.KAKAO_REDIRECT_URI,
                 "code": code,
+                "client_secret": settings.KAKAO_CLIENT_SECRET,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
