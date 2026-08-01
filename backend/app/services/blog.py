@@ -22,6 +22,10 @@ class BlogConflictError(Exception):
     """생성 진행 중 충돌 (409)"""
 
 
+class BlogStateError(Exception):
+    """상태 전이 오류 (400)"""
+
+
 async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
     """블로그의 하루 기록 + 유저 + 장소들을 timeline_data로 직렬화."""
     daily_record = (
@@ -206,7 +210,7 @@ async def publish_blog(
     blog = await get_blog_by_id(db, blog_id, user_id)
 
     if blog.generation_status != GenerationStatus.COMPLETED:
-        raise ValueError("생성이 완료된 블로그만 발행할 수 있습니다")
+        raise BlogStateError("생성이 완료된 블로그만 발행할 수 있습니다")
 
     blog.is_published = True
     blog.visibility = "public"

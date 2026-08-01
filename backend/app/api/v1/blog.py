@@ -18,6 +18,7 @@ from app.schemas.blog import (
 )
 from app.services.blog import (
     BlogConflictError,
+    BlogStateError,
     create_blog_generation,
     get_blog_by_id,
     get_blog_list,
@@ -153,6 +154,8 @@ async def publish(
     try:
         blog = await publish_blog(db, blog_id, current_user.id)
     except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except BlogStateError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     return BlogPublishResponse(
