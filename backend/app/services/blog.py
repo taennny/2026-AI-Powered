@@ -13,6 +13,7 @@ from app.models.enums import GenerationStatus
 from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
+from app.services.subscription import get_user_subscription
 from app.services.timeline_serializer import build_timeline_data, map_style
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,35 @@ async def create_blog_generation(
     return blog
 
 
+STYLE_EXAMPLE_COUNT = 3  # 프롬프트에 넣을 최근 발행 글 수
+STYLE_EXAMPLE_MAX_CHARS = 1500  # 글당 절단 길이 (프롬프트 비대 방지)
+
+
+async def _get_style_examples(
+    db: AsyncSession, user_id: uuid.UUID, exclude_blog_id: uuid.UUID
+) -> list[str]:
+    """유료 사용자의 최근 발행 글 본문 — AI가 문체를 따라 쓸 예시.
+
+    무료 사용자는 빈 배열 (개인화 문체는 구독 혜택).
+    """
+    subscription = await get_user_subscription(db, user_id)
+    if subscription.plan_type != "premium":
+        return []
+
+    result = await db.execute(
+        select(Blog.content)
+        .where(
+            Blog.user_id == user_id,
+            Blog.is_published.is_(True),
+            Blog.id != exclude_blog_id,
+            Blog.content != "",
+        )
+        .order_by(Blog.created_at.desc())
+        .limit(STYLE_EXAMPLE_COUNT)
+    )
+    return [content[:STYLE_EXAMPLE_MAX_CHARS] for content in result.scalars()]
+
+
 async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) -> None:
     """BackgroundTask에서 실행 — 독립 세션으로 AI 호출 후 블로그 업데이트"""
     async with async_session() as db:
@@ -111,10 +141,12 @@ async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) 
 
         try:
             daily_record = await _build_timeline_for_blog(db, blog)
+            style_examples = await _get_style_examples(db, blog.user_id, blog.id)
             ai_result = await request_blog_generation(
                 daily_record=daily_record,
                 style=map_style(blog.style),
                 user_note=user_note,
+                style_examples=style_examples,
             )
 
             # AI 프롬프트는 25자 권장이지만 강제가 아님 — DB 컬럼(255) 초과 방지 절단
