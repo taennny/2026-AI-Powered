@@ -1,12 +1,10 @@
 import {useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback} from 'react-native';
-import {useRouter} from 'expo-router';
 
 import {sendResetEmail} from '@/services/authApi';
 import BackButton from '@/components/common/BackButton';
 
 export default function FindPasswordScreen() {
-  const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [guideMessage, setGuideMessage] = useState('');

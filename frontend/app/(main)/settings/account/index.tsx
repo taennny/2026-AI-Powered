@@ -10,6 +10,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
+import {KAKAO_APP_REDIRECT, KAKAO_LINK_URL} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
 import {fetchMe, deleteAccount, type UserMe} from '@/services/authApi';
 
@@ -58,12 +59,10 @@ export default function AccountScreen() {
 
   const handleKakaoLink = async () => {
     try {
-      await WebBrowser.openAuthSessionAsync(
-        'https://api.roame.com/auth/kakao/link?source=account-link',
-        'roameapp://kakao-login',
-      );
+      await WebBrowser.openAuthSessionAsync(KAKAO_LINK_URL, KAKAO_APP_REDIRECT);
     } catch (error) {
       console.log('kakao link error', error);
+      Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
     }
   };
 

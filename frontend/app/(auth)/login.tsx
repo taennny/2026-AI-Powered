@@ -1,3 +1,4 @@
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import {
   View,
@@ -11,6 +12,12 @@ import {
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
 
+import {
+  buildKakaoAuthUrl,
+  KAKAO_REDIRECT_URI,
+  KAKAO_REST_API_KEY,
+} from '@/constants/kakao';
+import {saveTokens} from '@/utils/tokenStorage';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 import {useGpsTracking} from '@/hooks/useGpsTracking';
@@ -33,7 +40,7 @@ export default function LoginScreen() {
     }
 
     if (!email || !password) {
-      setErrorMessage('아이디 또는 비밀번호를 입력해주세요.');
+      setErrorMessage('이메일 또는 비밀번호를 입력해주세요.');
       return;
     }
 
@@ -68,15 +75,41 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
-
   const handleKakaoLogin = async () => {
+    if (!KAKAO_REST_API_KEY) {
+      setErrorMessage('카카오 로그인 설정이 없습니다.');
+      return;
+    }
+
     try {
-      await WebBrowser.openAuthSessionAsync(
-        'https://api.roame.com/auth/kakao/login',
-        'roameapp://kakao-login',
+      const result = await WebBrowser.openAuthSessionAsync(
+        buildKakaoAuthUrl(),
+        KAKAO_REDIRECT_URI,
       );
+
+      if (result.type !== 'success') return;
+
+      if (!result.url) {
+        throw new Error('Redirect URL이 없습니다.');
+      }
+
+      const {queryParams} = Linking.parse(result.url);
+      const accessToken = queryParams?.accessToken;
+      const refreshToken = queryParams?.refreshToken;
+
+      if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+        throw new Error('토큰을 받지 못했습니다.');
+      }
+
+      // authApi의 login()과 달리 여기서 직접 저장한다 — 디스크와 메모리 둘 다
+      await saveTokens(accessToken, refreshToken);
+      setToken(accessToken);
+
+      // TODO: isNewUser === 'true'면 추후 회원정보 입력 화면으로 분기
+      router.replace('/');
     } catch (error) {
       console.log('kakao login error', error);
+      setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
     }
   };
 

@@ -42,7 +42,7 @@ export default function SignupScreen() {
       return;
     }
     if (text.includes('@')) {
-      setEmailGuideMessage('사용 가능한 아이디입니다.');
+      setEmailGuideMessage('사용 가능한 이메일입니다.');
       setEmailGuideColor('#4EF5F9');
       return;
     }
@@ -84,7 +84,7 @@ export default function SignupScreen() {
         setPasswordGuideMessage('이메일 형식 또는 비밀번호 조건을 확인해주세요.');
         setPasswordGuideColor('#FF3B30');
       } else if (status === 409) {
-        setEmailGuideMessage('중복된 아이디입니다.');
+        setEmailGuideMessage('중복된 이메일입니다.');
         setEmailGuideColor('#FF3B30');
       } else {
         setEmailGuideMessage('회원가입 중 오류가 발생했습니다.');
@@ -159,7 +159,6 @@ export default function SignupScreen() {
           className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
       </View>
-
       <View className="mt-[18px] mb-[20px]">
         <TouchableOpacity
           activeOpacity={0.8}

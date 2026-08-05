@@ -1,3 +1,4 @@
+import {Platform} from 'react-native';
 import * as Location from 'expo-location';
 
 import {GPS_TASK_NAME} from '@/tasks/gpsTask';
@@ -6,6 +7,9 @@ const INTERVAL_MS = 30_000;
 const BG_GPS_ENABLED = process.env.EXPO_PUBLIC_BG_GPS !== 'false';
 
 export async function startGpsTracking() {
+  // 웹에는 백그라운드 위치 태스크가 없다 — Expo 웹으로 열었을 때 크래시 방지
+  if (Platform.OS === 'web') return;
+
   const {status: fg} = await Location.getForegroundPermissionsAsync();
   if (fg !== 'granted') return;
 

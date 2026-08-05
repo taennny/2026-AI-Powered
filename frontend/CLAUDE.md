@@ -273,11 +273,9 @@ npx jest gpsTask      # 파일 하나
 | EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:42` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
 | `photoUrls`가 서버에 반영 안 됨 | 프론트는 완료 | `BlogUpdateRequest`가 `title/content/visibility`만 받고 `BlogResponse`에 `photo_urls` 없음 | 백엔드 |
 | 자정 걸친 체류가 중복 계상 | `ai/server/modules/gps.py` | `place_count`가 부풀려짐 | 회의 안건 3·4 |
-| 카카오 OAuth URL 하드코딩 | `login.tsx:75`, `settings/account/index.tsx:62` | `api.roame.com` ≠ 실제 `api.roame.co.kr`. 프로덕션 로그인 실패 가능 | 프론트(auth) |
-| 카카오 실패가 조용히 삼켜짐 | 위 두 파일의 `console.log` | 사용자에게 아무 표시 없음 | 프론트(auth) |
+| 지도 공유 기능 비활성 | `MapPreview.tsx` | `RNFetchBlob`이 네이티브 전용이라 Expo 웹 번들이 깨져 주석 처리됨. 되살리려면 `Platform.OS` 가드 필요 | 프론트 |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
 | `JSON.parse` 방어 없음 | `write-preview/index.tsx:30` | 파라미터가 깨지면 크래시. 렌더마다 파싱 | 프론트(글쓰기) |
-| 미사용 변수 / deps 경고 | `find-password.tsx:9`, `kakao-login.tsx` | lint 경고 2건 | 프론트(auth) |
 
 ## 미구현 / TODO
 
@@ -287,8 +285,7 @@ npx jest gpsTask      # 파일 하나
 | 저장 후 리스트로 이동 | `write-preview/index.tsx` | 현재는 홈으로 |
 | 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글 → `!__DEV__` 검토 |
 | MapPreview 공유 실기기 테스트 | `MapPreview.tsx:52-70` | 시뮬레이터는 공유 시트에 앱이 없어 검증 불가 |
-| 카카오 OAuth URL | `login.tsx`, `settings/account` | `EXPO_PUBLIC_API_BASE_URL` 기준으로 교체 |
-| `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 백엔드 `/auth/me`가 `email`만 반환 |
+| `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 프론트 타입은 준비됨. 백엔드 `/auth/me`가 아직 `email`만 반환 |
 | GPS 시작 호출 중복 (낮음) | `(auth)/login.tsx:47`, `useBootstrap.ts` | 가드가 있어 무해. 가독성 정리 |
 
 ## 백엔드 팀 확인 필요

@@ -1,6 +1,5 @@
 import {useState} from 'react';
 import {
-  Alert,
   Image,
   Modal,
   Text,
@@ -8,11 +7,12 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import RNFetchBlob from 'react-native-blob-util';
-import * as Sharing from 'expo-sharing';
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {buildStaticMapUrl} from '@/utils/staticMapUrl';
+
+// TODO(공유 기능): RNFetchBlob이 네이티브 전용이라 Expo 웹에서 번들이 깨짐.
+// 사용할 땐 handleShare 주석 해제 + Alert·Sharing·RNFetchBlob import 복구 + Platform.OS 가드 필
 
 type Props = {
   places: TimelinePlace[];
@@ -28,7 +28,8 @@ export default function MapPreview({places}: Props) {
   const saveUrl = buildStaticMapUrl(places, SAVE_W, SAVE_H, 2);
   const [loadFailed, setLoadFailed] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [sharing, setSharing] = useState(false);
+
+  /*const [sharing, setSharing] = useState(false);
 
   const handleShare = async () => {
     if (!saveUrl || sharing) return;
@@ -49,7 +50,7 @@ export default function MapPreview({places}: Props) {
     } finally {
       setSharing(false);
     }
-  };
+  };*/
 
   if (!previewUrl || loadFailed) {
     return (
@@ -103,7 +104,7 @@ export default function MapPreview({places}: Props) {
                     <Text className="text-secondary">닫기</Text>
                   </TouchableOpacity>
                   <View className="w-px bg-line" />
-                  <TouchableOpacity
+                  {/*<TouchableOpacity
                     className="flex-1 items-center py-4"
                     onPress={handleShare}
                     disabled={sharing}
@@ -115,7 +116,7 @@ export default function MapPreview({places}: Props) {
                     >
                       공유
                     </Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity>*/}
                 </View>
               </View>
             </TouchableWithoutFeedback>

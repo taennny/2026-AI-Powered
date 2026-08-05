@@ -17,6 +17,8 @@ from app.schemas.blog import (
     BlogUpdateRequest,
 )
 from app.services.blog import (
+    BlogConflictError,
+    BlogStateError,
     create_blog_generation,
     get_blog_by_id,
     get_blog_list,
@@ -69,6 +71,8 @@ async def generate_blog(
         blog = await create_blog_generation(
             db, current_user.id, request.daily_record_id, request.style
         )
+    except BlogConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -132,6 +136,8 @@ async def edit_blog(
             request.content,
             request.visibility,
         )
+    except BlogConflictError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -148,6 +154,8 @@ async def publish(
     try:
         blog = await publish_blog(db, blog_id, current_user.id)
     except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except BlogStateError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     return BlogPublishResponse(

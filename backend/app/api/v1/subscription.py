@@ -3,7 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.subscription import SubscriptionResponse, SubscriptionUpdateRequest
+from app.schemas.subscription import (
+    PaymentVerifyRequest,
+    PaymentVerifyResponse,
+    SubscriptionResponse,
+    SubscriptionUpdateRequest,
+)
+from app.services.payment import process_receipt
+from app.services.payment_verifier import ReceiptVerificationError
 from app.services.subscription import get_user_subscription, update_user_subscription
 from app.utils.dependencies import get_current_user
 
@@ -35,3 +42,26 @@ async def change_subscription(
         raise HTTPException(status_code=400, detail=str(e))
 
     return subscription
+
+
+@router.post("/api/v1/subscriptions/verify", response_model=PaymentVerifyResponse)
+async def verify_payment(
+    request: PaymentVerifyRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """영수증 검증 후 구독 반영 (같은 영수증 재전송은 멱등 처리)"""
+    try:
+        payment, created = await process_receipt(
+            db, current_user.id, request.provider, request.receipt
+        )
+    except (ValueError, ReceiptVerificationError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return PaymentVerifyResponse(
+        transaction_id=payment.transaction_id,
+        plan=payment.plan_type,
+        billing_cycle=payment.billing_cycle,
+        already_processed=not created,
+        message="결제가 반영되었습니다" if created else "이미 처리된 결제입니다",
+    )
