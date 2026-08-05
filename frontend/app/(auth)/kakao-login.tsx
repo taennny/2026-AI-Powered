@@ -14,7 +14,7 @@ export default function KakaoLoginScreen() {
     source?: string;
   }>();
 
-  const setToken = useAuthStore(state => state.setToken);
+  const setAuthenticated = useAuthStore(state => state.setAuthenticated);
 
   useEffect(() => {
     const handleKakaoLogin = async () => {
@@ -25,7 +25,7 @@ export default function KakaoLoginScreen() {
         }
 
         await saveTokens(accessToken, refreshToken);
-        setToken(accessToken);
+        setAuthenticated();
 
         if (source === 'account-link') {
           router.replace('/(main)/settings/account');
@@ -40,7 +40,7 @@ export default function KakaoLoginScreen() {
     };
 
     void handleKakaoLogin();
-  }, [accessToken, refreshToken, router, setToken, source]);
+  }, [accessToken, refreshToken, router, setAuthenticated, source]);
 
   return (
     <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>

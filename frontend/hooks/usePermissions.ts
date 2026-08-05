@@ -33,7 +33,7 @@ function alertWithSettings({title, message}: PermissionMessage) {
  * 위치 권한(포그라운드 → 백그라운드)을 확인한다.
  * 아직 물어볼 수 있으면 시스템 다이얼로그를 띄우고, 이미 거부된 상태면 설정 안내를 띄운다.
  */
-export async function ensureLocationPermissions(): Promise<boolean> {
+async function ensureLocationPermissions(): Promise<boolean> {
   if (isCheckingLocation) return false;
   isCheckingLocation = true;
 
@@ -62,7 +62,11 @@ export async function ensureLocationPermissions(): Promise<boolean> {
   }
 }
 
-/** 사진 첨부 직전에 호출한다. false면 호출부는 picker를 열지 않는다. */
+/**
+ * 사진 첨부 직전에 호출한다. false면 호출부는 picker를 열지 않는다.
+ * 포스팅 사진 기능이 빠지면서 현재 호출부가 없다 — '사진 모아보기'가 들어올 때
+ * 다시 쓰려고 남겨둔 것이므로 미사용이라고 지우지 말 것.
+ */
 export async function ensureMediaLibraryPermission(): Promise<boolean> {
   let permission = await ImagePicker.getMediaLibraryPermissionsAsync();
   if (!permission.granted && permission.canAskAgain) {

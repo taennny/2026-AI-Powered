@@ -12,9 +12,6 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000'
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
-/** 업로드용 — 멀티파트 전송은 기본 타임아웃을 쉽게 넘긴다 */
-export const UPLOAD_TIMEOUT_MS = 60000;
-
 export const api = axios.create({
   baseURL: BASE_URL,
   timeout: DEFAULT_TIMEOUT_MS,
@@ -81,7 +78,7 @@ api.interceptors.response.use(
 
         if (!refreshToken) {
           await removeTokens();
-          useAuthStore.getState().clearToken();
+          useAuthStore.getState().clearAuth();
           return Promise.reject(error);
         }
 
@@ -100,7 +97,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         await removeTokens();
-        useAuthStore.getState().clearToken();
+        useAuthStore.getState().clearAuth();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

@@ -54,19 +54,21 @@ app/
     ├── 미인증 → /(auth)/login
     └── 인증   → useGpsTracking().start() → 온보딩 여부에 따라 /onboarding 또는 홈
 
-로그인   → authApi.login() → saveTokens() + authStore.setToken()
-로그아웃 → authStore.logout() → removeTokens() + clearToken() → /(auth)/login
+로그인   → authApi.login() → saveTokens() + authStore.setAuthenticated()
+로그아웃 → authStore.logout() → removeTokens() + isAuthenticated=false → /(auth)/login
 카카오   → WebBrowser.openAuthSessionAsync() → roameapp://kakao-login?accessToken=...
           → kakao-login.tsx가 저장 후 홈 (source=account-link면 settings/account로 복귀)
 ```
 
-`tokenStorage`는 디스크(앱 재시작 후 유지), `authStore`는 메모리 상태(리렌더 트리거).
-로그인·로그아웃 시 반드시 둘 다 업데이트합니다.
+**토큰 값의 단일 출처는 `tokenStorage`(디스크)입니다.** `authStore`는 `isAuthenticated`
+불리언만 들고 있고, 화면 가드(`(main)/_layout.tsx`)를 리렌더시키는 용도입니다.
+API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므로, store에 토큰을 복제하면
+401 재발급 때마다 두 곳이 어긋납니다 — 그래서 두지 않습니다.
 
 ### API 레이어
 
 모든 호출은 `utils/api.ts`의 axios 인스턴스를 통합니다. 기본 타임아웃 15초,
-업로드용 `UPLOAD_TIMEOUT_MS`(60초)는 별도 export. 요청 인터셉터가 Bearer 토큰을 붙이고,
+요청 인터셉터가 Bearer 토큰을 붙이고,
 응답 인터셉터가 401 시 refresh 후 재시도합니다.
 
 | 엔드포인트 | 함수 | 사용처 |
@@ -82,12 +84,17 @@ app/
 | `GET /api/v1/blogs` | `fetchBlogs` | `journal-list/index.tsx` |
 | `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` |
 | `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` |
-| `POST /api/v1/photos/upload` | `uploadPhoto` | `write-preview/index.tsx` |
 | `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` |
 | `GET /api/v1/blogs/{id}/status` | `fetchBlogGenerationStatus` | `waitForBlogGeneration` 폴링 |
 | `GET /api/v1/blog/{id}` | `fetchBlogDetail` | `write-preview/index.tsx` |
 | `PUT /api/v1/blog/{id}` | `updateBlog` | `write-preview/index.tsx` |
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription`, `settings/theme` |
+| `PUT /api/v1/subscriptions/me` | `subscribePremium`, `cancelSubscription` | `settings/subscription` |
+
+백엔드에는 있으나 **프론트가 아직 안 쓰는** 엔드포인트:
+`POST /api/v1/subscriptions/verify`(인앱결제 영수증 검증),
+`POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
+`POST /api/v1/photos/upload`(사진 — 기능 자체가 빠짐).
 
 ### 스타일링
 
@@ -160,15 +167,20 @@ MapPreview가 페이드인됩니다(`isMapMounted` + `mapOpacity`).
 HomeFooter 글쓰기 버튼 → /(main)/write (dailyRecordId 전달)
 ├── 프롬프트 + 스타일(정보 위주 / 감성적) → POST /blog/generate (202 + blog_id)
 ├── waitForBlogGeneration: status 폴링 → completed 시 상세 조회
-└── /(main)/write-preview → 사진 업로드 → PUT /blog/{id} → 홈
+└── /(main)/write-preview → PUT /blog/{id} → 저널 리스트
 
 저널 리스트 카드 탭 → /(main)/write-preview (blogId만) → 해당 화면이 상세 조회
 ```
 
+**포스팅에 사진은 넣지 않기로 했습니다** (회의 결정). `write`·`write-preview`의 사진 첨부
+UI와 `blogApi.ts`의 `uploadPhoto`·`photoUrls`도 제거했습니다.
+`usePermissions.ts`의 `ensureMediaLibraryPermission`만 '사진 모아보기'용으로 남겨뒀습니다.
+GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결정과 무관하게 그대로입니다.
+
 ### 상태 관리 (Zustand)
 
 ```
-store/authStore.ts      accessToken, isAuthenticated / setToken, clearToken, initialize, logout
+store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
 store/themeStore.ts     themeId, themeVars / setTheme, initialize
 ```
@@ -214,7 +226,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 자정 걸친 배치가 두 날짜 모두 analyze되는지, 한 날짜 실패 시 나머지 진행, 업로드 실패 시 analyze 미호출 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
-| `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 디스크·메모리 동시 갱신(로그아웃), `initialize` 복원 |
+| `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
 
 `jest.setup.js`가 두 가지를 합니다:
 
@@ -256,11 +268,26 @@ npx jest gpsTask      # 파일 하나
 기기 tz는 `Intl.DateTimeFormat().resolvedOptions().timeZone`. 실기기에서 값 확인 필요하고,
 안 되면 `expo-localization` 추가.
 
-### 미결
+### 회의에서 정해진 것
 
-1. 다른 날에 쓴 글의 날짜 — 작성일 / 기록 대상일 (`write/index.tsx:43`이 항상 오늘로 표시 중)
-2. 자정 걸친 활동 — `MIN_STAY_MINUTES = 3`이라 쪼개진 조각이 양쪽 다 통과해 **중복 계상**됨
-3. "하루"의 경계 시각 — 자정 / 새벽 4~5시 (2의 실질적 해법)
+1. **해외 서비스 지원** — 기기 로컬 tz 기준으로 간다 (위 "기기 tz로 넘어갈 때" 표가 작업 목록)
+2. **하루의 경계는 새벽 4시** — 자정이 아니다. 자정 걸친 체류의 중복 계상도 이걸로 해소한다
+3. **다른 날에 쓴 글은 날짜를 2개 표시** — 작성일과 기록 대상일 둘 다
+
+경계 4시는 "논리적 날짜 = (로컬 시각 − 4시간)의 날짜"로 계산합니다.
+표시용 날짜(`formatDate`)는 실제 달력 날짜 그대로 두고, **데이터 키에만** 적용합니다.
+
+**프론트만 먼저 바꾸면 깨집니다.** 새벽 0~4시에 프론트는 전날 키로 조회하는데 백엔드는
+당일에 저장하므로 그 시간대 타임라인이 빕니다. 백엔드와 동시 배포가 필요한 항목:
+`useCalendar.ts`의 "오늘" 초기값, `gpsTask.ts`의 analyze 날짜 키.
+
+### 남은 미결
+
+1. 4시 경계를 **표시**에도 적용할지 — 새벽 3시 기록을 `3:00AM`으로 볼지 `27:00`으로 볼지
+   (캘린더에서 전날 칸에 들어가는 것은 결정됨)
+2. 여행 중 tz가 바뀌는 날 — `daily_records.timezone`이 한 칼럼이면 하루에 tz가 하나뿐이라
+   비행기 탄 날이 어긋난다. 출발지 / 도착지 / 로그별 중 택일 **(컬럼 추가 전에 결정 필요)**
+3. 구독 횟수 제한의 리셋 시점 — 4시 경계를 따르는지, 월 N회면 월 경계는 어느 tz 기준인지
 4. EXIF `OffsetTimeOriginal` 우선 사용 여부 — 해외에서 찍은 사진은 KST 고정이면 다시 어긋남
 
 ## 알려진 문제
@@ -271,7 +298,8 @@ npx jest gpsTask      # 파일 하나
 | `daily_records.timezone` 컬럼 없음 | `backend/app/models/daily_record.py` | 해외 지원(기기 tz)의 전제. 나중에 넣으면 과거 기록의 tz를 알 수 없음 | 백엔드 |
 | 날짜 비교가 인덱스를 못 탐 | `calendar.py:89`, `ai.py:111,143` | `func.date(func.timezone(...))`로 컬럼을 감쌈. 같은 파일 `ai.py:40-57`은 범위 비교라 방식이 섞여 있음 | 백엔드 |
 | EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:42` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
-| `photoUrls`가 서버에 반영 안 됨 | 프론트는 완료 | `BlogUpdateRequest`가 `title/content/visibility`만 받고 `BlogResponse`에 `photo_urls` 없음 | 백엔드 |
+| 카카오 계정 연동이 404 | `settings/account/index.tsx` | 백엔드에 `/auth/kakao/link` 엔드포인트가 **없음**. 버튼을 누르면 실패한다 | 백엔드 |
+| 카카오 로그인 returnUrl 불일치 | `(auth)/login.tsx` | `openAuthSessionAsync`의 두 번째 인자가 백엔드 콜백 URL인데, 백엔드는 `roameapp://kakao-login`으로 리다이렉트한다. 세션이 안 닫히거나 토큰 파싱이 실패할 수 있음 | 프론트(auth) |
 | 자정 걸친 체류가 중복 계상 | `ai/server/modules/gps.py` | `place_count`가 부풀려짐 | 회의 안건 3·4 |
 | 지도 공유 기능 비활성 | `MapPreview.tsx` | `RNFetchBlob`이 네이티브 전용이라 Expo 웹 번들이 깨져 주석 처리됨. 되살리려면 `Platform.OS` 가드 필요 | 프론트 |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
@@ -282,9 +310,11 @@ npx jest gpsTask      # 파일 하나
 | 항목 | 위치 | 비고 |
 |---|---|---|
 | PostCard 탭 동작 미정 | `PostCard.tsx` | `TimelinePlace`에 `blogId`가 없어 저널로 못 보냄. 사진 뷰어 / 장소 상세 / 장소명 수정 중 기획 결정 필요. 그때까지 `View` |
-| 저장 후 리스트로 이동 | `write-preview/index.tsx` | 현재는 홈으로 |
 | 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글 → `!__DEV__` 검토 |
-| MapPreview 공유 실기기 테스트 | `MapPreview.tsx:52-70` | 시뮬레이터는 공유 시트에 앱이 없어 검증 불가 |
+| 인앱결제 | `settings/subscription` | 백엔드 `POST /subscriptions/verify` 준비됨. mock 영수증 형식 `mock:<txid>:<monthly\|annual>` |
+| `billing_cycle` 미사용 | `services/subscriptionApi.ts` | 백엔드가 GET 응답·PUT 요청 양쪽 지원하는데 프론트가 안 보냄 (월/연 선택 UI 없음) |
+| `premium_started_at` 미사용 | `services/subscriptionApi.ts` | 백엔드 응답에 있음. "구독한 지 N일" 표시에 쓸 수 있음 |
+| 타임존 획득 로직 | 미착수 | `utils/timezone.ts` 신규 + 날짜 키 일원화. 아래 "시간·타임존 정책" 참고 |
 | `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 프론트 타입은 준비됨. 백엔드 `/auth/me`가 아직 `email`만 반환 |
 | GPS 시작 호출 중복 (낮음) | `(auth)/login.tsx:47`, `useBootstrap.ts` | 가드가 있어 무해. 가독성 정리 |
 
@@ -298,12 +328,13 @@ npx jest gpsTask      # 파일 하나
 - EXIF `OffsetTimeOriginal`이 있으면 우선 사용 (없을 때만 그날의 tz 폴백)
 - Postgres `TimeZone` 확인 — compose에 `TZ` 미설정이라 UTC로 가정 중
 
-**신규 필드**
-1. `GET /subscriptions/me`에 `premium_started_at` — 갱신 시 리셋 X. "구독한 지 N일" 표시용
-2. `billing_cycle: "monthly" | "annual"` — GET 응답 + PUT 요청 양쪽. 현재 프론트에서 하드코딩
-3. `GET /auth/me`에 `is_kakao_linked` — 현재 `{email}`만 반환
+**해결됨** — `premium_started_at`·`billing_cycle`은 `SubscriptionResponse`에 추가됐고(PUT도 수용),
+`POST /blog/{id}/publish`도 존재합니다. 프론트가 아직 안 쓰고 있을 뿐입니다.
 
-**엔드포인트 확인**
-4. 저널 저장 방식 — 프론트는 `POST /api/v1/blogs`를 상정했으나 해당 엔드포인트 없음.
-   `generate` → `POST /blog/{id}/publish`가 맞는지 확인
-5. 카카오 계정 연동 딥링크 — `source=account-link` pass-through 지원 여부
+**남은 것**
+1. `GET /auth/me`에 `is_kakao_linked` — 현재 `{email}`만 반환. 프론트 타입은 준비돼 있음
+2. **카카오 계정 연동 엔드포인트 자체가 없음** — `source=account-link` pass-through 이전에
+   `/auth/kakao/link`가 구현돼 있지 않습니다. 로그인 콜백(`/auth/kakao/callback`)은 `code`만 받고
+   `source`를 안 받으므로, 연동 흐름을 어떻게 태울지부터 정해야 합니다
+3. 4시 경계·타임존 — 아래 "시간·타임존 정책"의 미결 항목. **`daily_records.timezone` 컬럼은
+   나중에 넣으면 과거 기록의 tz를 복구할 수 없으므로 먼저 박는 게 이득**

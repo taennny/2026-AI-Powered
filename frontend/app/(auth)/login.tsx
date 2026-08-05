@@ -24,7 +24,7 @@ import {useGpsTracking} from '@/hooks/useGpsTracking';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setToken = useAuthStore(s => s.setToken);
+  const setAuthenticated = useAuthStore(s => s.setAuthenticated);
   const {start: startGps} = useGpsTracking();
 
   const [email, setEmail] = useState('');
@@ -48,8 +48,9 @@ export default function LoginScreen() {
       setIsLoading(true);
       setErrorMessage('');
 
-      const {access_token} = await login({email, password});
-      setToken(access_token);
+      // login()이 토큰을 디스크에 저장한다 — 여기서는 인증 플래그만 세운다
+      await login({email, password});
+      setAuthenticated();
 
       await startGps();
 
@@ -103,7 +104,7 @@ export default function LoginScreen() {
 
       // authApi의 login()과 달리 여기서 직접 저장한다 — 디스크와 메모리 둘 다
       await saveTokens(accessToken, refreshToken);
-      setToken(accessToken);
+      setAuthenticated();
 
       // TODO: isNewUser === 'true'면 추후 회원정보 입력 화면으로 분기
       router.replace('/');

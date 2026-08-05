@@ -8,8 +8,7 @@ import {
   saveTokens,
 } from '@/utils/tokenStorage';
 
-const reset = () =>
-  useAuthStore.setState({accessToken: null, isAuthenticated: false});
+const reset = () => useAuthStore.setState({isAuthenticated: false});
 
 describe('authStore', () => {
   beforeEach(async () => {
@@ -17,48 +16,45 @@ describe('authStore', () => {
     reset();
   });
 
-  it('setToken은 토큰과 인증 플래그를 함께 세운다', () => {
-    useAuthStore.getState().setToken('access-1');
+  it('setAuthenticated는 인증 플래그를 세운다', () => {
+    useAuthStore.getState().setAuthenticated();
 
-    expect(useAuthStore.getState()).toMatchObject({
-      accessToken: 'access-1',
-      isAuthenticated: true,
-    });
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 
-  it('clearToken은 메모리 상태만 비운다 — 디스크는 건드리지 않는다', async () => {
-    await saveTokens('access-1', 'refresh-1');
-    useAuthStore.getState().setToken('access-1');
+  it('토큰 값을 store에 복제하지 않는다 — 단일 출처는 tokenStorage다', () => {
+    useAuthStore.getState().setAuthenticated();
 
-    useAuthStore.getState().clearToken();
+    expect(useAuthStore.getState()).not.toHaveProperty('accessToken');
+  });
+
+  it('clearAuth는 메모리 상태만 비운다 — 디스크는 건드리지 않는다', async () => {
+    await saveTokens('access-1', 'refresh-1');
+    useAuthStore.getState().setAuthenticated();
+
+    useAuthStore.getState().clearAuth();
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     await expect(getAccessToken()).resolves.toBe('access-1');
   });
 
-  it('initialize는 디스크의 토큰을 메모리로 복원한다 — 앱 재시작 시 로그인 유지', async () => {
+  it('initialize는 디스크에 토큰이 있으면 인증 상태로 복원한다 — 앱 재시작 시 로그인 유지', async () => {
     await saveTokens('access-1', 'refresh-1');
 
     await useAuthStore.getState().initialize();
 
-    expect(useAuthStore.getState()).toMatchObject({
-      accessToken: 'access-1',
-      isAuthenticated: true,
-    });
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
   });
 
   it('저장된 토큰이 없으면 initialize 후 미인증이다', async () => {
     await useAuthStore.getState().initialize();
 
-    expect(useAuthStore.getState()).toMatchObject({
-      accessToken: null,
-      isAuthenticated: false,
-    });
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 
   it('logout은 디스크와 메모리를 모두 비운다 — 둘 중 하나만 지우면 안 된다', async () => {
     await saveTokens('access-1', 'refresh-1');
-    useAuthStore.getState().setToken('access-1');
+    useAuthStore.getState().setAuthenticated();
 
     await useAuthStore.getState().logout();
 

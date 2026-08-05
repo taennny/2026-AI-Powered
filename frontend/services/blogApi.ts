@@ -1,4 +1,4 @@
-import {api, UPLOAD_TIMEOUT_MS} from '@/utils/api';
+import {api} from '@/utils/api';
 
 export type JournalData = {
   id: string;
@@ -48,7 +48,6 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
-  photo_urls?: string[];
 };
 
 export async function generateBlog(
@@ -99,7 +98,6 @@ export async function waitForBlogGeneration(blogId: string): Promise<BlogDetail>
 export type UpdateBlogRequest = {
   title: string;
   content: string;
-  photoUrls?: string[];
 };
 
 export async function updateBlog(
@@ -110,25 +108,3 @@ export async function updateBlog(
   return data;
 }
 
-export type UploadedPhoto = {
-  photo_url: string;
-};
-
-export async function uploadPhoto(imageUri: string): Promise<UploadedPhoto> {
-  const formData = new FormData();
-  formData.append('photo', {
-    uri: imageUri,
-    name: 'photo.jpg',
-    type: 'image/jpeg',
-  } as any);
-
-  const {data} = await api.post<UploadedPhoto>(
-    '/api/v1/photos/upload',
-    formData,
-    {
-      headers: {'Content-Type': 'multipart/form-data'},
-      timeout: UPLOAD_TIMEOUT_MS,
-    },
-  );
-  return data;
-}
