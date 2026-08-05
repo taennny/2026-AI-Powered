@@ -82,7 +82,7 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/auth/me` | `fetchMe` | `settings/account/index.tsx` |
 | `GET /api/v1/calendar/{year}/{month}` | `fetchCalendarMonth` | `hooks/useCalendar.ts` |
 | `GET /api/v1/calendar/{date}/timeline` | `fetchTimeline` | `hooks/useCalendar.ts` |
-| `GET /api/v1/blogs` | `fetchBlogs` | `journal-list/index.tsx` |
+| `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`page`·`size` 사용) |
 | `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` |
 | `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` |
 | `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` |
@@ -218,6 +218,7 @@ hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀)
+hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
@@ -253,6 +254,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
 | `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀 |
+| `__tests__/useJournalList.test.ts` | `useJournalList` | 디바운스, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
 `jest.setup.js`가 두 가지를 합니다:
 
