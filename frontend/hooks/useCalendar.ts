@@ -10,6 +10,26 @@ import {
 import {useTimelineStore} from '@/store/timelineStore';
 import {logicalToday, toDateKey} from '@/utils/formatDate';
 
+/**
+ * 마지막으로 성공한 조회 결과를 모듈에 남긴다.
+ *
+ * 탭 레이아웃이 `Slot`이라 홈↔저널을 오갈 때마다 화면이 통째로 언마운트된다.
+ * 캐시가 없으면 돌아올 때마다 빈 화면을 보다가 네트워크가 끝나야 채워진다.
+ * 캐시를 초기값으로 깔아 즉시 보여주고, 갱신은 뒤에서 진행한다.
+ *
+ * 키가 다르면(다른 달·다른 날짜) 쓰지 않는다 — 엉뚱한 날짜의 기록을 보여주면 안 된다.
+ * 로그아웃 시 `(main)/_layout`이 비운다 — 다음 계정이 물려받으면 안 된다.
+ */
+let cachedMonth: {key: string; days: CalendarDay[]} | null = null;
+let cachedTimeline: {key: string; places: TimelinePlace[]} | null = null;
+
+const monthKey = (date: Date) => `${date.getFullYear()}-${date.getMonth() + 1}`;
+
+export function clearCalendarCache(): void {
+  cachedMonth = null;
+  cachedTimeline = null;
+}
+
 export function useCalendar() {
   // 새벽 4시 이전이면 아직 '어제'다 — 자정 넘겨 앱을 열었을 때
   // 기록이 없는 새 날짜가 선택되는 것을 막는다
@@ -19,22 +39,36 @@ export function useCalendar() {
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
-  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
-  const [places, setPlaces] = useState<TimelinePlace[]>([]);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>(() =>
+    cachedMonth?.key === monthKey(viewDate) ? cachedMonth.days : [],
+  );
+  const [places, setPlaces] = useState<TimelinePlace[]>(() =>
+    cachedTimeline?.key === toDateKey(selectedDate) ? cachedTimeline.places : [],
+  );
   const setTimeline = useTimelineStore(s => s.setTimeline);
   const setDailyRecordId = useTimelineStore(s => s.setDailyRecordId);
   const refreshKey = useTimelineStore(s => s.refreshKey);
 
   const loadCalendar = useCallback(() => {
+    const key = monthKey(viewDate);
     fetchCalendarMonth(viewDate.getFullYear(), viewDate.getMonth() + 1)
-      .then(data => setCalendarDays(data.days))
-      .catch(() => setCalendarDays([]));
+      .then(data => {
+        cachedMonth = {key, days: data.days};
+        setCalendarDays(data.days);
+      })
+      .catch(() => {
+        // 실패한 결과를 캐시에 남기면 다음 진입에서 옛 데이터가 되살아난다
+        if (cachedMonth?.key === key) cachedMonth = null;
+        setCalendarDays([]);
+      });
   }, [viewDate]);
 
   const loadTimeline = useCallback(() => {
     // selectedDate는 이미 '며칠'이 정해진 달력 날짜다 — 경계 보정을 다시 하면 안 된다
-    fetchTimeline(toDateKey(selectedDate))
+    const key = toDateKey(selectedDate);
+    fetchTimeline(key)
       .then(data => {
+        cachedTimeline = {key, places: data.places};
         setPlaces(data.places);
         setTimeline(data.places.length);
 
@@ -45,6 +79,7 @@ export function useCalendar() {
         }
       })
       .catch(() => {
+        if (cachedTimeline?.key === key) cachedTimeline = null;
         setPlaces([]);
         setTimeline(0);
       });

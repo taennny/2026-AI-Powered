@@ -4,12 +4,10 @@ import {View} from 'react-native';
 import BottomSheet from '@/components/bottomsheet/BottomSheet';
 import Calendar from '@/components/home/Calendar';
 import {useCalendar} from '@/hooks/useCalendar';
-import {useDailyAnalyze} from '@/hooks/useDailyAnalyze';
 
 export default function HomeIndex() {
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [calendarHeight, setCalendarHeight] = useState<number | null>(null);
-  useDailyAnalyze();
   const {selectedDate, setSelectedDate, viewDate, setViewDate, calendarDays, places} =
     useCalendar();
 
