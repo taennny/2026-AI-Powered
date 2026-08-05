@@ -20,12 +20,10 @@ import {
 import {saveTokens} from '@/utils/tokenStorage';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
-import {useGpsTracking} from '@/hooks/useGpsTracking';
 
 export default function LoginScreen() {
   const router = useRouter();
   const setAuthenticated = useAuthStore(s => s.setAuthenticated);
-  const {start: startGps} = useGpsTracking();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,8 +49,6 @@ export default function LoginScreen() {
       // login()이 토큰을 디스크에 저장한다 — 여기서는 인증 플래그만 세운다
       await login({email, password});
       setAuthenticated();
-
-      await startGps();
 
       router.replace('/');
     } catch (error: any) {

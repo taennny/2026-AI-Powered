@@ -52,10 +52,11 @@ app/
 앱 시작 → app/index.tsx → hooks/useBootstrap.ts (준비 작업은 전부 여기에)
     ├── authStore.initialize()          # tokenStorage → authStore 동기화
     ├── 미인증 → /(auth)/login
-    └── 인증   → useGpsTracking().start() → 온보딩 여부에 따라 /onboarding 또는 홈
+    └── 인증   → 온보딩 여부에 따라 /onboarding 또는 홈
 
 로그인   → authApi.login() → saveTokens() + authStore.setAuthenticated()
-로그아웃 → authStore.logout() → removeTokens() + isAuthenticated=false → /(auth)/login
+로그아웃 → authStore.logout() → removeTokens() + isAuthenticated=false
+          → (main)/_layout이 stopGpsTracking() 후 /(auth)/login
 카카오   → WebBrowser.openAuthSessionAsync() → roameapp://kakao-login?accessToken=...
           → kakao-login.tsx가 저장 후 홈 (source=account-link면 settings/account로 복귀)
 ```
@@ -145,6 +146,8 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 - **거부 시**: 아직 물어볼 수 있으면(`canAskAgain`) 시스템 다이얼로그, 이미 거부됐으면
   불이익 + 설정 경로를 담은 `Alert` → `Linking.openSettings()`.
 - 설정에서 뒤늦게 허용하면 `AppState` 복귀 시 감지해 `startGpsTracking()`이 살아납니다.
+- **GPS 시작은 여기 한 곳뿐입니다.** 로그인 화면이나 `useBootstrap`에서 부르면 권한 요청
+  전이라 항상 조용히 실패하므로 두지 않습니다. 정지는 `(main)/_layout`이 미인증을 감지할 때.
 - `isAlertOpen` / `isCheckingLocation` 모듈 플래그로 안내가 겹쳐 쌓이는 것을 막습니다.
 
 ### 데이터 재조회 정책
@@ -316,7 +319,6 @@ npx jest gpsTask      # 파일 하나
 | `premium_started_at` 미사용 | `services/subscriptionApi.ts` | 백엔드 응답에 있음. "구독한 지 N일" 표시에 쓸 수 있음 |
 | 타임존 획득 로직 | 미착수 | `utils/timezone.ts` 신규 + 날짜 키 일원화. 아래 "시간·타임존 정책" 참고 |
 | `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 프론트 타입은 준비됨. 백엔드 `/auth/me`가 아직 `email`만 반환 |
-| GPS 시작 호출 중복 (낮음) | `(auth)/login.tsx:47`, `useBootstrap.ts` | 가드가 있어 무해. 가독성 정리 |
 
 ## 백엔드 팀 확인 필요
 
