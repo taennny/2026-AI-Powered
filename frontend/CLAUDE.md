@@ -16,6 +16,7 @@ npm run android           # Android 에뮬레이터 실행
 npm run lint              # ESLint 검사
 npm run lint:fix          # ESLint 자동 수정
 npm run format            # Prettier 포맷팅
+npm test                  # Jest (jest-expo). tz는 jest.setup.js에서 Asia/Seoul 고정
 
 # iOS 네이티브 모듈 변경 후 필수
 cd ios && bundle exec pod install && cd ..
@@ -196,6 +197,35 @@ hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 ### 경로 별칭
 
 `@/`는 프로젝트 루트를 가리킵니다.
+
+## 테스트
+
+`jest-expo` 프리셋. 화면 렌더링은 테스트하지 않고 **순수 로직만** 다룹니다.
+
+```bash
+npm test              # 전체
+npm run test:watch    # 변경 감지
+npx jest gpsTask      # 파일 하나
+```
+
+| 파일 | 대상 | 핵심 |
+|---|---|---|
+| `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | KST 자정 경계(`15:00Z`), 월·연 넘김, 12AM/PM, `formatTimeAgo` 임계값 |
+| `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 자정 걸친 배치가 두 날짜 모두 analyze되는지, 한 날짜 실패 시 나머지 진행, 업로드 실패 시 analyze 미호출 |
+| `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
+| `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
+| `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 디스크·메모리 동시 갱신(로그아웃), `initialize` 복원 |
+
+`jest.setup.js`가 두 가지를 합니다:
+
+- **`process.env.TZ = 'Asia/Seoul'` 고정** — `formatDate`·`formatTimeFromISO`가 기기 로컬 시간에
+  의존해서, tz를 안 박으면 CI(UTC)에서 그냥 깨집니다. 반대로 **해외 지원 작업에 들어갈 때
+  이 값을 `America/New_York` 등으로 바꿔 돌리면 어디가 깨지는지 바로 나옵니다.**
+- AsyncStorage를 인메모리 목으로 교체 (네이티브 모듈이라 JS 환경에 없음)
+
+새 테스트를 쓸 때: 네이티브 모듈에 의존하는 모듈은 `jest.mock`으로 잘라내고
+(`expo-task-manager`는 `defineTask`에 등록된 핸들러를 붙잡아 직접 호출),
+`EXPO_PUBLIC_*`를 import 시점에 읽는 모듈은 `jest.isolateModules`로 다시 로드합니다.
 
 ## 시간·타임존 정책
 
