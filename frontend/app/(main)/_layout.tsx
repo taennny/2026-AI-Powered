@@ -6,8 +6,10 @@ import {useAuthStore} from '@/store/authStore';
 import {useLocationPermissionGuard} from '@/hooks/usePermissions';
 import {useSubscriptionSync} from '@/hooks/useSubscriptionSync';
 import {useDailyAnalyze} from '@/hooks/useDailyAnalyze';
+import {usePhotoSync} from '@/hooks/usePhotoSync';
 import {clearCalendarCache} from '@/hooks/useCalendar';
 import {clearJournalCache} from '@/hooks/useJournalList';
+import {clearPhotoSyncState} from '@/utils/photoSync';
 import {stopGpsTracking} from '@/hooks/useGpsTracking';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
 
@@ -20,6 +22,7 @@ export default function MainLayout() {
   // 리마운트되는데, 거기 두면 탭을 누를 때마다 analyze가 나가 전환이 느려진다
   // (게다가 백엔드가 places를 덮어쓰지 않아 그때마다 장소가 하나씩 늘어난다).
   useDailyAnalyze();
+  usePhotoSync();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -29,6 +32,7 @@ export default function MainLayout() {
       // 캘린더·저널이 잠깐 보인다
       clearCalendarCache();
       clearJournalCache();
+      void clearPhotoSyncState();
       // 로그아웃·회원탈퇴·토큰 만료가 모두 여기를 지난다.
       // 백그라운드 태스크는 화면이 사라져도 살아남으므로 명시적으로 꺼야 한다 —
       // 안 그러면 로그아웃한 사용자의 위치를 계속 수집한다.

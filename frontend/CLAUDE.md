@@ -92,10 +92,11 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription`, `settings/theme` |
 | `PUT /api/v1/subscriptions/me` | `subscribePremium`, `cancelSubscription` | `settings/subscription` |
 
+| `POST /api/v1/photos/upload` | `uploadPhoto` | `utils/photoSync.ts` (타임라인 카드 사진) |
+
 백엔드에는 있으나 **프론트가 아직 안 쓰는** 엔드포인트:
 `POST /api/v1/subscriptions/verify`(인앱결제 영수증 검증),
-`POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
-`POST /api/v1/photos/upload`(사진 — 기능 자체가 빠짐).
+`POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리).
 
 ### 스타일링
 
@@ -139,6 +140,7 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 |---|---|---|
 | `useLocationPermissionGuard()` | `app/(main)/_layout.tsx` | 앱 진입 + `AppState` `'active'` 복귀마다 |
 | `ensureMediaLibraryPermission()` | `write`, `write-preview`의 사진 버튼 | 사진 첨부 직전 |
+| `ensurePhotoLibraryPermission()` | `usePermissions` 내부 | 위치 권한을 다 받은 **직후** (타임라인 사진 자동 동기화용) |
 
 - **요청 시점**: 앱 진입 직후가 아니라 `(main)` 진입 시. 온보딩은 `(main)` 바깥이라
   신규 사용자는 자동으로 "온보딩 완료 후" 요청을 받습니다.
@@ -224,8 +226,11 @@ hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀)
 hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
+hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
 utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
 utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책" 참고)
+utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
+                          (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
@@ -259,6 +264,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
 | `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분 |
+| `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
 | `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |

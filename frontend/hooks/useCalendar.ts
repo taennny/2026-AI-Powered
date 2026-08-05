@@ -9,6 +9,7 @@ import {
 } from '@/services/calendarApi';
 import {useTimelineStore} from '@/store/timelineStore';
 import {logicalToday, toDateKey} from '@/utils/formatDate';
+import {syncPhotosForDate} from '@/utils/photoSync';
 
 /**
  * 마지막으로 성공한 조회 결과를 모듈에 남긴다.
@@ -92,6 +93,25 @@ export function useCalendar() {
   useEffect(() => {
     loadTimeline();
   }, [loadTimeline, refreshKey]);
+
+  /**
+   * 고른 날짜의 사진을 올린다 — 보는 날짜만 채우는 구조라 과거도 열면 채워진다.
+   *
+   * 오늘은 `usePhotoSync`가 앱 진입·복귀 때 이미 올리지만, 5분 간격 가드를
+   * 공유하므로 중복 업로드는 일어나지 않는다.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    syncPhotosForDate(toDateKey(selectedDate)).then(uploaded => {
+      // 올린 게 있을 때만 다시 받는다 — 방금 올린 사진이 카드에 붙도록
+      if (uploaded > 0 && !cancelled) loadTimeline();
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, loadTimeline]);
 
   // 백그라운드 복귀 시 그사이 쌓인 기록 반영 (재마운트가 없어 위 effect는 안 돈다)
   useEffect(() => {

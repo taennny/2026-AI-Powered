@@ -77,12 +77,14 @@ export default function SectionTabs() {
       >
         <TouchableOpacity
           onPress={() => handleTabPress('home')}
-          className="items-center bg-card rounded-tl-[10px] rounded-tr-[10px] py-2"
+          className="items-center bg-card rounded-tr-[10px] py-3"
           style={{
+            // spread 음수로 아래 방향 번짐을 없앤다 — 콘텐츠와 맞닿는 쪽에는
+            // 그림자가 보이지 않아야 탭이 화면에 이어 붙은 것처럼 보인다
             boxShadow:
               activeTab === 'home'
-                ? '3px -2px 6px rgba(0,0,0,0.09)'
-                : '0 -1px 4px rgba(0,0,0,0.05)',
+                ? '4px -3px 9px -3px rgba(0,0,0,0.10)'
+                : '0 -2px 6px -3px rgba(0,0,0,0.06)',
           }}
         >
           <Text
@@ -96,12 +98,12 @@ export default function SectionTabs() {
       >
         <TouchableOpacity
           onPress={() => handleTabPress('journal')}
-          className="items-center bg-teal rounded-tl-[10px] rounded-tr-[10px] py-2"
+          className="items-center bg-teal rounded-tl-[10px] py-3"
           style={{
             boxShadow:
               activeTab === 'journal'
-                ? '-3px -2px 6px rgba(0,0,0,0.09)'
-                : '0 -1px 4px rgba(0,0,0,0.05)',
+                ? '-4px -3px 9px -3px rgba(0,0,0,0.10)'
+                : '0 -2px 6px -3px rgba(0,0,0,0.06)',
           }}
         >
           <Text
