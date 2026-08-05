@@ -258,6 +258,7 @@ npx jest gpsTask      # 파일 하나
 |---|---|---|
 | `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
+| `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
 | `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
@@ -348,7 +349,7 @@ npx jest gpsTask      # 파일 하나
 | 날짜 비교가 인덱스를 못 탐 | `calendar.py:89`, `ai.py:111,143` | `func.date(func.timezone(...))`로 컬럼을 감쌈. 같은 파일 `ai.py:40-57`은 범위 비교라 방식이 섞여 있음 | 백엔드 |
 | EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:42` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
 | 카카오 계정 연동이 404 | `settings/account/index.tsx` | 백엔드에 `/auth/kakao/link` 엔드포인트가 **없음**. 버튼을 누르면 실패한다 | 백엔드 |
-| 카카오 로그인 returnUrl 불일치 | `(auth)/login.tsx` | `openAuthSessionAsync`의 두 번째 인자가 백엔드 콜백 URL인데, 백엔드는 `roameapp://kakao-login`으로 리다이렉트한다. 세션이 안 닫히거나 토큰 파싱이 실패할 수 있음 | 프론트(auth) |
+| 카카오 로그인이 서버 env·콘솔 설정에 걸려 있음 | 서버 `KAKAO_REDIRECT_URI`, 카카오 개발자 콘솔 | 프론트는 `https://api.roame.co.kr/api/v1/auth/kakao/callback`을 보낸다. **셋(프론트·서버 env·콘솔 등록값)이 문자 단위로 같아야** 하고, 하나라도 다르면 KOE006으로 막힌다 | 백엔드 |
 | 자정 걸친 체류가 중복 계상 | `ai/server/modules/gps.py` | `place_count`가 부풀려짐 | 회의 안건 3·4 |
 | 지도 공유 기능 비활성 | `MapPreview.tsx` | `RNFetchBlob`이 네이티브 전용이라 Expo 웹 번들이 깨져 주석 처리됨. 되살리려면 `Platform.OS` 가드 필요 | 프론트 |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
