@@ -1,9 +1,3 @@
-/**
- * @file services/subscriptionApi.ts
- * @description 구독 상태 조회 API
- * GET /api/v1/subscriptions/me
- */
-
 import {api} from '@/utils/api';
 
 type SubscriptionResponse = {

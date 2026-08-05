@@ -1,13 +1,16 @@
-/**
- * @file utils/formatDate.ts
- * @description 날짜 포맷 유틸 함수
- */
-
 /** Date → 'YYYY-MM-DD' (데이터 날짜 키) */
 export function toDateKey(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+/** Date → KST 기준 'YYYY-MM-DD' — 백엔드가 날짜 경계를 KST로 해석한다 */
+export function toKstDateKey(date: Date): string {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(kst.getUTCDate()).padStart(2, '0');
+  return `${kst.getUTCFullYear()}-${mm}-${dd}`;
 }
 
 /** Date → 'YY.MM.DD(day)' */

@@ -1,9 +1,3 @@
-/**
- * @file services/blogApi.ts
- * @description 저널(블로그) 목록 API 및 타입 정의
- * GET /api/v1/blogs
- */
-
 import {api} from '@/utils/api';
 
 export type JournalData = {
@@ -54,7 +48,6 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
-  photo_urls?: string[];
 };
 
 export async function generateBlog(
@@ -70,8 +63,9 @@ export async function generateBlog(
 export async function fetchBlogGenerationStatus(
   blogId: string,
 ): Promise<BlogGenerationStatus> {
+  // 주의: 상태 조회만 경로가 복수형(blogs)이다. 백엔드 OpenAPI 기준.
   const {data} = await api.get<BlogGenerationStatus>(
-    `/api/v1/blog/${blogId}/status`,
+    `/api/v1/blogs/${blogId}/status`,
   );
   return data;
 }
@@ -104,7 +98,6 @@ export async function waitForBlogGeneration(blogId: string): Promise<BlogDetail>
 export type UpdateBlogRequest = {
   title: string;
   content: string;
-  photoUrls?: string[];
 };
 
 export async function updateBlog(
@@ -114,3 +107,4 @@ export async function updateBlog(
   const {data} = await api.put<BlogDetail>(`/api/v1/blog/${blogId}`, body);
   return data;
 }
+

@@ -1,8 +1,3 @@
-/**
- * @file services/calendarApi.ts
- * @description 캘린더 관련 API 호출 및 타입 정의
- */
-
 import {api} from '@/utils/api';
 
 export type CalendarDay = {

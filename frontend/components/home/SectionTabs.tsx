@@ -1,12 +1,8 @@
-/**
- * @file components/home/SectionTabs.tsx — 홈 네비게이션 탭 (Home ↔ Journal List)
- * - 활성 탭 52% / 비활성 48% spring 너비 애니메이션
- * - 활성 탭에 boxShadow 카드 효과
- */
-
 import {View, Text, TouchableOpacity, Animated} from 'react-native';
 import {useRef, useEffect} from 'react';
 import {router, usePathname} from 'expo-router';
+
+import {useTimelineStore} from '@/store/timelineStore';
 
 type Tab = 'home' | 'journal';
 
@@ -16,6 +12,7 @@ const INACTIVE_FLEX = 48;
 export default function SectionTabs() {
   const pathname = usePathname();
   const activeTab: Tab = pathname.includes('journal') ? 'journal' : 'home';
+  const requestRefresh = useTimelineStore(s => s.requestRefresh);
   const homeFlex = useRef(
     new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX),
   ).current;
@@ -38,10 +35,14 @@ export default function SectionTabs() {
         friction: 14,
       }),
     ]).start();
-  }, [activeTab]);
+  }, [activeTab, homeFlex, journalFlex]);
 
   const handleTabPress = (tab: Tab) => {
-    if (tab === activeTab) return;
+    if (tab === activeTab) {
+      // 이미 홈이면 이동 대신 새로고침 — 탭을 눌렀는데 아무 반응이 없는 것을 막는다
+      if (tab === 'home') requestRefresh();
+      return;
+    }
     if (tab === 'home') {
       router.replace('/(main)/(tabs)/home');
     } else {

@@ -1,11 +1,5 @@
-/**
- * @file utils/api.ts
- * @description axios 인스턴스 — 모든 API 요청은 이 인스턴스를 사용
- * - 요청 인터셉터: Authorization 헤더에 액세스 토큰 자동 첨부
- * - 응답 인터셉터: 401 시 리프레시 토큰으로 재발급 후 재시도
- */
-
 import axios from 'axios';
+
 import {
   getAccessToken,
   getRefreshToken,
@@ -14,11 +8,13 @@ import {
 } from '@/utils/tokenStorage';
 import {useAuthStore} from '@/store/authStore';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-console.log("BASE_URL =", BASE_URL);
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+
+const DEFAULT_TIMEOUT_MS = 15000;
+
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -82,7 +78,7 @@ api.interceptors.response.use(
 
         if (!refreshToken) {
           await removeTokens();
-          useAuthStore.getState().clearToken();
+          useAuthStore.getState().clearAuth();
           return Promise.reject(error);
         }
 
@@ -101,7 +97,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         await removeTokens();
-        useAuthStore.getState().clearToken();
+        useAuthStore.getState().clearAuth();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

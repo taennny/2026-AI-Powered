@@ -1,10 +1,6 @@
-/**
- * @file app/(main)/write-preview/index.tsx
- * @description 글쓰기 미리보기/저장 화면
- */
-
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   Text,
@@ -15,7 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
-import {updateBlog} from '@/services/blogApi';
+import {fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
@@ -31,6 +27,33 @@ export default function WritePreviewScreen() {
   const [journalTitle, setJournalTitle] = useState(title || '');
   const [journalContent, setJournalContent] = useState(content || '');
   const [isSaving, setIsSaving] = useState(false);
+
+  const needsFetch = !!blogId && !title;
+  const [isLoading, setIsLoading] = useState(needsFetch);
+
+  useEffect(() => {
+    if (!needsFetch || !blogId) return;
+
+    let isActive = true;
+
+    fetchBlogDetail(blogId)
+      .then(detail => {
+        if (!isActive) return;
+        setJournalTitle(detail.title);
+        setJournalContent(detail.content);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        Alert.alert('오류', '글을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [blogId, needsFetch]);
 
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
@@ -78,6 +101,14 @@ export default function WritePreviewScreen() {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface justify-center items-center">
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface">

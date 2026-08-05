@@ -1,5 +1,4 @@
 import * as Linking from 'expo-linking';
-import { saveTokens } from '@/utils/tokenStorage';
 import * as WebBrowser from 'expo-web-browser';
 import {
   View,
@@ -13,12 +12,18 @@ import {
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
 
+import {
+  buildKakaoAuthUrl,
+  KAKAO_REDIRECT_URI,
+  KAKAO_REST_API_KEY,
+} from '@/constants/kakao';
+import {saveTokens} from '@/utils/tokenStorage';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setToken = useAuthStore(s => s.setToken);
+  const setAuthenticated = useAuthStore(s => s.setAuthenticated);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -41,8 +46,9 @@ export default function LoginScreen() {
       setIsLoading(true);
       setErrorMessage('');
 
-      const {access_token} = await login({email, password});
-      setToken(access_token);
+      // login()이 토큰을 디스크에 저장한다 — 여기서는 인증 플래그만 세운다
+      await login({email, password});
+      setAuthenticated();
 
       router.replace('/');
     } catch (error: any) {
@@ -66,59 +72,43 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
-const handleKakaoLogin = async () => {
-  try {
-    const CLIENT_ID = 'fe4f73594264f90fbda73e9847a0c218';
-    const REDIRECT_URI = 'https://api.roame.co.kr/api/v1/auth/kakao/callback';
-
-    const authUrl =
-      `https://kauth.kakao.com/oauth/authorize` +
-      `?client_id=${CLIENT_ID}` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&response_type=code`;
-
-    const result = await WebBrowser.openAuthSessionAsync(
-      authUrl,
-      REDIRECT_URI,
-    );
-
-    if (result.type !== 'success') {
+  const handleKakaoLogin = async () => {
+    if (!KAKAO_REST_API_KEY) {
+      setErrorMessage('카카오 로그인 설정이 없습니다.');
       return;
     }
 
-    if (!result.url) {
-      throw new Error('Redirect URL이 없습니다.');
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(
+        buildKakaoAuthUrl(),
+        KAKAO_REDIRECT_URI,
+      );
+
+      if (result.type !== 'success') return;
+
+      if (!result.url) {
+        throw new Error('Redirect URL이 없습니다.');
+      }
+
+      const {queryParams} = Linking.parse(result.url);
+      const accessToken = queryParams?.accessToken;
+      const refreshToken = queryParams?.refreshToken;
+
+      if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+        throw new Error('토큰을 받지 못했습니다.');
+      }
+
+      // authApi의 login()과 달리 여기서 직접 저장한다 — 디스크와 메모리 둘 다
+      await saveTokens(accessToken, refreshToken);
+      setAuthenticated();
+
+      // TODO: isNewUser === 'true'면 추후 회원정보 입력 화면으로 분기
+      router.replace('/');
+    } catch (error) {
+      console.log('kakao login error', error);
+      setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
     }
-
-    const { queryParams } = Linking.parse(result.url);
-
-const accessToken = queryParams?.accessToken;
-const refreshToken = queryParams?.refreshToken;
-const isNewUser = queryParams?.isNewUser;
-
-if (
-  typeof accessToken !== 'string' ||
-  typeof refreshToken !== 'string'
-) {
-  throw new Error('토큰을 받지 못했습니다.');
-}
-
-// authApi의 login()처럼 토큰 저장
-await saveTokens(accessToken, refreshToken);
-
-setToken(accessToken);
-
-// 필요하면 신규 회원 분기
-if (isNewUser === 'true') {
-  router.replace('/');
-  // 추후 회원정보 입력 화면으로 변경 가능
-} else {
-  router.replace('/');
-}
-  } catch (error) {
-    console.log('kakao login error', error);
-  }
-};
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
