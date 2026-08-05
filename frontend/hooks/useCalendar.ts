@@ -8,12 +8,14 @@ import {
   type TimelinePlace,
 } from '@/services/calendarApi';
 import {useTimelineStore} from '@/store/timelineStore';
-import {toKstDateKey} from '@/utils/formatDate';
+import {logicalToday, toDateKey} from '@/utils/formatDate';
 
 export function useCalendar() {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  // 새벽 4시 이전이면 아직 '어제'다 — 자정 넘겨 앱을 열었을 때
+  // 기록이 없는 새 날짜가 선택되는 것을 막는다
+  const [selectedDate, setSelectedDate] = useState<Date>(logicalToday);
   const [viewDate, setViewDate] = useState<Date>(() => {
-    const today = new Date();
+    const today = logicalToday();
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
@@ -29,8 +31,8 @@ export function useCalendar() {
   }, [viewDate]);
 
   const loadTimeline = useCallback(() => {
-    // 조회 키는 KST — analyze가 target_date를 KST 날짜로 기록한다
-    fetchTimeline(toKstDateKey(selectedDate))
+    // selectedDate는 이미 '며칠'이 정해진 달력 날짜다 — 경계 보정을 다시 하면 안 된다
+    fetchTimeline(toDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
         setTimeline(data.places.length);

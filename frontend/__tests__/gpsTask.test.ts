@@ -49,6 +49,16 @@ describe('gpsTask', () => {
     ]);
   });
 
+  it('업로드는 순간을 UTC로 보내고, 날짜 키는 로컬 경계로 만든다', async () => {
+    // 두 값을 섞지 않는 것이 시간 정책의 핵심이다
+    await run([location('2026-08-05T16:00:00.000Z')]);
+
+    expect(mockUpload.mock.calls[0][0][0].timestamp).toBe(
+      '2026-08-05T16:00:00.000Z',
+    );
+    expect(analyzedDates()).toEqual(['2026-08-05']); // 로컬 8/6 01:00 → 논리 8/5
+  });
+
   it('accuracy·speed가 null이면 0으로 채운다', async () => {
     await run([
       {
@@ -73,21 +83,25 @@ describe('gpsTask', () => {
     expect(analyzedDates()).toEqual(['2026-08-05']);
   });
 
-  // KST 자정(= 15:00Z)을 걸친 배치. 예전에는 마지막 로그의 날짜만 분석해서
-  // 앞 날짜가 통째로 누락됐다.
-  it('자정을 걸친 배치는 포함된 날짜를 전부, 시간순으로 분석한다', async () => {
+  // 경계(로컬 새벽 4시 = 19:00Z)를 걸친 배치.
+  // 예전에는 마지막 로그의 날짜만 분석해서 앞 날짜가 통째로 누락됐다.
+  it('하루 경계를 걸친 배치는 포함된 날짜를 전부, 시간순으로 분석한다', async () => {
     await run([
-      location('2026-08-05T14:30:00.000Z'), // KST 8/5 23:30
-      location('2026-08-05T15:30:00.000Z'), // KST 8/6 00:30
+      location('2026-08-05T18:30:00.000Z'), // 로컬 8/6 03:30 → 논리 8/5
+      location('2026-08-05T19:30:00.000Z'), // 로컬 8/6 04:30 → 논리 8/6
     ]);
 
     expect(analyzedDates()).toEqual(['2026-08-05', '2026-08-06']);
   });
 
-  it('날짜 키는 기기 로컬이 아니라 KST 기준이다', async () => {
-    await run([location('2026-08-05T15:00:00.000Z')]);
+  it('자정을 넘겨도 새벽 4시 전이면 전날로 묶는다', async () => {
+    await run([
+      location('2026-08-05T14:00:00.000Z'), // 로컬 8/5 23:00
+      location('2026-08-05T16:00:00.000Z'), // 로컬 8/6 01:00
+    ]);
 
-    expect(analyzedDates()).toEqual(['2026-08-06']);
+    // 자정 기준이었다면 8/5와 8/6으로 쪼개져 체류가 중복 계상됐다
+    expect(analyzedDates()).toEqual(['2026-08-05']);
   });
 
   it('analyze가 daily_record_id를 주면 store에 넣는다 — 글쓰기에 필요하다', async () => {
@@ -113,8 +127,8 @@ describe('gpsTask', () => {
       .mockResolvedValueOnce({daily_record_id: 'rec-2'});
 
     await run([
-      location('2026-08-05T14:30:00.000Z'),
-      location('2026-08-05T15:30:00.000Z'),
+      location('2026-08-05T18:30:00.000Z'),
+      location('2026-08-05T19:30:00.000Z'),
     ]);
 
     expect(analyzedDates()).toEqual(['2026-08-05', '2026-08-06']);
