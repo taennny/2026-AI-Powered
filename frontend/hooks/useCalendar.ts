@@ -22,6 +22,7 @@ export function useCalendar() {
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [places, setPlaces] = useState<TimelinePlace[]>([]);
   const setTimeline = useTimelineStore(s => s.setTimeline);
+  const setDailyRecordId = useTimelineStore(s => s.setDailyRecordId);
   const refreshKey = useTimelineStore(s => s.refreshKey);
 
   const loadCalendar = useCallback(() => {
@@ -36,12 +37,18 @@ export function useCalendar() {
       .then(data => {
         setPlaces(data.places);
         setTimeline(data.places.length);
+
+        // 백엔드가 아직 안 주면 undefined — 그때는 analyze 응답으로 채워진 값을
+        // 그대로 둔다. 내려주기 시작하면 선택한 날짜의 id로 자동 교체된다.
+        if (data.daily_record_id !== undefined) {
+          setDailyRecordId(data.daily_record_id);
+        }
       })
       .catch(() => {
         setPlaces([]);
         setTimeline(0);
       });
-  }, [selectedDate, setTimeline]);
+  }, [selectedDate, setTimeline, setDailyRecordId]);
 
   useEffect(() => {
     loadCalendar();
