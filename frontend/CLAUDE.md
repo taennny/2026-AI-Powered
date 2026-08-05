@@ -158,6 +158,26 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 
 홈 화면에 머무는 동안 GPS analyze가 새 장소를 만들어도 화면은 그대로입니다 — 홈 탭을 다시 누르면 반영됩니다.
 
+### 구독 상태
+
+서버가 단일 출처입니다. `subscriptionStore`가 들고 있고, **프리미엄 기능 개방 판정은
+`isPremium()` 하나만 봅니다** (`plan === 'premium' && isActive && 만료 전).
+
+| 규칙 | 이유 |
+|---|---|
+| `plan`을 프론트가 직접 정하지 않는다 | 낙관적 업데이트를 하면 결제 검증 실패 시 유료 기능이 잠깐 열립니다. 진행 표시가 필요하면 `plan` 대신 별도 로딩 플래그를 쓰세요. **eslint(`no-restricted-syntax`)가 화면에서의 `setState` 호출을, TS `readonly`가 필드 대입을 막습니다** |
+| 조회 실패 시 `free`로 떨어뜨린다 | 모를 때 프리미엄으로 두면 조회 실패가 곧 유료 기능 개방이 됩니다 |
+| 프리미엄이 끊기면 프리미엄 테마를 `basic`으로 되돌린다 | `refresh()`가 처리합니다. 대상은 `constants/themes.ts`의 `PREMIUM_THEMES` |
+| `expires_at`이 지났으면 서버가 `active`라 해도 만료로 본다 | 앱을 오래 켜둔 채 만료가 지나는 경우 |
+
+재조회 시점은 `useSubscriptionSync`(앱 진입 + `AppState` 복귀)와 결제·해지 직후입니다.
+인앱결제는 시스템 다이얼로그라 앱 밖에서 완료될 수 있어 복귀 갱신이 특히 중요합니다.
+로그아웃 시 `(main)/_layout`이 `reset()`으로 비웁니다 — 다음 계정이 물려받으면 안 됩니다.
+
+> ⚠️ 지금 프리미엄 판정은 **클라이언트에만** 있습니다. 테마는 겉모습이라 괜찮지만,
+> BM의 **횟수 제한처럼 비용이 드는 기능은 반드시 서버가 막아야 합니다.**
+> 프론트의 `isPremium()`은 UI 표시용이지 보안 경계가 아닙니다.
+
 ### BottomSheet
 
 PanResponder로 3단계 스냅: `0`(expanded), `sheetHeight - peekHeight`(peek),
@@ -186,6 +206,7 @@ GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결�
 store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
 store/themeStore.ts     themeId, themeVars / setTheme, initialize
+store/subscriptionStore.ts  plan, isActive, expiresAt, hasLoaded / isPremium(), refresh, reset
 ```
 
 ### 훅
@@ -196,6 +217,7 @@ hooks/usePermissions.ts   권한 확인·요청·거부 안내 (아래 "권한 �
 hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
+hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
@@ -230,6 +252,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
+| `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀 |
 
 `jest.setup.js`가 두 가지를 합니다:
 
@@ -317,6 +340,7 @@ npx jest gpsTask      # 파일 하나
 | 인앱결제 | `settings/subscription` | 백엔드 `POST /subscriptions/verify` 준비됨. mock 영수증 형식 `mock:<txid>:<monthly\|annual>` |
 | `billing_cycle` 미사용 | `services/subscriptionApi.ts` | 백엔드가 GET 응답·PUT 요청 양쪽 지원하는데 프론트가 안 보냄 (월/연 선택 UI 없음) |
 | `premium_started_at` 미사용 | `services/subscriptionApi.ts` | 백엔드 응답에 있음. "구독한 지 N일" 표시에 쓸 수 있음 |
+| 구독 만료 시 안내 없음 | `subscriptionStore` | 테마는 basic으로 되돌리지만 사용자에게 알리지 않음 |
 | 타임존 획득 로직 | 미착수 | `utils/timezone.ts` 신규 + 날짜 키 일원화. 아래 "시간·타임존 정책" 참고 |
 | `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 프론트 타입은 준비됨. 백엔드 `/auth/me`가 아직 `email`만 반환 |
 
