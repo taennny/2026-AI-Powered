@@ -34,8 +34,19 @@ export default function SubscriptionScreen() {
             // 서버 응답을 받고 나서 상태를 갱신한다 — 먼저 화면을 바꾸면
             // 결제가 실패했을 때 유료 기능이 잠깐 열린다
             await subscribePremium();
-            await useSubscriptionStore.getState().refresh();
-            Alert.alert('', '결제가 완료되었습니다.');
+
+            // 결제 반영은 웹훅을 거쳐 몇 초 늦을 수 있다. 한 번만 조회하면
+            // 아직 free라 결제가 실패한 것처럼 보인다
+            const applied = await useSubscriptionStore
+              .getState()
+              .refreshUntilChanged(false);
+
+            Alert.alert(
+              '',
+              applied
+                ? '결제가 완료되었습니다.'
+                : '결제가 접수되었습니다. 반영까지 잠시 걸릴 수 있어요.',
+            );
           } catch {
             Alert.alert(
               '오류',
@@ -70,11 +81,17 @@ export default function SubscriptionScreen() {
     ]);
   };
 
+  /**
+   * 해지를 예약해도 만료일까지는 프리미엄이다. 그때도 "다음 결제일"이라고 하면
+   * 해지가 안 된 줄 알고 또 해지하러 간다 — 갱신 여부를 문구로 구분한다.
+   */
   const subtitle = !isPremium
     ? '베이직 플랜을 이용 중'
-    : subscription.expiresAt
-      ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${formatMonthDay(subscription.expiresAt)}`
-      : '프리미엄 플랜을 이용 중';
+    : !subscription.expiresAt
+      ? '프리미엄 플랜을 이용 중'
+      : subscription.willRenew
+        ? `프리미엄 플랜을 이용 중 - 다음 결제일 : ${formatMonthDay(subscription.expiresAt)}`
+        : `해지 예약됨 - ${formatMonthDay(subscription.expiresAt)}까지 이용 가능`;
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
@@ -104,6 +121,7 @@ export default function SubscriptionScreen() {
             is_active: subscription.isActive,
             started_at: subscription.startedAt,
             expires_at: subscription.expiresAt,
+            will_renew: subscription.willRenew,
           }}
           onCancel={handleCancel}
         />

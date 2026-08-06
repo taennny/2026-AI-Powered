@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 
 import {useAuthStore} from '@/store/authStore';
+import {useSettingsStore} from '@/store/settingsStore';
 import {isOnboardingDone} from '@/utils/onboardingStorage';
 
 export type BootstrapRoute =
@@ -16,7 +17,12 @@ export function useBootstrap(): BootstrapRoute | null {
     let isActive = true;
 
     const bootstrap = async () => {
-      await initialize();
+      // 위치 기록 토글도 여기서 복원한다 — 헤더 알림이 이 값을 보고 뜨는데,
+      // 권한 흐름까지 기다리면 알림이 늦게 나타난다
+      await Promise.all([
+        initialize(),
+        useSettingsStore.getState().initialize(),
+      ]);
 
       if (!useAuthStore.getState().isAuthenticated) {
         if (isActive) setRoute('/(auth)/login');

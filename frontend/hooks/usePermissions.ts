@@ -6,6 +6,7 @@ import * as MediaLibrary from 'expo-media-library';
 
 import {PERMISSION_MESSAGES} from '@/constants/permissionMessages';
 import {startGpsTracking} from '@/hooks/useGpsTracking';
+import {useSettingsStore} from '@/store/settingsStore';
 
 type PermissionMessage = {title: string; message: string};
 
@@ -105,9 +106,21 @@ async function ensurePhotoLibraryPermission(): Promise<boolean> {
  */
 async function checkLocationAndStartTracking() {
   const granted = await ensureLocationPermissions();
-  if (!granted) return;
 
-  await startGpsTracking();
+  if (granted) {
+    // 사용자가 설정에서 껐으면 권한이 있어도 시작하지 않는다.
+    // 복원 전이면 기본값(켬)이라 잠깐 켜졌다 꺼지는 대신, 복원을 기다린다.
+    const settings = useSettingsStore.getState();
+    if (!settings.hasLoaded) await settings.initialize();
+    if (useSettingsStore.getState().isTrackingEnabled) {
+      await startGpsTracking();
+    }
+  }
+
+  // 사진은 위치와 독립적인 기능이다. 위치를 "앱 사용 중에만"으로 두거나
+  // 거부한 사용자도 타임라인 사진은 쓸 수 있어야 하므로, 위치 결과와
+  // 무관하게 묻는다. (순서만 위치 뒤 — 시스템 다이얼로그가 겹치면
+  // 뒤엣것이 무시된다)
   await ensurePhotoLibraryPermission();
 }
 

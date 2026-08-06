@@ -54,6 +54,7 @@ describe('photoSync', () => {
     mockInfo.mockReset().mockImplementation(async (a: MediaLibrary.Asset) => ({
       ...a,
       localUri: `file:///${a.id}.jpg`,
+      exif: {DateTimeOriginal: '2026:08:06 13:00:00'},
     }));
     mockUpload.mockReset().mockResolvedValue({photo_id: 'p'});
     mockNet.mockReset().mockResolvedValue({type: 'WIFI'});
@@ -77,14 +78,63 @@ describe('photoSync', () => {
     expect(createdBefore.getHours()).toBe(4);
   });
 
-  // EXIF가 없어 서버가 업로드 시각으로 저장한다 — 엉뚱한 장소에 붙는다
-  it('스크린샷은 올리지 않는다', async () => {
-    mockAssets.mockResolvedValue({
-      assets: [asset('a'), asset('shot', {mediaSubtypes: ['screenshot']})],
+  // 서버는 taken_at을 EXIF로만 정한다. 없으면 업로드 시각으로 저장돼
+  // "지금 있는 장소"에 붙는다 — 스크린샷·저장한 이미지·받은 사진이 전부 그렇다
+  describe('촬영 시각이 없는 사진', () => {
+    const withoutExif = (a: MediaLibrary.Asset) => ({
+      ...a,
+      localUri: `file:///${a.id}.jpg`,
     });
 
-    await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
-    expect(uploadedIds()).toEqual(['a.jpg']);
+    it('올리지 않는다', async () => {
+      mockAssets.mockResolvedValue({assets: [asset('a'), asset('saved')]});
+      mockInfo.mockImplementation(async (a: MediaLibrary.Asset) =>
+        a.id === 'saved'
+          ? withoutExif(a)
+          : {...withoutExif(a), exif: {DateTimeOriginal: '2026:08:06 13:00:00'}},
+      );
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+      expect(uploadedIds()).toEqual(['a.jpg']);
+    });
+
+    it('중첩된 EXIF 구조도 읽는다 (플랫폼마다 다르다)', async () => {
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      mockInfo.mockImplementation(async (a: MediaLibrary.Asset) => ({
+        ...withoutExif(a),
+        exif: {Exif: {DateTimeOriginal: '2026:08:06 13:00:00'}},
+      }));
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+    });
+
+    // 기록해두지 않으면 회차마다 같은 사진의 EXIF를 다시 읽는다
+    it('건너뛴 사진도 기록해 다시 검사하지 않는다', async () => {
+      mockAssets.mockResolvedValue({assets: [asset('saved')]});
+      mockInfo.mockImplementation(async (a: MediaLibrary.Asset) =>
+        withoutExif(a),
+      );
+      await syncPhotosForDate(TODAY, NOW);
+
+      mockInfo.mockClear();
+      await syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS);
+
+      expect(mockInfo).not.toHaveBeenCalled();
+    });
+  });
+
+  // usePhotoSync(오늘)와 useCalendar(고른 날짜)가 거의 동시에 들어온다.
+  // 잠그기 전에 await이 있으면 둘 다 통과해 같은 사진을 두 번 올린다
+  it('동시에 불려도 한 번만 올린다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+    const [first, second] = await Promise.all([
+      syncPhotosForDate(TODAY, NOW),
+      syncPhotosForDate(TODAY, NOW),
+    ]);
+
+    expect(first + second).toBe(1);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
   });
 
   it('iOS의 ph:// 대신 실제 파일 경로로 올린다', async () => {
@@ -155,6 +205,16 @@ describe('photoSync', () => {
 
       await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
       expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    // 권한을 나중에 켜고 돌아왔을 때 5분을 기다리게 하면 안 된다
+    it('권한이 없어 건너뛴 날짜는 권한을 켜면 바로 올린다', async () => {
+      mockPerm.mockResolvedValue({status: 'denied'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      await syncPhotosForDate(TODAY, NOW);
+
+      mockPerm.mockResolvedValue({status: 'granted'});
+      await expect(syncPhotosForDate(TODAY, NOW + 1000)).resolves.toBe(1);
     });
 
     it('셀룰러라 건너뛴 날짜는 와이파이가 되면 바로 올린다', async () => {

@@ -69,9 +69,12 @@ export default function PremiumView({subscription, onCancel}: Props) {
         <TouchableOpacity>
           <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onCancel}>
-          <Text className="text-[15px] text-tertiary">구독 해지</Text>
-        </TouchableOpacity>
+        {/* 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다 */}
+        {subscription.will_renew && (
+          <TouchableOpacity onPress={onCancel}>
+            <Text className="text-[15px] text-tertiary">구독 해지</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
