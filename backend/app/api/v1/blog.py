@@ -19,7 +19,9 @@ from app.schemas.blog import (
 from app.services.blog import (
     BlogConflictError,
     BlogStateError,
+    QuotaExceededError,
     create_blog_generation,
+    delete_blog,
     get_blog_by_id,
     get_blog_list,
     publish_blog,
@@ -27,6 +29,7 @@ from app.services.blog import (
     update_blog,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.timezone import KST
 
 router = APIRouter(tags=["blog"])
 
@@ -70,6 +73,17 @@ async def generate_blog(
     try:
         blog = await create_blog_generation(
             db, current_user.id, request.daily_record_id, request.style
+        )
+    except QuotaExceededError as e:
+        # 프론트가 "다음 주 월요일부터" 안내에 바로 쓰도록 reset_at은 KST ISO 문자열
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": str(e),
+                "limit": e.limit,
+                "used": e.used,
+                "reset_at": e.reset_at.astimezone(KST).isoformat(),
+            },
         )
     except BlogConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -142,6 +156,19 @@ async def edit_blog(
         raise HTTPException(status_code=404, detail=str(e))
 
     return blog
+
+
+@router.delete("/api/v1/blog/{blog_id}", status_code=204)
+async def remove_blog(
+    blog_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """블로그 삭제 (소프트 삭제 — 주간 생성 횟수는 유지된다)"""
+    try:
+        await delete_blog(db, blog_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/api/v1/blog/{blog_id}/publish", response_model=BlogPublishResponse)

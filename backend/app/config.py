@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # RevenueCat
+    # 대시보드 Webhooks의 Authorization 값과 동일하게. 빈 값이면 웹훅 엔드포인트가 503 반환
+    REVENUECAT_WEBHOOK_SECRET: str = ""
+    # 이벤트 environment 필터 기준 (불일치 이벤트는 저장만): PRODUCTION | SANDBOX
+    REVENUECAT_ENVIRONMENT: str = "PRODUCTION"
+
+    # 생성 쿼터
+    FREE_WEEKLY_BLOG_LIMIT: int = 3  # 무료 사용자 주간 AI 생성 한도. 회의 확정값 3
+    DAY_BOUNDARY_HOUR: int = 4  # 하루 경계(새벽 4시). 주 리셋도 이 시각 기준
+
     # Kakao
     KAKAO_REST_API_KEY: str = ""
     KAKAO_REDIRECT_URI: str = ""

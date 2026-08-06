@@ -118,4 +118,5 @@ async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
 @router.get("/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     """현재 로그인한 유저 정보 조회"""
-    return {"email": current_user.email}
+    # user_id: RevenueCat Purchases.logIn()에 넘길 우리 서비스 식별자
+    return {"user_id": current_user.id, "email": current_user.email}
