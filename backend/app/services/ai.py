@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -144,7 +144,13 @@ async def analyze_and_save(
         .values(daily_record_id=daily_record.id)
     )
 
-    # 6. places 저장
+    # 6. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
+    # 지우지 않으면 analyze를 부를 때마다 같은 체류가 통째로 다시 insert되어
+    # 타임라인에 같은 카드가 계속 쌓인다.
+    await db.execute(
+        delete(Place).where(Place.daily_record_id == daily_record.id)
+    )
+
     for stay in stays:
         place = Place(
             user_id=user_id,
