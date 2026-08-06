@@ -232,7 +232,9 @@ async def get_blog_list(
     result = await db.execute(
         select(Blog)
         .where(*filters)
-        .order_by(Blog.created_at.desc())
+        # created_at이 같은 글이 둘 이상이면 DB가 순서를 보장하지 않아,
+        # 페이지 경계에서 같은 글이 두 번 나오거나 하나가 누락된다.
+        .order_by(Blog.created_at.desc(), Blog.id.desc())
         .offset((page - 1) * size)
         .limit(size)
     )
