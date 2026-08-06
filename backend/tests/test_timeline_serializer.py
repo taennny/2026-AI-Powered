@@ -59,7 +59,8 @@ def test_build_timeline_data_with_places():
     for key in ("seq", "start", "end", "place", "category", "address"):
         assert key in block
     assert block["seq"] == 1
-    assert block["start"] == "10:30"
+    # 저장은 UTC, AI에는 현지 시각으로 나간다 (10:30 UTC = 19:30 KST)
+    assert block["start"] == "19:30"
     assert block["place"] == "성수 카페"
 
 
