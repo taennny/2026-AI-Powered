@@ -200,7 +200,16 @@ async def get_blog_list(
     filters = [Blog.user_id == user_id]
     if q:
         keyword = f"%{q}%"
-        filters.append(or_(Blog.title.ilike(keyword), Blog.content.ilike(keyword)))
+        filters.append(
+            or_(
+                Blog.title.ilike(keyword),
+                Blog.content.ilike(keyword),
+                # 프론트 카드가 날짜를 '26.08.01(thu)'로 보여주므로,
+                # 사용자는 화면에 보이는 그대로 '26.08'·'27'·'thu'를 입력해 찾는다.
+                # 포맷을 화면과 똑같이 맞춰야 요일까지 걸린다 (dy = mon/tue/…).
+                func.to_char(Blog.target_date, "YY.MM.DD(dy)").ilike(keyword),
+            )
+        )
     if target_date is not None:
         filters.append(Blog.target_date == target_date)
 
@@ -212,7 +221,9 @@ async def get_blog_list(
     result = await db.execute(
         select(Blog)
         .where(*filters)
-        .order_by(Blog.created_at.desc())
+        # created_at이 같은 글이 둘 이상이면 DB가 순서를 보장하지 않아,
+        # 페이지 경계에서 같은 글이 두 번 나오거나 하나가 누락된다.
+        .order_by(Blog.created_at.desc(), Blog.id.desc())
         .offset((page - 1) * size)
         .limit(size)
     )
