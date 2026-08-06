@@ -70,9 +70,7 @@ export default function MapPreview({places}: Props) {
         <Text className="text-sm text-secondary mb-1">
           지도를 불러올 수 없어요
         </Text>
-        <Text className="text-[11px] text-tertiary">
-          .env › EXPO_PUBLIC_GOOGLE_MAPS_KEY
-        </Text>
+        <Text className="text-[11px] text-tertiary">잠시 후 다시 열어주세요</Text>
       </View>
     );
   }
