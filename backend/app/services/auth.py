@@ -89,31 +89,44 @@ async def kakao_login(db: AsyncSession, code: str) -> dict:
         "nickname", f"카카오유저{kakao_id[:4]}"
     )
 
-    # 3. 기존 유저인지 확인
+    # 3. 기존 유저인지 확인 (social_id 우선)
     result = await db.execute(select(User).where(User.social_id == kakao_id))
     user = result.scalar_one_or_none()
     is_new_user = False
 
-    # 4. 신규 유저면 자동 회원가입
     if not user:
-        is_new_user = True
-        user = User(
-            id=uuid.uuid4(),
-            email=email,
-            password_hash=None,
-            nickname=nickname,
-            auth_provider="kakao",
-            social_id=kakao_id,
-        )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
+        # 4. social_id로 못 찾았으면 email로 한 번 더 확인 — 이미 이메일로
+        # 가입한 유저면 새 계정을 만들지 않고 그 계정에 카카오 연동만 해준다.
+        # (이메일 미동의 유저는 f"{kakao_id}@kakao.com" 가짜 이메일이라 겹칠 일 없음)
+        email_result = await db.execute(select(User).where(User.email == email))
+        existing_user = email_result.scalar_one_or_none()
 
-    # 5. JWT 발급
+        if existing_user:
+            existing_user.social_id = kakao_id
+            existing_user.updated_at = datetime.now(timezone.utc)
+            user = existing_user
+            await db.commit()
+            await db.refresh(user)
+        else:
+            # 5. 이메일로도 없으면 진짜 신규 유저
+            is_new_user = True
+            user = User(
+                id=uuid.uuid4(),
+                email=email,
+                password_hash=None,
+                nickname=nickname,
+                auth_provider="kakao",
+                social_id=kakao_id,
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+
+    # 6. JWT 발급
     access_token = create_access_token(str(user.id))
     refresh_token = create_refresh_token(str(user.id))
 
-    # 6. refresh_token DB에 저장
+    # 7. refresh_token DB에 저장
     user.refresh_token = refresh_token
     user.updated_at = datetime.now(timezone.utc)
     await db.commit()
