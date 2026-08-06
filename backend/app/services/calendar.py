@@ -134,9 +134,11 @@ async def get_timeline(
             and place.left_at
             and place.arrived_at <= p.taken_at <= place.left_at
         ]
+
+        # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
         photo_urls = []
-        for photo in place_photos:
-            url = await get_presigned_url(photo.storage_key)
+        if place_photos:
+            url = await get_presigned_url(place_photos[0].storage_key)
             photo_urls.append(url)
 
         place_list.append(
