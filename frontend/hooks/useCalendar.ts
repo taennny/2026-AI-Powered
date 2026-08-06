@@ -1,9 +1,6 @@
-/**
- * @file hooks/useCalendar.ts
- * @description 캘린더 데이터 및 타임라인 fetch 로직
- */
+import {useState, useEffect, useCallback} from 'react';
+import {AppState} from 'react-native';
 
-import {useState, useEffect} from 'react';
 import {
   fetchCalendarMonth,
   fetchTimeline,
@@ -11,7 +8,7 @@ import {
   type TimelinePlace,
 } from '@/services/calendarApi';
 import {useTimelineStore} from '@/store/timelineStore';
-import {toDateKey} from '@/utils/formatDate';
+import {toKstDateKey} from '@/utils/formatDate';
 
 export function useCalendar() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -23,15 +20,17 @@ export function useCalendar() {
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const [places, setPlaces] = useState<TimelinePlace[]>([]);
   const setTimeline = useTimelineStore(s => s.setTimeline);
+  const refreshKey = useTimelineStore(s => s.refreshKey);
 
-  useEffect(() => {
+  const loadCalendar = useCallback(() => {
     fetchCalendarMonth(viewDate.getFullYear(), viewDate.getMonth() + 1)
       .then(data => setCalendarDays(data.days))
       .catch(() => setCalendarDays([]));
   }, [viewDate]);
 
-  useEffect(() => {
-    fetchTimeline(toDateKey(selectedDate))
+  const loadTimeline = useCallback(() => {
+    // 조회 키는 KST — analyze가 target_date를 KST 날짜로 기록한다
+    fetchTimeline(toKstDateKey(selectedDate))
       .then(data => {
         setPlaces(data.places);
         setTimeline(data.places.length);
@@ -41,6 +40,26 @@ export function useCalendar() {
         setTimeline(0);
       });
   }, [selectedDate, setTimeline]);
+
+  useEffect(() => {
+    loadCalendar();
+  }, [loadCalendar, refreshKey]);
+
+  useEffect(() => {
+    loadTimeline();
+  }, [loadTimeline, refreshKey]);
+
+  // 백그라운드 복귀 시 그사이 쌓인 기록 반영 (재마운트가 없어 위 effect는 안 돈다)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        loadCalendar();
+        loadTimeline();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [loadCalendar, loadTimeline]);
 
   return {
     selectedDate,

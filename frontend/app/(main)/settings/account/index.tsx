@@ -10,6 +10,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 
+import {KAKAO_APP_REDIRECT, KAKAO_LINK_URL} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
 import {fetchMe, deleteAccount, type UserMe} from '@/services/authApi';
 
@@ -58,40 +59,32 @@ export default function AccountScreen() {
 
   const handleKakaoLink = async () => {
     try {
-      await WebBrowser.openAuthSessionAsync(
-        'https://api.roame.com/auth/kakao/link?source=account-link',
-        'roameapp://kakao-login',
-      );
+      await WebBrowser.openAuthSessionAsync(KAKAO_LINK_URL, KAKAO_APP_REDIRECT);
     } catch (error) {
       console.log('kakao link error', error);
+      Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
     }
   };
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-      {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Text className="text-2xl font-normal text-muted">{'<'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 타이틀 */}
       <View className="px-6 pb-4">
         <Text className="text-[36px] font-extrabold text-primary">계정</Text>
       </View>
 
-      {/* 콘텐츠 */}
       <View className="flex-1">
-        {/* 세로 장식선 */}
         <View
           className="absolute top-10 bottom-[50px] w-[0.7px] bg-primary"
           style={{left: '70%'}}
         />
 
-        {/* 상단 콘텐츠 */}
         <View className="px-6 pt-7 gap-y-8">
-          {/* 이메일 + 비밀번호 재설정 */}
           <View className="gap-y-3">
             {loading ? (
               <ActivityIndicator size="small" />
@@ -108,7 +101,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* SNS 연동 상태 */}
           <View className="gap-y-[14px]">
             <Text className="text-[13px] text-tertiary">SNS 연동 상태</Text>
             {loading ? (
@@ -137,7 +129,6 @@ export default function AccountScreen() {
           </View>
         </View>
 
-        {/* 하단 버튼 */}
         <View className="absolute bottom-20 left-6 gap-y-2">
           <TouchableOpacity onPress={handleLogout} activeOpacity={0.6}>
             <Text className="text-[15px] text-primary">로그아웃</Text>

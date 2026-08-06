@@ -1,5 +1,3 @@
-/** @file components/home/HomeHeader.tsx — 홈 상단 헤더 (설정 버튼) */
-
 import {View, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';

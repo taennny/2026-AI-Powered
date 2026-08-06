@@ -1,11 +1,6 @@
-/**
- * @file components/bottomsheet/PostCard.tsx — 바텀시트 타임라인 장소 카드
- *
- * ## 다음 연결 작업
- * - [ ] 카드 탭 시 journal-detail 화면으로 이동
- */
+/** 탭 동작 미정 — 눌리는 반응만 나고 아무 일도 안 일어나지 않도록 View로 둔다 */
 
-import {View, Text, Image, TouchableOpacity} from 'react-native';
+import {View, Text, Image} from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {formatTimeFromISO} from '@/utils/formatDate';
@@ -20,8 +15,7 @@ export default function PostCard({data}: Props) {
   const firstPhoto = photos?.[0];
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <View
       className="bg-card rounded-[14px] px-4 py-[14px] mb-[10px] flex-row justify-between items-center"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
@@ -36,6 +30,6 @@ export default function PostCard({data}: Props) {
           className="w-[60px] h-[60px] rounded-[10px] ml-3"
         />
       )}
-    </TouchableOpacity>
+    </View>
   );
 }

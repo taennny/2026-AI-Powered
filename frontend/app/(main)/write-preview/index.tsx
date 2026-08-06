@@ -1,12 +1,7 @@
-/**
- * @file app/(main)/write-preview/index.tsx
- * @description 글쓰기 미리보기/저장 화면
- */
-
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
   Text,
   TextInput,
@@ -14,31 +9,51 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
-import {updateBlog} from '@/services/blogApi';
-import {uploadPhoto} from '@/services/journalApi';
+import {fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 export default function WritePreviewScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {blogId, title, content, imageUris} = useLocalSearchParams<{
+  const {blogId, title, content} = useLocalSearchParams<{
     blogId?: string;
     title?: string;
     content?: string;
-    imageUris?: string;
   }>();
-
-  const parsedImageUris = imageUris ? JSON.parse(imageUris) : [];
 
   const [journalTitle, setJournalTitle] = useState(title || '');
   const [journalContent, setJournalContent] = useState(content || '');
-  const [selectedImageUris, setSelectedImageUris] =
-    useState<string[]>(parsedImageUris);
   const [isSaving, setIsSaving] = useState(false);
+
+  const needsFetch = !!blogId && !title;
+  const [isLoading, setIsLoading] = useState(needsFetch);
+
+  useEffect(() => {
+    if (!needsFetch || !blogId) return;
+
+    let isActive = true;
+
+    fetchBlogDetail(blogId)
+      .then(detail => {
+        if (!isActive) return;
+        setJournalTitle(detail.title);
+        setJournalContent(detail.content);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        Alert.alert('오류', '글을 불러오지 못했습니다.');
+      })
+      .finally(() => {
+        if (isActive) setIsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [blogId, needsFetch]);
 
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
@@ -49,32 +64,9 @@ export default function WritePreviewScreen() {
       {
         text: '취소',
         style: 'destructive',
-        onPress: () => router.replace('/(main)/(tabs)/home'),
+        onPress: () => router.replace('/(main)/(tabs)/journal-list'),
       },
     ]);
-  };
-
-  const handleImageAddPress = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-      allowsMultipleSelection: true,
-    });
-
-    if (!result.canceled) {
-      const newImageUris = result.assets.map(asset => asset.uri);
-
-      setSelectedImageUris(prevImageUris => [
-        ...prevImageUris,
-        ...newImageUris,
-      ]);
-    }
-  };
-
-  const handleImageDeletePress = (targetImageUri: string) => {
-    setSelectedImageUris(prevImageUris =>
-      prevImageUris.filter(imageUri => imageUri !== targetImageUri),
-    );
   };
 
   const handleSavePress = async () => {
@@ -91,25 +83,17 @@ export default function WritePreviewScreen() {
     try {
       setIsSaving(true);
 
-      const uploadedPhotoUrls = await Promise.all(
-        selectedImageUris.map(async imageUri => {
-          if (imageUri.startsWith('http')) {
-            return imageUri;
-          }
-
-          const uploaded = await uploadPhoto(imageUri);
-          return uploaded.photo_url;
-        }),
-      );
-
       await updateBlog(blogId, {
-        title: journalTitle,
-        content: journalContent,
-        photoUrls: uploadedPhotoUrls,
+        title: journalTitle.trim(),
+        content: journalContent.trim(),
       });
 
       Alert.alert('완료', '글이 저장되었습니다.', [
-        {text: '확인', onPress: () => router.replace('/(main)/(tabs)/home')},
+        {
+          text: '확인',
+          onPress: () =>
+            router.replace('/(main)/(tabs)/journal-list'),
+        },
       ]);
     } catch {
       Alert.alert('오류', '저장에 실패했습니다. 다시 시도해주세요.');
@@ -117,6 +101,14 @@ export default function WritePreviewScreen() {
       setIsSaving(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <SafeAreaView className="flex-1 bg-surface justify-center items-center">
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
@@ -155,30 +147,6 @@ export default function WritePreviewScreen() {
           placeholderTextColor={tc.tertiary}
           textAlign="center"
         />
-
-        <TouchableOpacity
-          className="w-full h-[210px] bg-teal-bg justify-center items-center mb-5"
-          onPress={handleImageAddPress}
-        >
-          <Text className="text-sm text-tertiary">사진 추가</Text>
-        </TouchableOpacity>
-
-        {selectedImageUris.map(imageUri => (
-          <View key={imageUri} className="w-full mb-5">
-            <Image
-              source={{uri: imageUri}}
-              className="w-full h-[250px]"
-              resizeMode="cover"
-            />
-
-            <TouchableOpacity
-              className="mt-2 self-center"
-              onPress={() => handleImageDeletePress(imageUri)}
-            >
-              <Text className="text-xs text-tertiary">사진 삭제</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
 
         <TextInput
           className="text-sm text-primary leading-[22px]"

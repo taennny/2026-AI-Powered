@@ -1,13 +1,16 @@
 import {useMemo, useState} from 'react';
 import {Text, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback} from 'react-native';
 import {useRouter} from 'expo-router';
+
 import {signup} from '@/services/authApi';
+import BackButton from '@/components/common/BackButton';
 
 export default function SignupScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const [isServiceTermsChecked, setIsServiceTermsChecked] = useState(false);
@@ -24,11 +27,12 @@ export default function SignupScreen() {
     return (
       email.includes('@') &&
       password.length >= 8 &&
+      nickname.trim().length > 0 &&
       isServiceTermsChecked &&
       isPrivacyPolicyChecked &&
       isAgeConfirmed
     );
-  }, [email, password, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
+  }, [email, password, nickname, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
 
   const handleEmailChange = (text: string) => {
     setEmail(text);
@@ -38,7 +42,7 @@ export default function SignupScreen() {
       return;
     }
     if (text.includes('@')) {
-      setEmailGuideMessage('사용 가능한 아이디입니다.');
+      setEmailGuideMessage('사용 가능한 이메일입니다.');
       setEmailGuideColor('#4EF5F9');
       return;
     }
@@ -70,17 +74,17 @@ export default function SignupScreen() {
       setEmailGuideMessage('');
       setPasswordGuideMessage('');
 
-      await signup({email, password});
+      await signup({email, password, nickname: nickname.trim()});
 
       router.replace('/(auth)/login');
     } catch (error: any) {
       const status = error?.response?.status;
 
-      if (status === 400) {
+      if (status === 400 || status === 422) {
         setPasswordGuideMessage('이메일 형식 또는 비밀번호 조건을 확인해주세요.');
         setPasswordGuideColor('#FF3B30');
       } else if (status === 409) {
-        setEmailGuideMessage('중복된 아이디입니다.');
+        setEmailGuideMessage('중복된 이메일입니다.');
         setEmailGuideColor('#FF3B30');
       } else {
         setEmailGuideMessage('회원가입 중 오류가 발생했습니다.');
@@ -98,6 +102,7 @@ export default function SignupScreen() {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
     <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
+      <BackButton />
       <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
         Roa{'\n'}me
       </Text>
@@ -141,6 +146,19 @@ export default function SignupScreen() {
         </Text>
       </View>
 
+      <View className="mb-[10px]">
+        <View className="flex-row items-center justify-between mb-[6px]">
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">닉네임</Text>
+        </View>
+        <TextInput
+          value={nickname}
+          onChangeText={setNickname}
+          placeholder="닉네임을 입력해주세요."
+          placeholderTextColor="#CCCCCC"
+          autoCapitalize="none"
+          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
+        />
+      </View>
       <View className="mt-[18px] mb-[20px]">
         <TouchableOpacity
           activeOpacity={0.8}

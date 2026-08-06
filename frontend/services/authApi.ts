@@ -1,14 +1,10 @@
-/**
- * @file services/authApi.ts
- * @description 인증 관련 API
- */
-
 import {api} from '@/utils/api';
-import {saveTokens, saveAccessToken, getRefreshToken} from '@/utils/tokenStorage';
+import {saveTokens} from '@/utils/tokenStorage';
 
 export interface SignupRequest {
   email: string;
   password: string;
+  nickname: string;
 }
 
 export interface LoginRequest {
@@ -22,13 +18,12 @@ export interface LoginResponse {
   token_type: string;
 }
 
-export interface RefreshResponse {
-  access_token: string;
-  token_type: string;
-}
-
-export async function signup({email, password}: SignupRequest) {
-  const response = await api.post('/api/v1/auth/register', {email, password});
+export async function signup({email, password, nickname}: SignupRequest) {
+  const response = await api.post('/api/v1/auth/register', {
+    email,
+    password,
+    nickname,
+  });
   return response.data;
 }
 
@@ -39,15 +34,8 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   return response.data;
 }
 
-export async function refreshAccessToken(): Promise<RefreshResponse> {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) {
-    throw new Error('refresh token 없음');
-  }
-  const response = await api.post('/api/v1/auth/refresh', {refresh_token: refreshToken});
-  await saveAccessToken(response.data.access_token);
-  return response.data;
-}
+// 토큰 재발급은 utils/api.ts의 응답 인터셉터가 401을 받아 알아서 처리한다.
+// 여기에 같은 로직을 또 두면 재발급 경로가 둘로 갈라진다.
 
 export async function sendResetEmail(email: string) {
   const response = await api.post('/api/v1/auth/password-reset/request', {email});

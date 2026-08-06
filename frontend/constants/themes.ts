@@ -2,6 +2,12 @@ import {vars} from 'nativewind';
 
 export type ThemeId = 'basic' | 'dark' | 'strawberry' | 'aqua';
 
+/** 프리미엄 전용 테마 — 구독이 끊기면 basic으로 되돌린다 (subscriptionStore) */
+export const PREMIUM_THEMES: ThemeId[] = ['strawberry', 'aqua'];
+
+/** 구독이 없을 때 강제되는 테마 */
+export const DEFAULT_THEME: ThemeId = 'basic';
+
 export type ThemeColors = {
   tealBg: string;
   teal: string;

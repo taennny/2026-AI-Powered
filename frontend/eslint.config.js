@@ -59,5 +59,23 @@ export default [
     },
   },
 
+  // 구독 상태는 서버가 단일 출처다. 화면이 setState로 plan을 직접 바꾸면
+  // 결제 검증이 실패했을 때 유료 기능이 열린 채로 남는다.
+  // 갱신은 subscriptionStore.refresh()만 할 수 있다.
+  {
+    files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "hooks/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.object.name='useSubscriptionStore'][callee.property.name='setState']",
+          message:
+            "구독 상태를 직접 쓰지 마세요. 서버 응답으로만 갱신됩니다 — useSubscriptionStore.getState().refresh()를 쓰세요.",
+        },
+      ],
+    },
+  },
+
   prettier,
 ];
