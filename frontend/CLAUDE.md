@@ -98,7 +98,11 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 `POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
 `POST /api/v1/webhooks/revenuecat`(결제 웹훅 — 앱이 부르는 게 아니라 RevenueCat이 부릅니다).
 
-응답에서 읽고 있으나 화면에 아직 안 쓰는 필드: `billing_cycle`(월/연 선택 UI 없음).
+응답에서 읽고 있으나 아직 서버로 안 보내는 값: `billing_cycle`
+(월/연 선택 UI는 `FreeView`에 있으나 고른 값이 `subscribePremium()`까지 전달되지 않습니다).
+
+외부 링크: 문의하기는 카카오 오픈채팅(`settings/index.tsx`의 `SUPPORT_CHAT_URL`)으로,
+`Linking.openURL` 전에 확인 다이얼로그를 띄웁니다.
 
 ### 스타일링
 
@@ -214,8 +218,19 @@ RevenueCat이 검증한 뒤 백엔드로 웹훅을 보냅니다.
 (이메일 / 카카오 버튼 / 카카오 딥링크)이라 `(main)/_layout`에서 인증 상태로 한 번만 부릅니다.
 
 > **SDK는 아직 설치 전입니다.** App Store Connect에 상품을 등록해야 하고, 그러려면
-> Apple Developer Program($99/년)이 필요합니다. `services/purchases.ts`의
-> `TODO(결제)` 주석 두 줄이 SDK 호출 자리입니다 — 계정이 준비되면 거기만 채우면 됩니다.
+> Apple Developer Program($99/년)이 필요합니다.
+
+계정이 준비되면 할 일 (SDK 호출 한 줄이 아닙니다):
+
+| | 내용 |
+|---|---|
+| 상품 등록 | App Store Connect에 월간·연간 두 개 |
+| SDK 설치 | `react-native-purchases` (네이티브 → 재빌드) |
+| `purchases.ts` | `TODO(결제)` 자리에 `Purchases.logIn` / `logOut` |
+| `FreeView` | 월/연 선택 UI는 이미 있으나 **고른 값이 밖으로 안 나갑니다**(`onSubscribe: () => void`). `onSubscribe(cycle)`로 넘겨야 합니다 |
+| 가격 표시 | 지금은 `₩7,500` 하드코딩. `getOfferings()`가 주는 실제 가격으로 — 지역·환율에 따라 달라집니다 |
+| 결제 호출 | `Purchases.purchasePackage()` → 성공 시 `refreshUntilChanged(false)` |
+| 해지 경로 | 지금은 우리 서버에 `PUT`. 실제 구독은 앱스토어에 있으므로 구독 관리 화면(`itms-apps://apps.apple.com/account/subscriptions`)으로 보내야 합니다 |
 
 ### BottomSheet
 
@@ -409,16 +424,16 @@ npx jest gpsTask      # 파일 하나
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| **인앱결제** | `settings/subscription` | 배선은 끝났습니다(`services/purchases.ts`, `will_renew`, 재조회 재시도). **Apple Developer Program($99/년)이 있어야** App Store Connect에 상품을 등록하고 SDK 호출을 켤 수 있습니다. `purchases.ts`의 `TODO(결제)` 주석 두 줄이 그 자리입니다 |
-| 인앱결제 후 해지 경로 변경 | `settings/subscription` | 지금은 우리 서버에 `PUT`을 쏩니다. 실제 구독은 앱스토어에 있으므로 결제를 붙이면 구독 관리 화면(`itms-apps://apps.apple.com/account/subscriptions`)으로 보내야 합니다 |
+| **인앱결제** | `settings/subscription` | 배선(사용자 식별·`will_renew`·재조회 재시도)은 끝났습니다. 남은 작업은 위 "결제" 섹션의 표 참고. **Apple Developer Program($99/년)이 전제입니다** |
+| `billing_cycle` 미전달 | `FreeView` → `subscriptionApi` | 월/연 선택 UI는 있는데 고른 값이 서버로 안 갑니다. 인앱결제 작업 때 함께 |
 | **모아쓰기(여러 날 묶어쓰기)** | 캘린더 + `write` | 캘린더 다중 선택 → "N일 선택됨 · 글쓰기". **요청 형식이 백엔드·AI와 협의 중**이라 대기 중입니다 (배열/범위, 개수 제한, 빈 날짜 처리, 횟수 차감 규칙) |
 | 리포트 | — | 와이어프레임 대기 |
 | 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
 | 사진 모아보기 | `settings/records` | 다른 담당자 구현 중. 설정 > 기록 화면에 붙일 자리를 만들어 뒀습니다 |
+| 개인정보처리방침 | `settings/index.tsx` | 링크가 비어 있습니다. **앱스토어 심사 필수** — 문서를 쓰고 공개 URL(Notion 게시 등)을 만들어야 합니다. 위치 상시 수집·사진 업로드가 있어 수집 항목을 꼼꼼히 적어야 합니다 |
 | 남은 생성 횟수 표시 | 글쓰기 | 지금은 429가 떠야만 `used/limit`을 알 수 있습니다. `GET /subscriptions/me`에 넣어주면 "이번 주 1/3" 안내가 가능합니다 |
 | 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:105` | 백엔드가 `isNewUser`를 주는데 프론트가 무시해서 `카카오유저1234`로 남습니다. 정보 입력 화면을 만들지 기획 판단 필요 |
 | PostCard 탭 동작 미정 | `PostCard.tsx` | `TimelinePlace`에 `blogId`가 없어 저널로 못 보냅니다. 사진 뷰어 / 장소 상세 / 장소명 수정 중 결정 필요 |
-| `billing_cycle` 미사용 | `services/subscriptionApi.ts` | 월/연 선택 UI가 없어 안 보냅니다 |
 | 구독 만료 시 안내 없음 | `subscriptionStore` | 테마는 basic으로 되돌리지만 사용자에게 알리지 않습니다 |
 | 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글 |
 

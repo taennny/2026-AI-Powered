@@ -1,6 +1,9 @@
-import {View, Text, TouchableOpacity} from 'react-native';
+import {View, Text, TouchableOpacity, Alert, Linking} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
+
+/** 문의 채널 — 카카오 오픈채팅 */
+const SUPPORT_CHAT_URL = 'https://open.kakao.com/o/sCvGYyHi';
 
 const MENU_ITEMS = [
   {label: '계정', route: '/(main)/settings/account'},
@@ -11,6 +14,23 @@ const MENU_ITEMS = [
 ] as const;
 
 export default function SettingsScreen() {
+  /** 앱 밖으로 나가는 동작이라 먼저 알린다 */
+  const handleSupport = () => {
+    Alert.alert('문의하기', '카카오 오픈채팅으로 이동할까요?', [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '이동',
+        onPress: async () => {
+          try {
+            await Linking.openURL(SUPPORT_CHAT_URL);
+          } catch {
+            Alert.alert('오류', '채팅방을 열지 못했어요. 다시 시도해주세요.');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
       <View className="flex-row items-center px-5 py-3">
@@ -51,7 +71,7 @@ export default function SettingsScreen() {
           <TouchableOpacity activeOpacity={0.6}>
             <Text className="text-sm text-primary">개인정보처리방침</Text>
           </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.6}>
+          <TouchableOpacity activeOpacity={0.6} onPress={handleSupport}>
             <Text className="text-sm text-primary">문의하기</Text>
           </TouchableOpacity>
         </View>

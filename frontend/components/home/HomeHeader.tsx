@@ -21,10 +21,18 @@ function TrackingOffNotice() {
     <TouchableOpacity
       onPress={() => router.push('/(main)/settings/records')}
       activeOpacity={0.6}
-      className="flex-row items-center gap-x-[5px] p-1"
+      className="flex-row items-center gap-x-[9px] py-1"
     >
-      <View className="w-[5px] h-[5px] rounded-full bg-teal-dark" />
-      <Text className="text-[12px] text-tertiary">위치 기록 꺼짐</Text>
+      {/* 바텀시트 드래그 핸들과 같은 결의 세로 바 */}
+      <View className="w-[2.5px] h-[26px] rounded-full bg-teal-dark" />
+      <View>
+        <Text className="text-[12px] leading-[15px] text-secondary">
+          위치 기록이 꺼져 있어요
+        </Text>
+        <Text className="text-[10px] leading-[13px] text-tertiary">
+          설정 &gt; 기록 &gt; 위치 기록
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }

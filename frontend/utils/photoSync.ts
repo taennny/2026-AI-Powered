@@ -20,8 +20,6 @@ import type * as MediaLibraryTypes from 'expo-media-library';
 import {uploadPhoto} from '@/services/photoApi';
 import {DAY_BOUNDARY_HOUR} from '@/utils/formatDate';
 
-type Asset = MediaLibraryTypes.Asset;
-
 /**
  * 네이티브 모듈은 **함수 안에서 늦게** 가져온다.
  *
@@ -104,11 +102,23 @@ function logicalDayRange(dateKey: string): {start: Date; end: Date} | null {
 }
 
 /**
- * 스크린샷·다운로드 이미지는 EXIF가 없어서 서버가 업로드 시각으로 저장한다.
- * 그러면 "지금 있는 장소"에 엉뚱하게 붙으므로 아예 올리지 않는다.
+ * EXIF에 촬영 시각이 있는지. **이게 없으면 올리지 않는다.**
+ *
+ * 서버는 `taken_at`을 EXIF의 `DateTimeOriginal`로만 정하고, 없으면 업로드
+ * 시각으로 저장한다. 그러면 "지금 있는 장소"에 엉뚱하게 붙는다.
+ * 스크린샷·저장한 이미지·받은 사진이 전부 여기 해당한다
+ * (실기기 테스트에서 지도 공유로 저장한 이미지가 카드에 뜬 적이 있다).
+ *
+ * 종류별로 예외를 늘리는 대신 "촬영 시각을 아는 사진만"으로 한 번에 거른다.
+ *
+ * EXIF 구조는 플랫폼마다 달라서 평탄한 형태와 중첩된 형태를 모두 본다.
  */
-function isCameraShot(asset: Asset): boolean {
-  return !asset.mediaSubtypes?.includes('screenshot');
+function hasCaptureTime(info: MediaLibraryTypes.AssetInfo): boolean {
+  const exif = info.exif as Record<string, unknown> | undefined;
+  if (!exif) return false;
+
+  const nested = exif.Exif as Record<string, unknown> | undefined;
+  return Boolean(exif.DateTimeOriginal ?? nested?.DateTimeOriginal);
 }
 
 /**
@@ -170,18 +180,26 @@ export async function syncPhotosForDate(
     if (uploadedIds === null) return 0;
 
     const targets = assets
-      .filter(isCameraShot)
       .filter(a => !uploadedIds.has(a.id))
       .slice(0, MAX_PER_RUN);
 
     if (targets.length === 0) return 0;
 
+    const knownBefore = uploadedIds.size;
     let uploaded = 0;
     for (const asset of targets) {
       try {
         // iOS의 asset.uri는 ph:// 스킴이라 그대로 업로드할 수 없다.
-        // getAssetInfoAsync가 실제 파일 경로(localUri)를 준다.
+        // getAssetInfoAsync가 실제 파일 경로(localUri)와 EXIF를 준다.
         const info = await MediaLibrary.getAssetInfoAsync(asset);
+
+        if (!hasCaptureTime(info)) {
+          // 촬영 시각을 모르는 사진은 올려봤자 엉뚱한 장소에 붙는다.
+          // 다음 회차에 또 검사하지 않도록 올린 것으로 기록해 둔다
+          uploadedIds.add(asset.id);
+          continue;
+        }
+
         const uri = info.localUri ?? asset.uri;
 
         await uploadPhoto(uri, asset.filename);
@@ -193,7 +211,9 @@ export async function syncPhotosForDate(
       }
     }
 
-    if (uploaded > 0) await writeUploadedIds(uploadedIds);
+    // 올린 것뿐 아니라 "촬영 시각이 없어 건너뛴 것"도 기록됐다.
+    // 저장하지 않으면 다음 회차에 같은 사진의 EXIF를 또 읽는다
+    if (uploadedIds.size > knownBefore) await writeUploadedIds(uploadedIds);
     return uploaded;
   } catch {
     // 조회 자체가 실패하면 간격을 소진시키지 않고 다음 기회에 재시도한다
