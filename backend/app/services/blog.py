@@ -1,11 +1,12 @@
 import uuid
 import logging
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from app.config import settings
 from app.database import async_session
 from app.models.blog import Blog
 from app.models.daily_record import DailyRecord
@@ -13,7 +14,9 @@ from app.models.enums import GenerationStatus
 from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
+from app.services.subscription import get_user_subscription
 from app.services.timeline_serializer import build_timeline_data, map_style
+from app.utils.timezone import week_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,40 @@ class BlogConflictError(Exception):
 
 class BlogStateError(Exception):
     """상태 전이 오류 (400)"""
+
+
+class QuotaExceededError(Exception):
+    """주간 생성 한도 초과 (429)"""
+
+    def __init__(self, limit: int, used: int, reset_at: datetime):
+        super().__init__("이번 주 생성 횟수를 모두 사용했습니다")
+        self.limit = limit
+        self.used = used
+        self.reset_at = reset_at
+
+
+async def get_weekly_usage(
+    db: AsyncSession, user_id: uuid.UUID
+) -> tuple[int, datetime]:
+    """이번 주 생성 사용 횟수와 다음 리셋 시각(UTC aware) 반환.
+
+    실패(FAILED) 건은 세지 않으므로 "생성 실패 시 횟수 복구"가 별도 로직 없이 성립한다.
+    취소 기능은 아직 없지만, 나중에 취소를 FAILED로 기록하면 같은 원리로 복구된다.
+    """
+    start, end = week_bounds()
+    used = (
+        await db.execute(
+            select(func.count())
+            .select_from(Blog)
+            .where(
+                Blog.user_id == user_id,
+                Blog.created_at >= start,
+                Blog.created_at < end,
+                Blog.generation_status != GenerationStatus.FAILED,
+            )
+        )
+    ).scalar_one()
+    return used, end
 
 
 async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
@@ -67,6 +104,15 @@ async def create_blog_generation(
     daily_record = result.scalar_one_or_none()
     if not daily_record:
         raise ValueError("해당 하루 기록을 찾을 수 없습니다")
+
+    # 무료 사용자 주간 한도 검사 (프리미엄은 무제한)
+    subscription = await get_user_subscription(db, user_id)
+    if subscription.plan_type != "premium":
+        used, reset_at = await get_weekly_usage(db, user_id)
+        if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
+            raise QuotaExceededError(
+                limit=settings.FREE_WEEKLY_BLOG_LIMIT, used=used, reset_at=reset_at
+            )
 
     # 같은 하루 기록으로 생성이 진행 중이면 중복 요청 거절 (완료/실패 건은 허용)
     in_progress = (

@@ -19,6 +19,7 @@ from app.schemas.blog import (
 from app.services.blog import (
     BlogConflictError,
     BlogStateError,
+    QuotaExceededError,
     create_blog_generation,
     get_blog_by_id,
     get_blog_list,
@@ -27,6 +28,7 @@ from app.services.blog import (
     update_blog,
 )
 from app.utils.dependencies import get_current_user
+from app.utils.timezone import KST
 
 router = APIRouter(tags=["blog"])
 
@@ -70,6 +72,17 @@ async def generate_blog(
     try:
         blog = await create_blog_generation(
             db, current_user.id, request.daily_record_id, request.style
+        )
+    except QuotaExceededError as e:
+        # 프론트가 "다음 주 월요일부터" 안내에 바로 쓰도록 reset_at은 KST ISO 문자열
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": str(e),
+                "limit": e.limit,
+                "used": e.used,
+                "reset_at": e.reset_at.astimezone(KST).isoformat(),
+            },
         )
     except BlogConflictError as e:
         raise HTTPException(status_code=409, detail=str(e))
