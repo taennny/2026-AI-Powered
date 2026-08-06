@@ -2,6 +2,7 @@ import {useEffect} from 'react';
 import {Alert, AppState, Linking} from 'react-native';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 
 import {PERMISSION_MESSAGES} from '@/constants/permissionMessages';
 import {startGpsTracking} from '@/hooks/useGpsTracking';
@@ -80,10 +81,34 @@ export async function ensureMediaLibraryPermission(): Promise<boolean> {
   return true;
 }
 
-/** 권한이 확보되면 추적을 시작한다 — 설정에서 뒤늦게 허용한 경우도 여기서 살아난다. */
+/**
+ * 사진 라이브러리 접근을 확인한다. 타임라인 카드에 그날 찍은 사진을 자동으로
+ * 넣기 위한 것이라 사용자 조작 없이 백그라운드에서 쓰인다.
+ *
+ * 위치와는 **완전히 별개 권한**이고(iOS `NSPhotoLibraryUsageDescription`),
+ * 거부해도 앱의 나머지는 그대로 동작하므로 설정 안내를 띄우지 않는다 —
+ * 위치처럼 필수가 아닌데 알림을 쌓으면 성가시기만 하다.
+ */
+async function ensurePhotoLibraryPermission(): Promise<boolean> {
+  let permission = await MediaLibrary.getPermissionsAsync();
+  if (permission.status !== 'granted' && permission.canAskAgain) {
+    permission = await MediaLibrary.requestPermissionsAsync();
+  }
+  return permission.status === 'granted';
+}
+
+/**
+ * 권한이 확보되면 추적을 시작한다 — 설정에서 뒤늦게 허용한 경우도 여기서 살아난다.
+ *
+ * 사진 권한은 위치를 다 받은 **뒤에** 이어서 묻는다. 시스템 다이얼로그를 동시에
+ * 띄우면 뒤엣것이 무시되고, 위치가 이 앱의 본질이라 순서가 먼저다.
+ */
 async function checkLocationAndStartTracking() {
   const granted = await ensureLocationPermissions();
-  if (granted) await startGpsTracking();
+  if (!granted) return;
+
+  await startGpsTracking();
+  await ensurePhotoLibraryPermission();
 }
 
 /**

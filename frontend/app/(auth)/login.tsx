@@ -14,7 +14,7 @@ import {useRouter} from 'expo-router';
 
 import {
   buildKakaoAuthUrl,
-  KAKAO_REDIRECT_URI,
+  KAKAO_APP_REDIRECT,
   KAKAO_REST_API_KEY,
 } from '@/constants/kakao';
 import {saveTokens} from '@/utils/tokenStorage';
@@ -79,9 +79,11 @@ export default function LoginScreen() {
     }
 
     try {
+      // returnUrl은 앱 딥링크다. 백엔드 콜백을 주면 토큰이 만들어지기 전에
+      // 세션이 닫혀 code만 받게 된다 (constants/kakao.ts 참고)
       const result = await WebBrowser.openAuthSessionAsync(
         buildKakaoAuthUrl(),
-        KAKAO_REDIRECT_URI,
+        KAKAO_APP_REDIRECT,
       );
 
       if (result.type !== 'success') return;

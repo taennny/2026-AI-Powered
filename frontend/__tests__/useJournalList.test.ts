@@ -1,7 +1,7 @@
 import {act, create, type ReactTestRenderer} from 'react-test-renderer';
 import {createElement} from 'react';
 
-import {useJournalList} from '@/hooks/useJournalList';
+import {clearJournalCache, useJournalList} from '@/hooks/useJournalList';
 import {fetchBlogs} from '@/services/blogApi';
 
 jest.mock('@/services/blogApi', () => ({fetchBlogs: jest.fn()}));
@@ -54,6 +54,8 @@ describe('useJournalList', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockFetch.mockReset();
+    // 모듈 레벨 캐시라 테스트 사이에 남는다 — 앞 테스트 결과가 다음 초기 상태가 된다
+    clearJournalCache();
   });
 
   afterEach(() => {
@@ -192,5 +194,76 @@ describe('useJournalList', () => {
 
     expect(result.current.journals.map(j => j.id)).toEqual(['a', 'b']);
     expect(result.current.isLoadingMore).toBe(false);
+  });
+
+  // 탭 레이아웃이 Slot이라 홈↔저널을 오갈 때마다 이 화면이 언마운트된다.
+  // 캐시가 없으면 돌아올 때마다 스피너를 보고 기다려야 했다.
+  describe('첫 페이지 캐시', () => {
+    it('다시 마운트하면 스피너 없이 지난 목록부터 보여준다', async () => {
+      mockFetch.mockResolvedValue(page(['a', 'b'], 2));
+      const first = renderHook(() => useJournalList());
+      await flush();
+      first.unmount();
+
+      const {result} = renderHook(() => useJournalList());
+
+      // 네트워크를 기다리기 전에 이미 목록이 있다
+      expect(result.current.journals.map(j => j.id)).toEqual(['a', 'b']);
+      expect(result.current.isLoading).toBe(false);
+
+      await flush();
+    });
+
+    it('검색 결과는 캐시하지 않는다 — 검색어와 짝이 안 맞는 목록이 뜬다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const first = renderHook(() => useJournalList());
+      await flush();
+
+      mockFetch.mockResolvedValue(page(['searched'], 1));
+      act(() => first.result.current.setQuery('여행'));
+      await flush(300);
+      first.unmount();
+
+      const {result} = renderHook(() => useJournalList());
+
+      // 검색 결과가 아니라 검색 전 목록이 남아 있어야 한다
+      expect(result.current.journals.map(j => j.id)).toEqual(['a']);
+
+      await flush();
+    });
+
+    it('첫 페이지 조회에 실패하면 캐시를 지운다 — 옛 목록이 되살아나면 안 된다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const first = renderHook(() => useJournalList());
+      await flush();
+      first.unmount();
+
+      mockFetch.mockRejectedValue(new Error('network'));
+      const second = renderHook(() => useJournalList());
+      await flush();
+      second.unmount();
+
+      const {result} = renderHook(() => useJournalList());
+
+      expect(result.current.journals).toEqual([]);
+      expect(result.current.isLoading).toBe(true);
+
+      await flush();
+    });
+
+    it('clearJournalCache 후에는 처음처럼 스피너부터 보여준다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const first = renderHook(() => useJournalList());
+      await flush();
+      first.unmount();
+
+      clearJournalCache();
+      const {result} = renderHook(() => useJournalList());
+
+      expect(result.current.journals).toEqual([]);
+      expect(result.current.isLoading).toBe(true);
+
+      await flush();
+    });
   });
 });

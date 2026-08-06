@@ -1,0 +1,202 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as MediaLibrary from 'expo-media-library';
+import * as Network from 'expo-network';
+
+import {uploadPhoto} from '@/services/photoApi';
+import {
+  syncPhotosForDate,
+  clearPhotoSyncState,
+  SYNC_MIN_INTERVAL_MS,
+  __resetPhotoSync,
+} from '@/utils/photoSync';
+
+jest.mock('expo-media-library', () => ({
+  getPermissionsAsync: jest.fn(),
+  getAssetsAsync: jest.fn(),
+  getAssetInfoAsync: jest.fn(),
+}));
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(),
+  NetworkStateType: {WIFI: 'WIFI', CELLULAR: 'CELLULAR', NONE: 'NONE'},
+}));
+jest.mock('@/services/photoApi', () => ({uploadPhoto: jest.fn()}));
+
+const mockPerm = MediaLibrary.getPermissionsAsync as jest.Mock;
+const mockAssets = MediaLibrary.getAssetsAsync as jest.Mock;
+const mockInfo = MediaLibrary.getAssetInfoAsync as jest.Mock;
+const mockUpload = uploadPhoto as jest.Mock;
+const mockNet = Network.getNetworkStateAsync as jest.Mock;
+
+const asset = (
+  id: string,
+  overrides: Partial<MediaLibrary.Asset> = {},
+): MediaLibrary.Asset =>
+  ({
+    id,
+    filename: `${id}.jpg`,
+    uri: `ph://${id}`,
+    mediaSubtypes: [],
+    ...overrides,
+  }) as MediaLibrary.Asset;
+
+/** 로컬(Asia/Seoul) 8/6 13:00 */
+const NOW = new Date('2026-08-06T04:00:00.000Z').getTime();
+const TODAY = '2026-08-06';
+
+const uploadedIds = () => mockUpload.mock.calls.map(c => c[1]);
+
+describe('photoSync', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+    __resetPhotoSync();
+    mockPerm.mockReset().mockResolvedValue({status: 'granted'});
+    mockAssets.mockReset().mockResolvedValue({assets: []});
+    mockInfo.mockReset().mockImplementation(async (a: MediaLibrary.Asset) => ({
+      ...a,
+      localUri: `file:///${a.id}.jpg`,
+    }));
+    mockUpload.mockReset().mockResolvedValue({photo_id: 'p'});
+    mockNet.mockReset().mockResolvedValue({type: 'WIFI'});
+  });
+
+  it('권한이 없으면 사진을 조회하지도 않는다', async () => {
+    mockPerm.mockResolvedValue({status: 'denied'});
+
+    await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
+    expect(mockAssets).not.toHaveBeenCalled();
+  });
+
+  // 하루 경계는 자정이 아니라 기기 로컬 새벽 4시다 (utils/formatDate)
+  it('논리적 하루(새벽 4시~4시) 범위로 조회한다', async () => {
+    await syncPhotosForDate(TODAY, NOW);
+
+    const {createdAfter, createdBefore} = mockAssets.mock.calls[0][0];
+    expect(createdAfter.getHours()).toBe(4);
+    expect(createdAfter.getDate()).toBe(6);
+    expect(createdBefore.getDate()).toBe(7);
+    expect(createdBefore.getHours()).toBe(4);
+  });
+
+  // EXIF가 없어 서버가 업로드 시각으로 저장한다 — 엉뚱한 장소에 붙는다
+  it('스크린샷은 올리지 않는다', async () => {
+    mockAssets.mockResolvedValue({
+      assets: [asset('a'), asset('shot', {mediaSubtypes: ['screenshot']})],
+    });
+
+    await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+    expect(uploadedIds()).toEqual(['a.jpg']);
+  });
+
+  it('iOS의 ph:// 대신 실제 파일 경로로 올린다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+    await syncPhotosForDate(TODAY, NOW);
+
+    expect(mockUpload).toHaveBeenCalledWith('file:///a.jpg', 'a.jpg');
+  });
+
+  it('이미 올린 사진은 다시 올리지 않는다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+    await syncPhotosForDate(TODAY, NOW);
+    mockUpload.mockClear();
+
+    mockAssets.mockResolvedValue({assets: [asset('a'), asset('b')]});
+    await expect(syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS)).resolves.toBe(1);
+    expect(uploadedIds()).toEqual(['b.jpg']);
+  });
+
+  it('한 장이 실패해도 나머지는 계속 올리고, 실패한 것은 다음에 재시도한다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a'), asset('b')]});
+    mockUpload
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({photo_id: 'p'});
+
+    await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+
+    mockUpload.mockClear().mockResolvedValue({photo_id: 'p'});
+    await syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS);
+
+    expect(uploadedIds()).toEqual(['a.jpg']);
+  });
+
+  it('최소 간격 안에는 다시 돌지 않는다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+    await syncPhotosForDate(TODAY, NOW);
+    mockAssets.mockClear();
+
+    await expect(syncPhotosForDate(TODAY, NOW + 1000)).resolves.toBe(0);
+    expect(mockAssets).not.toHaveBeenCalled();
+  });
+
+  it('로그아웃하면 업로드 기록을 지운다 — 다음 계정이 물려받으면 안 된다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+    await syncPhotosForDate(TODAY, NOW);
+
+    await clearPhotoSyncState();
+
+    mockUpload.mockClear();
+    await syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS);
+    expect(uploadedIds()).toEqual(['a.jpg']);
+  });
+
+  // 사진 한 장이 3~5MB다. 하루치만 해도 수백 MB가 나갈 수 있다
+  describe('와이파이', () => {
+    it('셀룰러면 올리지 않는다', async () => {
+      mockNet.mockResolvedValue({type: 'CELLULAR'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('연결 상태를 확인하지 못하면 올리지 않는다', async () => {
+      mockNet.mockRejectedValue(new Error('unavailable'));
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('셀룰러라 건너뛴 날짜는 와이파이가 되면 바로 올린다', async () => {
+      mockNet.mockResolvedValue({type: 'CELLULAR'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      await syncPhotosForDate(TODAY, NOW);
+
+      // 간격 가드를 소진하지 않았어야 한다
+      mockNet.mockResolvedValue({type: 'WIFI'});
+      await expect(syncPhotosForDate(TODAY, NOW + 1000)).resolves.toBe(1);
+    });
+  });
+
+  describe('날짜별 처리', () => {
+    // 오늘을 올린 직후 캘린더에서 과거 날짜를 열어도 막히면 안 된다
+    it('간격 가드는 날짜마다 따로 센다', async () => {
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      await syncPhotosForDate(TODAY, NOW);
+      mockAssets.mockClear().mockResolvedValue({assets: [asset('b')]});
+
+      await expect(syncPhotosForDate('2026-07-01', NOW + 1000)).resolves.toBe(1);
+    });
+
+    it('고른 날짜의 범위로 조회한다', async () => {
+      await syncPhotosForDate('2026-07-01', NOW);
+
+      const {createdAfter, createdBefore} = mockAssets.mock.calls[0][0];
+      expect(createdAfter.getMonth()).toBe(6); // 7월
+      expect(createdAfter.getDate()).toBe(1);
+      expect(createdBefore.getDate()).toBe(2);
+    });
+
+    it('날짜 형식이 아니면 아무것도 하지 않는다', async () => {
+      await expect(syncPhotosForDate('', NOW)).resolves.toBe(0);
+      expect(mockAssets).not.toHaveBeenCalled();
+    });
+  });
+
+  // 200장 상한에 걸리면 늦게 찍은 것이 잘린다 — 카드에는 도착 직후 사진이 어울린다
+  it('오래된 사진부터 훑는다', async () => {
+    await syncPhotosForDate(TODAY, NOW);
+
+    expect(mockAssets.mock.calls[0][0].sortBy).toEqual([['creationTime', true]]);
+  });
+});

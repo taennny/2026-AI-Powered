@@ -3,43 +3,80 @@ import {
   formatDateStr,
   formatTimeAgo,
   formatTimeFromISO,
+  logicalToday,
   toDateKey,
-  toKstDateKey,
+  toLogicalDateKey,
 } from '@/utils/formatDate';
 
 // tz는 jest.setup.js에서 Asia/Seoul로 고정한다.
+// 해외 지원을 검증하려면 그 값을 바꿔 돌려볼 것.
 
-describe('toKstDateKey', () => {
-  it('UTC 시각을 KST 날짜로 변환한다', () => {
-    expect(toKstDateKey(new Date('2026-08-05T04:00:00.000Z'))).toBe(
-      '2026-08-05',
-    );
+describe('toLogicalDateKey — 하루 경계는 새벽 4시', () => {
+  /** 기기 로컬(KST) 시각으로 Date를 만든다 */
+  const at = (iso: string) => new Date(`${iso}+09:00`);
+
+  it('낮 시간은 그날 그대로다', () => {
+    expect(toLogicalDateKey(at('2026-08-05T14:00:00'))).toBe('2026-08-05');
   });
 
-  it('KST 자정을 막 넘긴 UTC 시각은 다음 날로 넘어간다', () => {
-    // 15:00Z = KST 익일 00:00
-    expect(toKstDateKey(new Date('2026-08-05T14:59:59.999Z'))).toBe(
+  it('자정을 넘겨도 새벽 4시 전이면 아직 전날이다', () => {
+    expect(toLogicalDateKey(at('2026-08-06T00:00:00'))).toBe('2026-08-05');
+    expect(toLogicalDateKey(at('2026-08-06T03:59:59'))).toBe('2026-08-05');
+  });
+
+  it('새벽 4시가 되면 새 날이 시작된다', () => {
+    expect(toLogicalDateKey(at('2026-08-06T04:00:00'))).toBe('2026-08-06');
+  });
+
+  it('월·연 경계도 4시 기준으로 넘어간다', () => {
+    expect(toLogicalDateKey(at('2026-09-01T03:00:00'))).toBe('2026-08-31');
+    expect(toLogicalDateKey(at('2027-01-01T03:00:00'))).toBe('2026-12-31');
+    expect(toLogicalDateKey(at('2027-01-01T04:00:00'))).toBe('2027-01-01');
+  });
+
+  it('UTC 문자열도 기기 로컬로 해석한다', () => {
+    // 19:00Z = KST 익일 04:00 → 새 날
+    expect(toLogicalDateKey(new Date('2026-08-05T18:59:59Z'))).toBe(
       '2026-08-05',
     );
-    expect(toKstDateKey(new Date('2026-08-05T15:00:00.000Z'))).toBe(
+    expect(toLogicalDateKey(new Date('2026-08-05T19:00:00Z'))).toBe(
       '2026-08-06',
     );
   });
+});
 
-  it('월·연 경계를 넘긴다', () => {
-    expect(toKstDateKey(new Date('2026-08-31T15:00:00.000Z'))).toBe(
-      '2026-09-01',
-    );
-    expect(toKstDateKey(new Date('2026-12-31T15:00:00.000Z'))).toBe(
-      '2027-01-01',
-    );
+describe('toDateKey — 달력 날짜는 보정하지 않는다', () => {
+  it('사용자가 고른 날짜를 그대로 쓴다', () => {
+    // 캘린더가 주는 값은 그 날짜의 로컬 자정이다.
+    // 여기에 4시간을 빼면 하루 전으로 밀려버린다 — 그러면 안 된다.
+    const picked = new Date(2026, 7, 5);
+
+    expect(toDateKey(picked)).toBe('2026-08-05');
+    expect(toLogicalDateKey(picked)).toBe('2026-08-04');
+  });
+});
+
+describe('logicalToday', () => {
+  afterEach(() => jest.useRealTimers());
+
+  it('새벽 4시 전에는 어제를 가리킨다', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-06T02:00:00+09:00'));
+
+    expect(toDateKey(logicalToday())).toBe('2026-08-05');
   });
 
-  it('기기 tz와 무관하게 항상 KST 기준이다', () => {
-    // toDateKey는 기기 로컬 기준이라 tz가 KST인 지금은 둘이 일치한다.
-    // 해외 tz로 넘어가면 이 둘이 갈라지고, 그때 서버로 보내는 키는 toKstDateKey여야 한다.
-    const d = new Date('2026-08-05T04:00:00.000Z');
-    expect(toKstDateKey(d)).toBe(toDateKey(d));
+  it('새벽 4시 이후에는 오늘을 가리킨다', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-06T04:30:00+09:00'));
+
+    expect(toDateKey(logicalToday())).toBe('2026-08-06');
+  });
+
+  it('그 날짜의 자정을 가리킨다 — 캘린더 표시에 그대로 쓸 수 있다', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-06T02:00:00+09:00'));
+
+    const today = logicalToday();
+    expect(today.getHours()).toBe(0);
+    expect(today.getMinutes()).toBe(0);
   });
 });
 

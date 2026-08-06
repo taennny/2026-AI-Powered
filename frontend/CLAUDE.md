@@ -83,8 +83,8 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/calendar/{year}/{month}` | `fetchCalendarMonth` | `hooks/useCalendar.ts` |
 | `GET /api/v1/calendar/{date}/timeline` | `fetchTimeline` | `hooks/useCalendar.ts` |
 | `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`page`·`size` 사용) |
-| `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` |
-| `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` |
+| `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` (body에 `timezone` 동봉) |
+| `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` (`?timezone=`) |
 | `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` |
 | `GET /api/v1/blogs/{id}/status` | `fetchBlogGenerationStatus` | `waitForBlogGeneration` 폴링 |
 | `GET /api/v1/blog/{id}` | `fetchBlogDetail` | `write-preview/index.tsx` |
@@ -92,10 +92,11 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription`, `settings/theme` |
 | `PUT /api/v1/subscriptions/me` | `subscribePremium`, `cancelSubscription` | `settings/subscription` |
 
+| `POST /api/v1/photos/upload` | `uploadPhoto` | `utils/photoSync.ts` (타임라인 카드 사진) |
+
 백엔드에는 있으나 **프론트가 아직 안 쓰는** 엔드포인트:
 `POST /api/v1/subscriptions/verify`(인앱결제 영수증 검증),
-`POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
-`POST /api/v1/photos/upload`(사진 — 기능 자체가 빠짐).
+`POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리).
 
 ### 스타일링
 
@@ -139,6 +140,7 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 |---|---|---|
 | `useLocationPermissionGuard()` | `app/(main)/_layout.tsx` | 앱 진입 + `AppState` `'active'` 복귀마다 |
 | `ensureMediaLibraryPermission()` | `write`, `write-preview`의 사진 버튼 | 사진 첨부 직전 |
+| `ensurePhotoLibraryPermission()` | `usePermissions` 내부 | 위치 권한을 다 받은 **직후** (타임라인 사진 자동 동기화용) |
 
 - **요청 시점**: 앱 진입 직후가 아니라 `(main)` 진입 시. 온보딩은 `(main)` 바깥이라
   신규 사용자는 자동으로 "온보딩 완료 후" 요청을 받습니다.
@@ -157,6 +159,10 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 홈에서 홈 탭 재탭(`timelineStore.requestRefresh()`), 앱 백그라운드→복귀(`AppState`).
 
 홈 화면에 머무는 동안 GPS analyze가 새 장소를 만들어도 화면은 그대로입니다 — 홈 탭을 다시 누르면 반영됩니다.
+
+**analyze 호출 시점**(`utils/analyzeSchedule.ts`): GPS 배치마다가 아니라 **1시간 주기 + 논리 날짜가
+넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
+갱신해 실패한 날짜가 다음 주기에 자동 재시도됩니다.
 
 ### 구독 상태
 
@@ -219,14 +225,21 @@ hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀)
 hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
+hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
+hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
+utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
+utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책" 참고)
+utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
+                          (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
 
 | 함수 | 변환 |
 |---|---|
-| `toDateKey(date)` | `Date` → 기기 로컬 `'YYYY-MM-DD'` — **현재 미사용** (아래 정책 참고) |
-| `toKstDateKey(date)` | `Date` → KST `'YYYY-MM-DD'` — 서버로 보내는 날짜 키는 전부 이것 |
+| `toDateKey(date)` | **달력 날짜** → `'YYYY-MM-DD'`. 경계 보정 안 함 (캘린더에서 고른 날짜용) |
+| `toLogicalDateKey(date)` | **순간** → 그 순간이 속한 논리적 하루. 새벽 4시 이전은 전날 (GPS timestamp용) |
+| `logicalToday()` | 지금이 속한 논리적 하루의 로컬 자정 `Date` (캘린더 "오늘") |
 | `formatDate(date)` | `Date` → `'YY.MM.DD(day)'` |
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
@@ -248,8 +261,12 @@ npx jest gpsTask      # 파일 하나
 
 | 파일 | 대상 | 핵심 |
 |---|---|---|
-| `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | KST 자정 경계(`15:00Z`), 월·연 넘김, 12AM/PM, `formatTimeAgo` 임계값 |
-| `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 자정 걸친 배치가 두 날짜 모두 analyze되는지, 한 날짜 실패 시 나머지 진행, 업로드 실패 시 analyze 미호출 |
+| `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
+| `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
+| `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분 |
+| `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
+| `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
+| `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
@@ -269,50 +286,61 @@ npx jest gpsTask      # 파일 하나
 
 ## 시간·타임존 정책
 
-**방향 확정: 해외 지원 (기기 로컬 기준).** 저장은 UTC 그대로 두고, 날짜 계산 시 앱이 tz를 파라미터로 보냅니다.
-
 원칙은 두 값을 섞지 않는 것입니다.
 
 - **순간(instant)** — 언제 일어났나: 전부 UTC (`timestamptz`, GPS `timestamp`는 ISO 8601 UTC)
-- **달력 날짜(civil date)** — 며칠의 기록인가: 그 기록이 속한 tz가 필요
+- **달력 날짜(civil date)** — 며칠의 기록인가: tz와 하루 경계가 필요
 
-### 현재 상태 (KST 고정 단계)
+### 하루의 경계는 기기 로컬 새벽 4시
 
-날짜 키는 `toKstDateKey`로 KST, 화면 표시는 기기 로컬. 백엔드도 KST로 통일돼 있어
-**국내에서는 앞뒤가 맞습니다.** 해외 기기에서만 어긋납니다.
+자정이 아닙니다. **논리 날짜 = (기기 로컬 시각 − 4시간)의 달력 날짜.**
 
-### 기기 tz로 넘어갈 때
+```
+로컬 8/5 23:00  → 2026-08-05
+로컬 8/6 03:59  → 2026-08-05   ← 자정을 넘겨도 아직 전날
+로컬 8/6 04:00  → 2026-08-06
+```
 
-| 대상 | 변경 |
+자정을 걸친 체류가 이틀로 쪼개져 `place_count`가 중복 계상되던 문제도 이걸로 해소됩니다.
+
+**표시용 날짜는 보정하지 않습니다.** `formatDate`는 실제 달력 날짜 그대로입니다.
+경계 보정은 **데이터 키에만** 적용합니다.
+
+### 두 함수를 헷갈리면 하루가 밀립니다
+
+| 입력 | 함수 | 예 |
+|---|---|---|
+| 실제 시각(순간) | `toLogicalDateKey` | GPS 로그 timestamp, 지금 |
+| 이미 정해진 달력 날짜 | `toDateKey` | 캘린더에서 고른 날짜 |
+
+캘린더가 주는 값은 그 날짜의 **로컬 자정**입니다. 여기에 `toLogicalDateKey`를 쓰면
+4시간이 빠져 **하루 전으로 밀립니다.** 사용자가 5일을 골랐으면 그냥 5일입니다.
+
+### 타임존
+
+기기 로컬 기준입니다. 날짜 계산에 `Intl`의 `timeZone` 옵션을 쓰지 않습니다 —
+`Date`의 로컬 게터만으로 충분하고, Hermes의 `Intl` 구현에 기대지 않는 편이 안전합니다.
+
+서버가 같은 계산을 할 수 있도록 tz 문자열을 함께 보냅니다:
+
+| 대상 | 방식 |
 |---|---|
-| `daily_records` | `timezone` 컬럼 추가 (IANA 문자열) — **선행 조건** |
-| GPS 업로드 | 배치에 `timezone` 동봉 |
-| analyze | 클라가 tz 전달 → 백엔드가 그 tz로 하루 경계 계산 |
-| 타임라인 응답 | `utc_offset_minutes` 동봉 |
-| `formatTimeFromISO` | 저장된 오프셋으로 포맷 (기록 당시 현지 시각 고정 표시) |
-| `toKstDateKey` | 기기 tz 기준으로 교체 |
-| 캘린더 "오늘" | 그대로 — 지금 여기 기준이 맞음 |
+| GPS 업로드 | body에 `timezone` 동봉 |
+| analyze | 쿼리 파라미터 `?timezone=` |
 
-기기 tz는 `Intl.DateTimeFormat().resolvedOptions().timeZone`. 실기기에서 값 확인 필요하고,
-안 되면 `expo-localization` 추가.
+`getDeviceTimeZone()`(`utils/timezone.ts`)은 **expo-localization → `Intl` → `Asia/Seoul`**
+순으로 폴백합니다. Hermes 빌드에 따라 `Intl`이 `UTC`를 뱉는 사례가 있어서입니다.
+**오프셋 숫자가 아닌 IANA 문자열**(`Asia/Seoul`)을 씁니다 — 오프셋은 서머타임 지역에서
+계절마다 달라져 과거 기록의 경계를 다시 계산할 수 없습니다.
 
-### 회의에서 정해진 것
-
-1. **해외 서비스 지원** — 기기 로컬 tz 기준으로 간다 (위 "기기 tz로 넘어갈 때" 표가 작업 목록)
-2. **하루의 경계는 새벽 4시** — 자정이 아니다. 자정 걸친 체류의 중복 계상도 이걸로 해소한다
-3. **다른 날에 쓴 글은 날짜를 2개 표시** — 작성일과 기록 대상일 둘 다
-
-경계 4시는 "논리적 날짜 = (로컬 시각 − 4시간)의 날짜"로 계산합니다.
-표시용 날짜(`formatDate`)는 실제 달력 날짜 그대로 두고, **데이터 키에만** 적용합니다.
-
-**프론트만 먼저 바꾸면 깨집니다.** 새벽 0~4시에 프론트는 전날 키로 조회하는데 백엔드는
-당일에 저장하므로 그 시간대 타임라인이 빕니다. 백엔드와 동시 배포가 필요한 항목:
-`useCalendar.ts`의 "오늘" 초기값, `gpsTask.ts`의 analyze 날짜 키.
+> 백엔드는 아직 tz도 4시 경계도 반영 전입니다. 지금 보내는 값은 조용히 무시되고
+> (pydantic `extra='ignore'`, FastAPI의 미지 쿼리 무시), 백엔드가 받기 시작하면
+> **앱 재배포 없이 켜집니다.** 그때까지 새벽 0~4시에는 프론트가 계산한 날짜와
+> 백엔드가 저장한 날짜가 달라 그 시간대 타임라인이 비어 보일 수 있습니다.
 
 ### 남은 미결
 
 1. 4시 경계를 **표시**에도 적용할지 — 새벽 3시 기록을 `3:00AM`으로 볼지 `27:00`으로 볼지
-   (캘린더에서 전날 칸에 들어가는 것은 결정됨)
 2. 여행 중 tz가 바뀌는 날 — `daily_records.timezone`이 한 칼럼이면 하루에 tz가 하나뿐이라
    비행기 탄 날이 어긋난다. 출발지 / 도착지 / 로그별 중 택일 **(컬럼 추가 전에 결정 필요)**
 3. 구독 횟수 제한의 리셋 시점 — 4시 경계를 따르는지, 월 N회면 월 경계는 어느 tz 기준인지
@@ -327,7 +355,7 @@ npx jest gpsTask      # 파일 하나
 | 날짜 비교가 인덱스를 못 탐 | `calendar.py:89`, `ai.py:111,143` | `func.date(func.timezone(...))`로 컬럼을 감쌈. 같은 파일 `ai.py:40-57`은 범위 비교라 방식이 섞여 있음 | 백엔드 |
 | EXIF 없는 사진이 업로드 시각으로 저장 | `backend/app/services/photos.py:42` | 몰아서 올리면 엉뚱한 장소에 붙음 | 백엔드 |
 | 카카오 계정 연동이 404 | `settings/account/index.tsx` | 백엔드에 `/auth/kakao/link` 엔드포인트가 **없음**. 버튼을 누르면 실패한다 | 백엔드 |
-| 카카오 로그인 returnUrl 불일치 | `(auth)/login.tsx` | `openAuthSessionAsync`의 두 번째 인자가 백엔드 콜백 URL인데, 백엔드는 `roameapp://kakao-login`으로 리다이렉트한다. 세션이 안 닫히거나 토큰 파싱이 실패할 수 있음 | 프론트(auth) |
+| 카카오 로그인이 서버 env·콘솔 설정에 걸려 있음 | 서버 `KAKAO_REDIRECT_URI`, 카카오 개발자 콘솔 | 프론트는 `https://api.roame.co.kr/api/v1/auth/kakao/callback`을 보낸다. **셋(프론트·서버 env·콘솔 등록값)이 문자 단위로 같아야** 하고, 하나라도 다르면 KOE006으로 막힌다 | 백엔드 |
 | 자정 걸친 체류가 중복 계상 | `ai/server/modules/gps.py` | `place_count`가 부풀려짐 | 회의 안건 3·4 |
 | 지도 공유 기능 비활성 | `MapPreview.tsx` | `RNFetchBlob`이 네이티브 전용이라 Expo 웹 번들이 깨져 주석 처리됨. 되살리려면 `Platform.OS` 가드 필요 | 프론트 |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
@@ -343,18 +371,23 @@ npx jest gpsTask      # 파일 하나
 | `billing_cycle` 미사용 | `services/subscriptionApi.ts` | 백엔드가 GET 응답·PUT 요청 양쪽 지원하는데 프론트가 안 보냄 (월/연 선택 UI 없음) |
 | `premium_started_at` 미사용 | `services/subscriptionApi.ts` | 백엔드 응답에 있음. "구독한 지 N일" 표시에 쓸 수 있음 |
 | 구독 만료 시 안내 없음 | `subscriptionStore` | 테마는 basic으로 되돌리지만 사용자에게 알리지 않음 |
-| 타임존 획득 로직 | 미착수 | `utils/timezone.ts` 신규 + 날짜 키 일원화. 아래 "시간·타임존 정책" 참고 |
 | `is_kakao_linked` 미연동 | `settings/account/index.tsx` | 프론트 타입은 준비됨. 백엔드 `/auth/me`가 아직 `email`만 반환 |
 
 ## 백엔드 팀 확인 필요
 
-**시간** — EXIF·polyline·photo_count의 KST 통일과 `app/utils/timezone.py` 공용화는 완료됨. 남은 것:
+**시간** — 프론트는 기기 tz + 새벽 4시 경계로 전환 완료. 백엔드는 아직 KST 고정 + 자정 기준이라
+**새벽 0~4시에 양쪽 계산이 어긋납니다.** 필요한 작업:
+- `daily_records.timezone` 컬럼 추가 + 기존 행 `'Asia/Seoul'` 백필 → **해외 지원의 전제.
+  나중에 넣으면 과거 기록의 tz를 복구할 수 없음**
+- 하루 경계를 자정 → 해당 tz의 **새벽 4시**로 (프론트가 보내는 값과 맞춰야 함)
+- GPS 업로드 body의 `timezone`, analyze 쿼리의 `?timezone=` 수용 (지금은 무시됨)
+- tz는 오프셋 숫자가 아닌 **IANA 문자열**(`Asia/Seoul`)로 — 서머타임 대응
 - 기존 `photos.taken_at` 보정 (테스트 데이터뿐이면 테이블을 비우는 편이 깨끗)
-- `daily_records.timezone` 컬럼 추가 + 기존 행 `'Asia/Seoul'` 백필 → **해외 지원의 전제**
 - 날짜 비교를 반개구간으로 통일 (인덱스 사용. `ai.py`의 `23:59:59` 경계 누락도 함께 해소)
-- 해외 지원 시 tz 파라미터는 오프셋 숫자가 아닌 **IANA 문자열**(`Asia/Seoul`) — 서머타임 대응
 - EXIF `OffsetTimeOriginal`이 있으면 우선 사용 (없을 때만 그날의 tz 폴백)
 - Postgres `TimeZone` 확인 — compose에 `TZ` 미설정이라 UTC로 가정 중
+- 목록 정렬 동점 처리: `order_by(created_at.desc(), id.desc())` (`blog.py:167`)
+- `POST /blog/generate`에 구독·횟수 검사 + 초과 시 응답 코드 확정(402/403/429)
 
 **해결됨** — `premium_started_at`·`billing_cycle`은 `SubscriptionResponse`에 추가됐고(PUT도 수용),
 `POST /blog/{id}/publish`도 존재합니다. 프론트가 아직 안 쓰고 있을 뿐입니다.

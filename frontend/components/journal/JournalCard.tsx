@@ -10,14 +10,30 @@ type Props = {
   query?: string;
 };
 
-function HighlightText({text, query, className, highlightColor}: {text: string; query: string; className?: string; highlightColor: string}) {
+function HighlightText({
+  text,
+  query,
+  className,
+  highlightColor,
+  numberOfLines,
+}: {
+  text: string;
+  query: string;
+  className?: string;
+  highlightColor: string;
+  numberOfLines?: number;
+}) {
   if (!query.trim()) {
-    return <Text className={className}>{text}</Text>;
+    return (
+      <Text className={className} numberOfLines={numberOfLines}>
+        {text}
+      </Text>
+    );
   }
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
   return (
-    <Text className={className}>
+    <Text className={className} numberOfLines={numberOfLines}>
       {parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
           <Text key={i} style={{color: highlightColor}}>{part}</Text>
@@ -44,7 +60,14 @@ export default function JournalCard({data, query = ''}: Props) {
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
       <View className="flex-row justify-between mb-1">
-        <Text className="text-[13px] font-semibold text-primary">{formatDateStr(data.date)}</Text>
+        {/* 화면에 보이는 '26.08.01(thu)' 그대로에 하이라이트를 건다 —
+            사용자는 보이는 문자열로 검색한다 */}
+        <HighlightText
+          text={formatDateStr(data.date)}
+          query={query}
+          className="text-[13px] font-semibold text-primary"
+          highlightColor={tc.tealAccent}
+        />
         <Text className="text-xs text-tertiary">{formatTimeAgo(data.created_at)}</Text>
       </View>
       <HighlightText
@@ -52,6 +75,7 @@ export default function JournalCard({data, query = ''}: Props) {
         query={query}
         className="text-sm font-semibold text-primary mb-[3px]"
         highlightColor={tc.tealAccent}
+        numberOfLines={1}
       />
       {data.summary !== null && (
         <HighlightText
@@ -59,6 +83,7 @@ export default function JournalCard({data, query = ''}: Props) {
           query={query}
           className="text-[13px] text-secondary"
           highlightColor={tc.tealAccent}
+          numberOfLines={3}
         />
       )}
     </TouchableOpacity>

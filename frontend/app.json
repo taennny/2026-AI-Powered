@@ -54,6 +54,15 @@
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
+      ],
+      "expo-localization",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "그날 찍은 사진을 타임라인 카드에 자동으로 넣기 위해 사진 접근이 필요합니다.",
+          "savePhotosPermission": false,
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ],
     "experiments": {
