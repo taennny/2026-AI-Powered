@@ -52,7 +52,12 @@ export async function resetPassword(token: string, newPassword: string) {
 
 export interface UserMe {
   email: string;
-  // 백엔드 /me는 현재 email만 반환 — 카카오 연동 여부는 미구현(추후 확장)
+  /**
+   * 우리 서비스의 사용자 id. 결제 SDK(RevenueCat)에 이 값을 넘겨야
+   * 결제 웹훅이 어느 계정 것인지 매칭된다.
+   */
+  user_id?: string;
+  // 백엔드 /me는 아직 카카오 연동 여부를 안 준다 (추후 확장)
   is_kakao_linked?: boolean;
 }
 

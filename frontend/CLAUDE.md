@@ -212,7 +212,8 @@ GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결�
 store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
 store/themeStore.ts     themeId, themeVars / setTheme, initialize
-store/subscriptionStore.ts  plan, isActive, expiresAt, hasLoaded / isPremium(), refresh, reset
+store/subscriptionStore.ts  plan, isActive, expiresAt, willRenew, hasLoaded
+                        / isPremium(), refresh, refreshUntilChanged, reset
 store/settingsStore.ts  isTrackingEnabled, hasLoaded / initialize, setTrackingEnabled
                         위치 기록 토글. 기본 켬, AsyncStorage 저장.
                         끄면 stopGpsTracking(), 켜면 startGpsTracking()
@@ -273,7 +274,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
-| `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀 |
+| `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도 |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
 | `__tests__/useJournalList.test.ts` | `useJournalList` | 디바운스, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
