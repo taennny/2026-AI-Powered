@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     # 이벤트 environment 필터 기준 (불일치 이벤트는 저장만): PRODUCTION | SANDBOX
     REVENUECAT_ENVIRONMENT: str = "PRODUCTION"
 
+    # 생성 쿼터
+    FREE_WEEKLY_BLOG_LIMIT: int = 3  # 무료 사용자 주간 AI 생성 한도. 회의 확정값 3
+    DAY_BOUNDARY_HOUR: int = 4  # 하루 경계(새벽 4시). 주 리셋도 이 시각 기준
+
     # Kakao
     KAKAO_REST_API_KEY: str = ""
     KAKAO_REDIRECT_URI: str = ""
