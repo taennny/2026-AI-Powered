@@ -119,7 +119,11 @@ async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """현재 로그인한 유저 정보 조회"""
     # user_id: RevenueCat Purchases.logIn()에 넘길 우리 서비스 식별자
-    return {"user_id": current_user.id, "email": current_user.email}
+    return {
+        "user_id": current_user.id,
+        "email": current_user.email,
+        "is_kakao_linked": current_user.social_id is not None,
+    }
 
 
 @router.delete("/me", status_code=204)
