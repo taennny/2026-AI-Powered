@@ -1,14 +1,29 @@
-/**
- * @file components/home/Calendar.tsx — 홈 화면 월간 캘린더
- * - 선택된 날짜만 하이라이트 (teal-accent 원)
- * - has_journal: tealAccent dot / has_timeline: tealDark dot (최대 2개)
- * - viewDate는 부모에서 관리 (월 변경 시 API fetch 연동 — useCalendar 훅)
- */
-
-import {View, Text, TouchableOpacity} from 'react-native';
+import {memo, useCallback, useMemo, useRef} from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Animated,
+  PanResponder,
+  Dimensions,
+} from 'react-native';
 
 import {type CalendarDay} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
+/** 이만큼 끌면 달이 넘어간다 */
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.22;
+
+/** 짧게 튕겨도 넘어가게 하는 속도 임계값 */
+const SWIPE_VELOCITY = 0.35;
+
+/** 손가락을 따라가는 정도. 1이면 그대로 따라와 너무 헐렁하다 */
+const DRAG_RESISTANCE = 0.35;
+
+/** 달이 갈릴 때 밀려나는 거리 */
+const SLIDE_DISTANCE = SCREEN_WIDTH * 0.25;
 
 const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
@@ -25,7 +40,7 @@ type Props = {
   eventDays?: CalendarDay[];
 };
 
-export default function Calendar({
+function Calendar({
   selectedDate,
   onDateSelect,
   viewDate,
@@ -36,40 +51,133 @@ export default function Calendar({
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
-  const goToPrevMonth = () => onViewDateChange(new Date(year, month - 1, 1));
-  const goToNextMonth = () => onViewDateChange(new Date(year, month + 1, 1));
+  const translateX = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
-  const firstDayOfWeek = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  /**
+   * 달을 바꾸면서 밀려나는 애니메이션.
+   * 진행 방향으로 빠져나간 뒤, 새 달이 반대편에서 들어온다.
+   *
+   * `delta`가 +1이면 다음 달(왼쪽으로 빠짐), -1이면 이전 달.
+   */
+  const changeMonth = useCallback(
+    (delta: number) => {
+      Animated.parallel([
+        Animated.timing(translateX, {
+          toValue: -delta * SLIDE_DISTANCE,
+          duration: 130,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 130,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        onViewDateChange(new Date(year, month + delta, 1));
 
-  const cells: (number | null)[] = [
-    ...Array(firstDayOfWeek).fill(null),
-    ...Array.from({length: daysInMonth}, (_, i) => i + 1),
-  ];
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  const weeks: (number | null)[][] = Array.from(
-    {length: cells.length / 7},
-    (_, i) => cells.slice(i * 7, i * 7 + 7),
+        // 새 달을 반대편에 세워두고 제자리로 당긴다
+        translateX.setValue(delta * SLIDE_DISTANCE);
+        Animated.parallel([
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 70,
+            friction: 11,
+            overshootClamping: true,
+          }),
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 160,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      });
+    },
+    [onViewDateChange, year, month, translateX, opacity],
   );
 
-  const isSameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+  const goToPrevMonth = useCallback(() => changeMonth(-1), [changeMonth]);
+  const goToNextMonth = useCallback(() => changeMonth(1), [changeMonth]);
 
-  const isSelected = (day: number) =>
-    !!selectedDate && isSameDay(new Date(year, month, day), selectedDate);
+  /**
+   * 가로 스와이프로 달 이동.
+   *
+   * 세로 움직임이 더 크면 잡지 않는다 — 바텀시트가 세로 드래그를 쓰기 때문에
+   * 여기서 가로만 확실할 때 가져와야 서로 뺏지 않는다.
+   * `onMoveShouldSetPanResponder`만 쓰므로 날짜 탭은 그대로 동작한다.
+   */
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, {dx, dy}) =>
+          Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy) * 1.5,
+        onPanResponderMove: (_, {dx}) => {
+          translateX.setValue(dx * DRAG_RESISTANCE);
+        },
+        onPanResponderRelease: (_, {dx, vx}) => {
+          const goPrev = dx > SWIPE_THRESHOLD || vx > SWIPE_VELOCITY;
+          const goNext = dx < -SWIPE_THRESHOLD || vx < -SWIPE_VELOCITY;
 
-  const getEventDay = (day: number): CalendarDay | undefined => {
-    const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return eventDays.find(d => d.date === key);
-  };
+          if (goPrev) changeMonth(-1);
+          else if (goNext) changeMonth(1);
+          else {
+            // 임계값에 못 미치면 제자리로
+            Animated.spring(translateX, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 70,
+              friction: 11,
+            }).start();
+          }
+        },
+      }),
+    [changeMonth, translateX],
+  );
+
+  // 달이 바뀔 때만 다시 만든다 — 시트를 드래그할 때마다 42칸을 새로 짜던 것을 막는다
+  const weeks = useMemo<(number | null)[][]>(() => {
+    const firstDayOfWeek = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const cells: (number | null)[] = [
+      ...Array(firstDayOfWeek).fill(null),
+      ...Array.from({length: daysInMonth}, (_, i) => i + 1),
+    ];
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    return Array.from({length: cells.length / 7}, (_, i) =>
+      cells.slice(i * 7, i * 7 + 7),
+    );
+  }, [year, month]);
+
+  /**
+   * 날짜 → 기록 여부. 예전에는 칸마다 `eventDays.find()`로 훑어서
+   * 최악 42 × 31번을 비교했다. Map으로 한 번만 만들어 O(1)로 본다.
+   */
+  const eventByDay = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    for (const d of eventDays) map.set(d.date, d);
+    return map;
+  }, [eventDays]);
+
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  // 선택 날짜는 하나뿐이다 — 칸마다 Date를 만들 필요 없이 일(day) 숫자만 비교한다
+  const selectedDay =
+    selectedDate &&
+    selectedDate.getFullYear() === year &&
+    selectedDate.getMonth() === month
+      ? selectedDate.getDate()
+      : null;
 
   return (
-    <View className="bg-card px-4 pt-5">
+    <Animated.View
+      className="bg-card px-4 pt-5"
+      style={{transform: [{translateX}], opacity}}
+      {...panResponder.panHandlers}
+    >
 
-      {/* 월 헤더 */}
       <View className="flex-row items-center mb-[14px]">
         <TouchableOpacity onPress={goToPrevMonth} className="pr-[10px]">
           <Text className="text-[22px] font-medium text-teal-accent">{'<'}</Text>
@@ -82,7 +190,6 @@ export default function Calendar({
         </TouchableOpacity>
       </View>
 
-      {/* 요일 레이블 */}
       <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
           <View key={label} className="flex-1 items-center pb-[6px]">
@@ -93,12 +200,13 @@ export default function Calendar({
         ))}
       </View>
 
-      {/* 날짜 그리드 */}
       {weeks.map((week, wi) => (
         <View key={wi} className="flex-row border-t-[0.5px] border-line">
           {week.map((day, di) => {
-            const eventDay = day ? getEventDay(day) : undefined;
-            const highlighted = !!day && isSelected(day);
+            const eventDay = day
+              ? eventByDay.get(`${monthPrefix}-${String(day).padStart(2, '0')}`)
+              : undefined;
+            const highlighted = day !== null && day === selectedDay;
 
             return (
               <TouchableOpacity
@@ -136,6 +244,15 @@ export default function Calendar({
         </View>
       ))}
 
-    </View>
+    </Animated.View>
   );
 }
+
+/**
+ * 바텀시트를 드래그하면 홈이 리렌더되는데(setVisibleH), 그때마다 달력 42칸을
+ * 다시 그릴 이유가 없다. props가 그대로면 건너뛴다.
+ *
+ * 부모가 `selectedDate`·`viewDate`를 state로 들고 있고 콜백은 setState 함수를
+ * 그대로 넘기므로, 실제로 값이 바뀔 때만 참조가 달라진다.
+ */
+export default memo(Calendar);

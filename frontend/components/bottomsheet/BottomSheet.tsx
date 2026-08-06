@@ -1,10 +1,8 @@
 /**
- * @file components/bottomsheet/BottomSheet.tsx — 홈 바텀시트
+ * 홈 바텀시트
  * - PanResponder 3단계 스냅: expanded ↔ peek ↔ handleOnly
  * - expanded 시 MapPreview 페이드인
- *
- * ## 다음 연결 작업
- * - [ ] ScrollView 스크롤 ↔ 드래그 제스처 충돌 처리 검토
+ * - panHandlers는 핸들·날짜 헤더·지도에만 붙는다 (ScrollView 스크롤과 충돌 방지)
  */
 
 import {useRef, useCallback, useState, useEffect} from 'react';
@@ -20,6 +18,7 @@ import {
 import {type TimelinePlace} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate} from '@/utils/formatDate';
+import MapPreview from '@/components/bottomsheet/MapPreview';
 import PostCard from '@/components/bottomsheet/PostCard';
 //import MapPreview from '@/components/bottomsheet/MapPreview';
 
@@ -52,14 +51,13 @@ export default function BottomSheet({
 }: Props) {
   const sheetHeight = useRef(0);
   const translateY = useRef(new Animated.Value(9999)).current;
-  // collapse(가장 아래) 시 남겨둘 노출 높이 = 핸들 + 날짜 헤더 실측값(폰트 확대 등 대응). 측정 전 폴백 64
+  // collapsed 시 남겨둘 노출 높이 = 핸들 + 날짜 헤더 실측값 (측정 전 폴백 64)
   const collapsedPeekRef = useRef(64);
   const lastY = useRef(0);
   const peekHeightRef = useRef(peekHeight);
   const currentSnap = useRef<'expanded' | 'peek' | 'collapsed'>('peek');
 
-  // 현재 snap에서 "화면에 보이는 시트 높이". 이 높이로 콘텐츠 영역을 한정해야
-  // 내부 ScrollView(flex:1)가 보이는 영역 기준으로 스크롤됨(peek에서도 카드 스크롤 가능).
+  // 화면에 보이는 시트 높이 — 이 값으로 콘텐츠 영역을 한정해야 내부 ScrollView가 스크롤된다
   const [visibleH, setVisibleH] = useState<number | null>(null);
 
   const [showMap, setShowMap] = useState(false);
@@ -92,7 +90,6 @@ export default function BottomSheet({
     }
   }, [showMap, mapOpacity]);
 
-  // 현재 snap 상태에 해당하는 translateY 위치 계산
   const snapPositionFor = useCallback(
     (state: 'expanded' | 'peek' | 'collapsed', h: number) => {
       if (state === 'expanded') return 0;
@@ -106,7 +103,6 @@ export default function BottomSheet({
     (e: LayoutChangeEvent) => {
       const h = e.nativeEvent.layout.height;
       sheetHeight.current = h;
-      // 재레이아웃(월 이동 등) 시에도 현재 snap 상태를 유지 — 항상 peek로 올라오지 않도록
       const target = snapPositionFor(currentSnap.current, h);
       translateY.setValue(target);
       lastY.current = target;
@@ -115,7 +111,7 @@ export default function BottomSheet({
     [translateY, snapPositionFor],
   );
 
-  // 월 이동 등으로 달력 높이(peekHeight)가 바뀌면 ref 갱신 + peek에 머물러 있을 땐 새 위치로 재정렬
+  // 달력 높이가 바뀌면 peek에 머물러 있을 때 새 위치로 재정렬
   useEffect(() => {
     peekHeightRef.current = peekHeight;
     if (sheetHeight.current > 0 && currentSnap.current === 'peek') {
@@ -137,7 +133,6 @@ export default function BottomSheet({
       onMoveShouldSetPanResponder: (_, {dy}) => Math.abs(dy) > 5,
       onPanResponderGrant: () => {
         translateY.stopAnimation();
-        // 드래그 중에는 콘텐츠 영역을 전체 높이로 펼쳐 둠 → 시트 아래 빈 공간 안 생기게
         setVisibleH(sheetHeight.current);
       },
       onPanResponderMove: (_, {dy}) => {
@@ -163,14 +158,12 @@ export default function BottomSheet({
         }
 
         lastY.current = snapTo;
-        // snap 확정 → 보이는 높이로 콘텐츠 영역 한정 (peek에서도 ScrollView가 스크롤됨)
         setVisibleH(sheetHeight.current - snapTo);
         Animated.spring(translateY, {
           toValue: snapTo,
           useNativeDriver: true,
           tension: 65,
           friction: 11,
-          // 경계(handleOnly/expanded)를 지나쳤다 되돌아오는 과한 바운스 방지
           overshootClamping: true,
         }).start();
       },
@@ -188,35 +181,31 @@ export default function BottomSheet({
       className="absolute left-0 right-0 top-0 bottom-0 bg-teal-bg rounded-tl-[20px] rounded-tr-[20px]"
       style={{transform: [{translateY}]}}
     >
-      {/* 보이는 영역 한정 래퍼 — 이 높이 안에서 ScrollView(flex:1)가 스크롤됨 */}
       <View style={visibleH != null ? {height: visibleH} : {flex: 1}}>
-        {/* 핸들 + 날짜 헤더 — 이 영역 드래그 시에만 시트 전체 이동 */}
         <View
           {...panResponder.panHandlers}
           onLayout={e => {
             collapsedPeekRef.current = e.nativeEvent.layout.height;
           }}
         >
-          {/* 핸들 */}
           <View className="items-center pt-[10px] pb-[6px]">
             <View className="w-9 h-1 rounded-full bg-teal-dark" />
           </View>
 
-          {/* 날짜 헤더 */}
           <Text className="text-center text-[15px] font-bold text-primary mb-4">
             {formatDate(selectedDate)}
           </Text>
         </View>
 
         {/* 지도 미리보기 — 지도 위 드래그도 시트 전체 이동(목록 스크롤 아님) */}
-        {/*{isMapMounted && hasPlaces && (
+        {isMapMounted && hasPlaces && (
           <Animated.View
             style={{opacity: mapOpacity}}
             {...panResponder.panHandlers}
           >
             <MapPreview places={places} />
           </Animated.View>
-        )}*/}
+        )}
 
         <ScrollView
           style={{flex: 1}}
@@ -235,7 +224,6 @@ export default function BottomSheet({
             </View>
           ) : (
             <View className="relative px-4">
-              {/* 세로 타임라인 바 */}
               <View
                 className="absolute top-0 bottom-0 w-2 bg-teal"
                 style={{left: 6 + BAR_LEFT}}

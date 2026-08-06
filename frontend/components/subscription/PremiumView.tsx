@@ -1,12 +1,3 @@
-/**
- * @file components/subscription/PremiumView.tsx — 구독 화면 프리미엄 사용자 뷰
- *
- * ## 다음 연결 작업
- * - [ ] 결제 수단 변경 → 결제 플로우 연결
- * - [ ] 구독 해지 → 해지 확인 모달 연결
- * - [ ] API에서 월/연 플랜 구분 필드 추가 시 currentBilling 동적 처리
- */
-
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type SubscriptionStatus} from '@/services/subscriptionApi';
@@ -40,7 +31,6 @@ export default function PremiumView({subscription, onCancel}: Props) {
         프리미엄 플랜
       </Text>
 
-      {/* 플랜 선택 (현재 플랜 표시) */}
       <View className="gap-y-[14px] mb-7">
         {PLANS.map(plan => {
           const isCurrent = plan.id === currentBilling;
@@ -68,7 +58,6 @@ export default function PremiumView({subscription, onCancel}: Props) {
         })}
       </View>
 
-      {/* D-day 박스 */}
       <View className="bg-teal-bg rounded-2xl py-[22px] px-5 items-center mb-10">
         <Text className="text-[15px] text-primary mb-[6px]">
           로미와 함께 한 지 <Text className="font-bold">{daysCount}일</Text> 💗
@@ -76,14 +65,16 @@ export default function PremiumView({subscription, onCancel}: Props) {
         <Text className="text-sm text-secondary">우리 오래봐요!</Text>
       </View>
 
-      {/* 하단 버튼 */}
       <View className="gap-y-2 mt-auto pb-20">
         <TouchableOpacity>
           <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onCancel}>
-          <Text className="text-[15px] text-tertiary">구독 해지</Text>
-        </TouchableOpacity>
+        {/* 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다 */}
+        {subscription.will_renew && (
+          <TouchableOpacity onPress={onCancel}>
+            <Text className="text-[15px] text-tertiary">구독 해지</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

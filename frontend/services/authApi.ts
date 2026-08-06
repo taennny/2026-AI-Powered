@@ -1,10 +1,5 @@
-/**
- * @file services/authApi.ts
- * @description 인증 관련 API
- */
-
 import {api} from '@/utils/api';
-import {saveTokens, saveAccessToken, getRefreshToken} from '@/utils/tokenStorage';
+import {saveTokens} from '@/utils/tokenStorage';
 
 export interface SignupRequest {
   email: string;
@@ -20,11 +15,6 @@ export interface LoginRequest {
 export interface LoginResponse {
   access_token: string;
   refresh_token: string;
-  token_type: string;
-}
-
-export interface RefreshResponse {
-  access_token: string;
   token_type: string;
 }
 
@@ -44,15 +34,8 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   return response.data;
 }
 
-export async function refreshAccessToken(): Promise<RefreshResponse> {
-  const refreshToken = await getRefreshToken();
-  if (!refreshToken) {
-    throw new Error('refresh token 없음');
-  }
-  const response = await api.post('/api/v1/auth/refresh', {refresh_token: refreshToken});
-  await saveAccessToken(response.data.access_token);
-  return response.data;
-}
+// 토큰 재발급은 utils/api.ts의 응답 인터셉터가 401을 받아 알아서 처리한다.
+// 여기에 같은 로직을 또 두면 재발급 경로가 둘로 갈라진다.
 
 export async function sendResetEmail(email: string) {
   const response = await api.post('/api/v1/auth/password-reset/request', {email});
@@ -69,7 +52,12 @@ export async function resetPassword(token: string, newPassword: string) {
 
 export interface UserMe {
   email: string;
-  // 백엔드 /me는 현재 email만 반환 — 카카오 연동 여부는 미구현(추후 확장)
+  /**
+   * 우리 서비스의 사용자 id. 결제 SDK(RevenueCat)에 이 값을 넘겨야
+   * 결제 웹훅이 어느 계정 것인지 매칭된다.
+   */
+  user_id?: string;
+  // 백엔드 /me는 아직 카카오 연동 여부를 안 준다 (추후 확장)
   is_kakao_linked?: boolean;
 }
 
@@ -81,18 +69,3 @@ export async function fetchMe(): Promise<UserMe> {
 export async function deleteAccount(): Promise<void> {
   await api.delete('/api/v1/auth/me');
 }
-
-// export interface KakaoLoginRequest {
-//   code: string;
-// }
-
-// export async function kakaoLogin(code: string): Promise<LoginResponse> {
-//   const response = await api.post('/api/v1/auth/kakao', {
-//     code,
-//   });
-
-//   const { access_token, refresh_token } = response.data;
-//   await saveTokens(access_token, refresh_token);
-
-//   return response.data;
-// }

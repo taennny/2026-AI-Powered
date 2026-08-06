@@ -41,3 +41,8 @@ class Blog(Base):
         onupdate=func.now(),
         nullable=False,
     )
+    # 소프트 삭제 시각. NULL이면 살아있는 글.
+    # 하드 삭제하지 않는 이유는 주간 생성 횟수를 유지하기 위해서다(services/blog.py 참고).
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )

@@ -1,5 +1,4 @@
 import * as Linking from 'expo-linking';
-import { saveTokens } from '@/utils/tokenStorage';
 import * as WebBrowser from 'expo-web-browser';
 import {
   View,
@@ -9,17 +8,22 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Image,
-  Alert,
 } from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
 
+import {
+  buildKakaoAuthUrl,
+  KAKAO_APP_REDIRECT,
+  KAKAO_REST_API_KEY,
+} from '@/constants/kakao';
+import {saveTokens} from '@/utils/tokenStorage';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const setToken = useAuthStore(s => s.setToken);
+  const setAuthenticated = useAuthStore(s => s.setAuthenticated);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,8 +46,9 @@ export default function LoginScreen() {
       setIsLoading(true);
       setErrorMessage('');
 
-      const {access_token} = await login({email, password});
-      setToken(access_token);
+      // login()이 토큰을 디스크에 저장한다 — 여기서는 인증 플래그만 세운다
+      await login({email, password});
+      setAuthenticated();
 
       router.replace('/');
     } catch (error: any) {
@@ -67,72 +72,48 @@ export default function LoginScreen() {
       setIsLoading(false);
     }
   };
-const handleKakaoLogin = async () => {
-  try {
-    const CLIENT_ID = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
-const REDIRECT_URI = process.env.EXPO_PUBLIC_KAKAO_REDIRECT_URI;
-
-if (!CLIENT_ID || !REDIRECT_URI) {
-  Alert.alert(
-    '카카오 로그인 오류',
-    '카카오 로그인 설정을 확인할 수 없습니다.',
-  );
-  return;
-}
-
-    const authUrl =
-      `https://kauth.kakao.com/oauth/authorize` +
-      `?client_id=${CLIENT_ID}` +
-      `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-      `&response_type=code`;
-
-    const result = await WebBrowser.openAuthSessionAsync(
-      authUrl,
-      REDIRECT_URI,
-    );
-
-    if (result.type !== 'success') {
+  const handleKakaoLogin = async () => {
+    if (!KAKAO_REST_API_KEY) {
+      setErrorMessage('카카오 로그인 설정이 없습니다.');
       return;
     }
 
-    if (!result.url) {
-      throw new Error('Redirect URL이 없습니다.');
+    try {
+      // returnUrl은 앱 딥링크다. 백엔드 콜백을 주면
+      // 토큰이 만들어지기 전에 세션이 닫힐 수 있다.
+      const result = await WebBrowser.openAuthSessionAsync(
+        buildKakaoAuthUrl(),
+        KAKAO_APP_REDIRECT,
+      );
+
+      if (result.type !== 'success') {
+        return;
+      }
+
+      if (!result.url) {
+        throw new Error('Redirect URL이 없습니다.');
+      }
+
+      const {queryParams} = Linking.parse(result.url);
+      const accessToken = queryParams?.accessToken;
+      const refreshToken = queryParams?.refreshToken;
+
+      if (
+        typeof accessToken !== 'string' ||
+        typeof refreshToken !== 'string'
+      ) {
+        throw new Error('토큰을 받지 못했습니다.');
+      }
+
+      await saveTokens(accessToken, refreshToken);
+      setAuthenticated();
+
+      router.replace('/');
+    } catch (error) {
+      console.error('kakao login error', error);
+      setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
     }
-
-    const { queryParams } = Linking.parse(result.url);
-
-const accessToken = queryParams?.accessToken;
-const refreshToken = queryParams?.refreshToken;
-const isNewUser = queryParams?.isNewUser;
-
-if (
-  typeof accessToken !== 'string' ||
-  typeof refreshToken !== 'string'
-) {
-  throw new Error('토큰을 받지 못했습니다.');
-}
-
-// authApi의 login()처럼 토큰 저장
-await saveTokens(accessToken, refreshToken);
-
-setToken(accessToken);
-
-// 필요하면 신규 회원 분기
-if (isNewUser === 'true') {
-  router.replace('/');
-  // 추후 회원정보 입력 화면으로 변경 가능
-} else {
-  router.replace('/');
-}
-  } catch (error) {
-  console.error('kakao login error', error);
-
-  Alert.alert(
-    '카카오 로그인 실패',
-    '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
-  );
-}
-};
+  };
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>

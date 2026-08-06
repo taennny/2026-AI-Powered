@@ -52,8 +52,15 @@ async def update_user_subscription(
     user_id: uuid.UUID,
     plan_type: str,
     billing_cycle: str = "monthly",
+    *,
+    expires_at: datetime | None = None,
+    will_renew: bool | None = None,
 ) -> Subscription:
-    """구독 플랜 변경"""
+    """구독 플랜 변경.
+
+    expires_at이 주어지면(웹훅 경로) 기간 계산 없이 그대로 저장한다.
+    will_renew가 주어지면 갱신 예정 여부를 함께 반영한다.
+    """
     valid_plans = {"free", "premium"}
     if plan_type not in valid_plans:
         raise ValueError(f"유효하지 않은 플랜입니다: {plan_type}")
@@ -67,15 +74,20 @@ async def update_user_subscription(
     subscription.billing_cycle = billing_cycle
     if plan_type == "premium":
         subscription.is_active = True
-        subscription.expires_at = datetime.now(timezone.utc) + timedelta(
-            days=BILLING_DURATION_DAYS[billing_cycle]
-        )
+        if expires_at is not None:
+            subscription.expires_at = expires_at
+        else:
+            subscription.expires_at = datetime.now(timezone.utc) + timedelta(
+                days=BILLING_DURATION_DAYS[billing_cycle]
+            )
         # 첫 전환에만 기록, 재결제(premium→premium)면 유지
         if not was_premium:
             subscription.premium_started_at = datetime.now(timezone.utc)
     else:  # 해지(free 전환): 만료일·프리미엄 시작일 초기화
         subscription.expires_at = None
         subscription.premium_started_at = None
+    if will_renew is not None:
+        subscription.will_renew = will_renew
     await db.commit()
     await db.refresh(subscription)
     return subscription

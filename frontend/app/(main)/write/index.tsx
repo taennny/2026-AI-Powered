@@ -1,5 +1,3 @@
-/** @file app/(main)/write/index.tsx — 프롬프트 입력 + AI 글 생성 화면 */
-
 import React, {useMemo, useState} from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +19,7 @@ import {
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {describeBlogGenerationError} from '@/utils/blogGenerationError';
 
 export default function WriteScreen() {
   const router = useRouter();
@@ -103,8 +102,23 @@ const [prompt, setPrompt] = useState('');
   createdAt: blog.created_at,
 },
       });
-    } catch {
-      Alert.alert('오류', '글 생성에 실패했습니다. 다시 시도해주세요.');
+    } catch (error) {
+      const {title, message, showSubscription} =
+        describeBlogGenerationError(error);
+
+      Alert.alert(
+        title,
+        message,
+        showSubscription
+          ? [
+              {text: '닫기', style: 'cancel'},
+              {
+                text: '구독 보기',
+                onPress: () => router.push('/(main)/settings/subscription'),
+              },
+            ]
+          : undefined,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +157,9 @@ const [prompt, setPrompt] = useState('');
             }`}
             onPress={() => setWritingStyle('info')}
           >
-            <Text className="text-xs font-semibold text-primary">정보 위주</Text>
+            <Text className="text-xs font-semibold text-primary">
+              정보 위주
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity

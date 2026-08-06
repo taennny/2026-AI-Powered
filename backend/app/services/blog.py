@@ -1,11 +1,12 @@
 import uuid
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from app.config import settings
 from app.database import async_session
 from app.models.blog import Blog
 from app.models.daily_record import DailyRecord
@@ -13,7 +14,9 @@ from app.models.enums import GenerationStatus
 from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
+from app.services.subscription import get_user_subscription
 from app.services.timeline_serializer import build_timeline_data, map_style
+from app.utils.timezone import week_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +27,44 @@ class BlogConflictError(Exception):
 
 class BlogStateError(Exception):
     """상태 전이 오류 (400)"""
+
+
+class QuotaExceededError(Exception):
+    """주간 생성 한도 초과 (429)"""
+
+    def __init__(self, limit: int, used: int, reset_at: datetime):
+        super().__init__("이번 주 생성 횟수를 모두 사용했습니다")
+        self.limit = limit
+        self.used = used
+        self.reset_at = reset_at
+
+
+async def get_weekly_usage(
+    db: AsyncSession, user_id: uuid.UUID
+) -> tuple[int, datetime]:
+    """이번 주 생성 사용 횟수와 다음 리셋 시각(UTC aware) 반환.
+
+    실패(FAILED) 건은 세지 않으므로 "생성 실패 시 횟수 복구"가 별도 로직 없이 성립한다.
+    취소 기능은 아직 없지만, 나중에 취소를 FAILED로 기록하면 같은 원리로 복구된다.
+
+    다른 조회와 달리 여기만 `deleted_at IS NULL` 필터를 넣지 않는다.
+    팀 정책이 "글을 받았으면 생성 1회 사용"이라 삭제해도 횟수는 유지돼야 하고,
+    필터를 넣으면 "생성 → 삭제 → 재생성"으로 한도를 무한히 우회할 수 있다.
+    """
+    start, end = week_bounds()
+    used = (
+        await db.execute(
+            select(func.count())
+            .select_from(Blog)
+            .where(
+                Blog.user_id == user_id,
+                Blog.created_at >= start,
+                Blog.created_at < end,
+                Blog.generation_status != GenerationStatus.FAILED,
+            )
+        )
+    ).scalar_one()
+    return used, end
 
 
 async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
@@ -68,12 +109,23 @@ async def create_blog_generation(
     if not daily_record:
         raise ValueError("해당 하루 기록을 찾을 수 없습니다")
 
+    # 무료 사용자 주간 한도 검사 (프리미엄은 무제한)
+    subscription = await get_user_subscription(db, user_id)
+    if subscription.plan_type != "premium":
+        used, reset_at = await get_weekly_usage(db, user_id)
+        if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
+            raise QuotaExceededError(
+                limit=settings.FREE_WEEKLY_BLOG_LIMIT, used=used, reset_at=reset_at
+            )
+
     # 같은 하루 기록으로 생성이 진행 중이면 중복 요청 거절 (완료/실패 건은 허용)
+    # 삭제된 건은 사용자에게 안 보이므로 새 생성을 막으면 안 된다.
     in_progress = (
         await db.execute(
             select(Blog.id).where(
                 Blog.user_id == user_id,
                 Blog.daily_record_id == daily_record_id,
+                Blog.deleted_at.is_(None),
                 Blog.generation_status.in_(
                     [GenerationStatus.PENDING, GenerationStatus.GENERATING]
                 ),
@@ -132,9 +184,13 @@ async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) 
 async def get_blog_by_id(
     db: AsyncSession, blog_id: uuid.UUID, user_id: uuid.UUID
 ) -> Blog:
-    """블로그 단건 조회"""
+    """블로그 단건 조회 (삭제된 글은 없는 것으로 취급)"""
     result = await db.execute(
-        select(Blog).where(Blog.id == blog_id, Blog.user_id == user_id)
+        select(Blog).where(
+            Blog.id == blog_id,
+            Blog.user_id == user_id,
+            Blog.deleted_at.is_(None),
+        )
     )
     blog = result.scalar_one_or_none()
     if not blog:
@@ -151,10 +207,20 @@ async def get_blog_list(
     target_date: date | None = None,
 ) -> tuple[list[Blog], int]:
     """블로그 목록 조회 + 총 개수 (키워드 검색 / 날짜 필터 / 페이지네이션)"""
-    filters = [Blog.user_id == user_id]
+    # 삭제된 글은 목록·총개수 양쪽에서 제외 (filters를 두 쿼리가 공유한다)
+    filters = [Blog.user_id == user_id, Blog.deleted_at.is_(None)]
     if q:
         keyword = f"%{q}%"
-        filters.append(or_(Blog.title.ilike(keyword), Blog.content.ilike(keyword)))
+        # 화면에 보이는 날짜 표기(예: 26.08.06(wed))로도 검색되게 한다.
+        # 포맷은 프론트 formatDate.ts와 동일해야 요일까지 걸린다.
+        date_label = func.to_char(Blog.target_date, "YY.MM.DD(dy)")
+        filters.append(
+            or_(
+                Blog.title.ilike(keyword),
+                Blog.content.ilike(keyword),
+                date_label.ilike(keyword),
+            )
+        )
     if target_date is not None:
         filters.append(Blog.target_date == target_date)
 
@@ -166,7 +232,9 @@ async def get_blog_list(
     result = await db.execute(
         select(Blog)
         .where(*filters)
-        .order_by(Blog.created_at.desc())
+        # created_at이 같은 글이 둘 이상이면 DB가 순서를 보장하지 않아,
+        # 페이지 경계에서 같은 글이 두 번 나오거나 하나가 누락된다.
+        .order_by(Blog.created_at.desc(), Blog.id.desc())
         .offset((page - 1) * size)
         .limit(size)
     )
@@ -201,6 +269,20 @@ async def update_blog(
     await db.commit()
     await db.refresh(blog)
     return blog
+
+
+async def delete_blog(db: AsyncSession, blog_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """블로그 소프트 삭제. 생성 횟수는 유지된다(팀 정책: 글을 받았으면 1회 사용).
+
+    생성 중(pending/generating)이어도 삭제를 허용한다.
+    백그라운드 작업은 완료될 때 generation_status만 바꾸고 deleted_at은 건드리지 않으므로,
+    작업이 끝나도 이 글은 조회·목록에 다시 나타나지 않는다.
+    """
+    # 없는 글이거나 남의 글이거나 이미 삭제된 글이면 여기서 ValueError → 404
+    blog = await get_blog_by_id(db, blog_id, user_id)
+
+    blog.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
 
 
 async def publish_blog(
