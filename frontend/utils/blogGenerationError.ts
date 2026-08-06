@@ -4,7 +4,8 @@
  * 전부 "다시 시도해주세요"로 뭉개면, 다시 시도해도 안 되는 실패(횟수 초과·중복 생성)에서
  * 사용자가 같은 벽에 계속 부딪힌다.
  *
- * 응답 body는 읽지 않고 상태 코드만 본다 — 백엔드가 detail에 뭘 담든 깨지지 않는다.
+ * 상태 코드가 기본이고, 횟수 초과일 때만 body의 `reset_at`을 덧붙여 읽는다.
+ * 없거나 형식이 달라도 문구만 담백해질 뿐 깨지지 않는다.
  */
 
 export type BlogGenerationErrorInfo = {
@@ -14,14 +15,28 @@ export type BlogGenerationErrorInfo = {
   showSubscription: boolean;
 };
 
-/**
- * 횟수 초과 응답 코드. 백엔드와 아직 합의 전이라 셋 다 받아둔다.
- * 확정되면 하나로 좁힐 것. (402가 의미상 가장 맞고, 429는 레이트리밋과 겹침)
- */
-const QUOTA_STATUSES = [402, 403, 429];
+/** 횟수 초과. 권한 부족(403)이나 결제 필요(402)가 아니라 할당량 소진이라 429다 */
+const QUOTA_STATUS = 429;
 
 function statusOf(error: unknown): number | undefined {
   return (error as {response?: {status?: number}})?.response?.status;
+}
+
+/**
+ * 한도가 풀리는 날짜. 백엔드가 `detail.reset_at`에 ISO 문자열로 준다
+ * (주 리셋은 월요일 새벽 4시).
+ */
+function resetDateOf(error: unknown): string | undefined {
+  const detail = (
+    error as {response?: {data?: {detail?: {reset_at?: unknown}}}}
+  )?.response?.data?.detail;
+
+  if (typeof detail?.reset_at !== 'string') return undefined;
+
+  const date = new Date(detail.reset_at);
+  if (Number.isNaN(date.getTime())) return undefined;
+
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 
 function messageOf(error: unknown): string | undefined {
@@ -33,10 +48,15 @@ export function describeBlogGenerationError(
 ): BlogGenerationErrorInfo {
   const status = statusOf(error);
 
-  if (status !== undefined && QUOTA_STATUSES.includes(status)) {
+  if (status === QUOTA_STATUS) {
+    const resetDate = resetDateOf(error);
     return {
-      title: '생성 횟수를 다 썼어요',
-      message: '프리미엄으로 더 많은 글을 만들 수 있어요.',
+      title: '이번 주 생성 횟수를 다 썼어요',
+      // 언제 풀리는지 알려주지 않으면 무료로 계속 쓰려는 사람은
+      // 기다려야 할지 결제해야 할지 판단할 수 없다
+      message: resetDate
+        ? `${resetDate}부터 다시 쓸 수 있어요.\n프리미엄이면 제한 없이 만들 수 있어요.`
+        : '프리미엄이면 제한 없이 만들 수 있어요.',
       showSubscription: true,
     };
   }
