@@ -136,15 +136,26 @@ export async function syncPhotosForDate(
   if (!native) return 0;
   const {MediaLibrary, Network} = native;
 
-  const {status} = await MediaLibrary.getPermissionsAsync();
-  if (status !== 'granted') return 0;
-
-  if (!(await isOnWifi(Network))) return 0;
-
+  // 여기서 잠근다. 권한·네트워크 확인에도 await이 있어서, 그 뒤에 잠그면
+  // usePhotoSync(오늘)와 useCalendar(고른 날짜)가 거의 동시에 들어올 때
+  // 둘 다 통과해 같은 사진을 두 번 올린다.
   isSyncing = true;
   lastSyncedAt.set(dateKey, now);
 
   try {
+    const {status} = await MediaLibrary.getPermissionsAsync();
+    if (status !== 'granted') {
+      // 권한이 없던 것뿐이라 간격을 소진시키지 않는다 — 설정에서 켜고
+      // 돌아오면 바로 다시 시도된다
+      lastSyncedAt.delete(dateKey);
+      return 0;
+    }
+
+    if (!(await isOnWifi(Network))) {
+      lastSyncedAt.delete(dateKey);
+      return 0;
+    }
+
     const {assets} = await MediaLibrary.getAssetsAsync({
       mediaType: 'photo',
       createdAfter: range.start,

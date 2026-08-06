@@ -87,6 +87,20 @@ describe('photoSync', () => {
     expect(uploadedIds()).toEqual(['a.jpg']);
   });
 
+  // usePhotoSync(오늘)와 useCalendar(고른 날짜)가 거의 동시에 들어온다.
+  // 잠그기 전에 await이 있으면 둘 다 통과해 같은 사진을 두 번 올린다
+  it('동시에 불려도 한 번만 올린다', async () => {
+    mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+    const [first, second] = await Promise.all([
+      syncPhotosForDate(TODAY, NOW),
+      syncPhotosForDate(TODAY, NOW),
+    ]);
+
+    expect(first + second).toBe(1);
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+  });
+
   it('iOS의 ph:// 대신 실제 파일 경로로 올린다', async () => {
     mockAssets.mockResolvedValue({assets: [asset('a')]});
 
@@ -155,6 +169,16 @@ describe('photoSync', () => {
 
       await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
       expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    // 권한을 나중에 켜고 돌아왔을 때 5분을 기다리게 하면 안 된다
+    it('권한이 없어 건너뛴 날짜는 권한을 켜면 바로 올린다', async () => {
+      mockPerm.mockResolvedValue({status: 'denied'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      await syncPhotosForDate(TODAY, NOW);
+
+      mockPerm.mockResolvedValue({status: 'granted'});
+      await expect(syncPhotosForDate(TODAY, NOW + 1000)).resolves.toBe(1);
     });
 
     it('셀룰러라 건너뛴 날짜는 와이파이가 되면 바로 올린다', async () => {
