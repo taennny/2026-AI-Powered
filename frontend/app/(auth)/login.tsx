@@ -9,6 +9,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Image,
+  Alert,
 } from 'react-native';
 import {useState} from 'react';
 import {useRouter} from 'expo-router';
@@ -68,8 +69,16 @@ export default function LoginScreen() {
   };
 const handleKakaoLogin = async () => {
   try {
-    const CLIENT_ID = 'fe4f73594264f90fbda73e9847a0c218';
-    const REDIRECT_URI = 'https://api.roame.co.kr/api/v1/auth/kakao/callback';
+    const CLIENT_ID = process.env.EXPO_PUBLIC_KAKAO_REST_API_KEY;
+const REDIRECT_URI = process.env.EXPO_PUBLIC_KAKAO_REDIRECT_URI;
+
+if (!CLIENT_ID || !REDIRECT_URI) {
+  Alert.alert(
+    '카카오 로그인 오류',
+    '카카오 로그인 설정을 확인할 수 없습니다.',
+  );
+  return;
+}
 
     const authUrl =
       `https://kauth.kakao.com/oauth/authorize` +
@@ -116,8 +125,13 @@ if (isNewUser === 'true') {
   router.replace('/');
 }
   } catch (error) {
-    console.log('kakao login error', error);
-  }
+  console.error('kakao login error', error);
+
+  Alert.alert(
+    '카카오 로그인 실패',
+    '로그인 중 오류가 발생했습니다. 다시 시도해주세요.',
+  );
+}
 };
 
   return (

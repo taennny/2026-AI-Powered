@@ -10,7 +10,7 @@
 
 import {useEffect} from 'react';
 import {useLocalSearchParams, useRouter} from 'expo-router';
-import {ActivityIndicator, View} from 'react-native';
+import {ActivityIndicator, Alert, View} from 'react-native';
 
 import {useAuthStore} from '@/store/authStore';
 import {saveTokens} from '@/utils/tokenStorage';
@@ -30,9 +30,18 @@ export default function KakaoLoginScreen() {
     const handleKakaoLogin = async () => {
       try {
         if (!accessToken || !refreshToken) {
-          router.replace('/(auth)/login');
-          return;
-        }
+  Alert.alert(
+    '카카오 로그인 실패',
+    '로그인 정보를 확인할 수 없습니다. 다시 시도해주세요.',
+    [
+      {
+        text: '확인',
+        onPress: () => router.replace('/(auth)/login'),
+      },
+    ],
+  );
+  return;
+}
 
         await saveTokens(accessToken, refreshToken);
         setToken(accessToken);
@@ -44,9 +53,19 @@ export default function KakaoLoginScreen() {
 
         router.replace('/(main)/(tabs)/home');
       } catch (error) {
-        console.log('카카오 딥링크 처리 오류:', error);
-        router.replace('/(auth)/login');
-      }
+  console.error('카카오 딥링크 처리 오류:', error);
+
+  Alert.alert(
+    '카카오 로그인 실패',
+    '로그인 처리 중 오류가 발생했습니다. 다시 시도해주세요.',
+    [
+      {
+        text: '확인',
+        onPress: () => router.replace('/(auth)/login'),
+      },
+    ],
+  );
+}
     };
 
     void handleKakaoLogin();

@@ -22,10 +22,13 @@ export default function WritePreviewScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {blogId, title, content} = useLocalSearchParams<{
+  const {blogId, title, content, targetData, createdAt} =
+  useLocalSearchParams<{
     blogId?: string;
     title?: string;
     content?: string;
+    targetData?: string;
+    createdAt?: string;
   }>();
 
   const [journalTitle, setJournalTitle] = useState(title || '');
@@ -34,6 +37,17 @@ export default function WritePreviewScreen() {
 
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
+  const formatDate = (date?: string) => {
+  if (!date) return '-';
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return parsedDate.toLocaleDateString('ko-KR');
+};
 
   const handleCancelPress = () => {
     Alert.alert('작성 취소', '수정 중인 글을 취소할까요?', [
@@ -107,6 +121,15 @@ export default function WritePreviewScreen() {
           alignItems: 'center',
         }}
       >
+        <View className="w-[90%] mb-5">
+  <Text className="text-sm font-semibold text-primary">
+    위치 기록 날짜 {formatDate(targetData)}
+  </Text>
+
+  <Text className="mt-1 text-xs text-muted">
+    기록일 {formatDate(createdAt)}
+  </Text>
+</View>
         <TextInput
           className="text-base font-bold text-primary mb-4"
           style={{width: '90%', padding: 0, textAlign: 'center'}}

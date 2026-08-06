@@ -54,6 +54,8 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
+  target_data: string;
+  created_at: string;
   photo_urls?: string[];
 };
 

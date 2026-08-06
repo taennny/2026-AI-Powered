@@ -8,20 +8,27 @@ import {View, Text, TouchableOpacity, Animated} from 'react-native';
 import {useRef, useEffect} from 'react';
 import {router, usePathname} from 'expo-router';
 
-type Tab = 'home' | 'journal';
+type Tab = 'home' | 'journal' | 'photos';
 
 const ACTIVE_FLEX = 52;
 const INACTIVE_FLEX = 48;
 
 export default function SectionTabs() {
   const pathname = usePathname();
-  const activeTab: Tab = pathname.includes('journal') ? 'journal' : 'home';
+  const activeTab: Tab = pathname.includes('photo-folder')
+  ? 'photos'
+  : pathname.includes('journal')
+    ? 'journal'
+    : 'home';
   const homeFlex = useRef(
     new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX),
   ).current;
   const journalFlex = useRef(
     new Animated.Value(activeTab === 'journal' ? ACTIVE_FLEX : INACTIVE_FLEX),
   ).current;
+  const photoFlex = useRef(
+  new Animated.Value(activeTab === 'photos' ? ACTIVE_FLEX : INACTIVE_FLEX),
+).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -37,17 +44,26 @@ export default function SectionTabs() {
         tension: 38,
         friction: 14,
       }),
+      Animated.spring(photoFlex, {
+  toValue: activeTab === 'photos' ? ACTIVE_FLEX : INACTIVE_FLEX,
+  useNativeDriver: false,
+  tension: 38,
+  friction: 14,
+}),
     ]).start();
-  }, [activeTab]);
+  }, [activeTab, homeFlex, journalFlex, photoFlex]);
 
   const handleTabPress = (tab: Tab) => {
-    if (tab === activeTab) return;
-    if (tab === 'home') {
-      router.replace('/(main)/(tabs)/home');
-    } else {
-      router.replace('/(main)/(tabs)/journal-list');
-    }
-  };
+  if (tab === activeTab) return;
+
+  if (tab === 'home') {
+    router.replace('/(main)/(tabs)/home');
+  } else if (tab === 'journal') {
+    router.replace('/(main)/(tabs)/journal-list');
+  } else {
+    router.replace('/(main)/(tabs)/photo-folder');
+  }
+};
 
   return (
     <View className="bg-surface flex-row pt-2">
@@ -65,8 +81,14 @@ export default function SectionTabs() {
           }}
         >
           <Text
-            className={`text-[13px] tracking-[0.3px] ${activeTab === 'home' ? 'font-semibold text-primary' : 'font-normal text-secondary'}`}
-          />
+  className={`text-[13px] tracking-[0.3px] ${
+    activeTab === 'home'
+      ? 'font-semibold text-primary'
+      : 'font-normal text-secondary'
+  }`}
+>
+  홈
+</Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -83,9 +105,39 @@ export default function SectionTabs() {
                 : '0 -1px 4px rgba(0,0,0,0.05)',
           }}
         >
-          <Text
-            className={`text-[13px] tracking-[0.3px] ${activeTab === 'journal' ? 'font-semibold text-primary' : 'font-normal text-secondary'}`}
-          />
+        <Text
+  className={`text-[13px] tracking-[0.3px] ${
+    activeTab === 'journal'
+      ? 'font-semibold text-primary'
+      : 'font-normal text-secondary'
+  }`}
+>
+  저널
+</Text>
+<Animated.View
+  style={{flex: photoFlex, zIndex: activeTab === 'photos' ? 1 : 0}}
+>
+  <TouchableOpacity
+    onPress={() => handleTabPress('photos')}
+    className="items-center bg-card rounded-tl-[10px] rounded-tr-[10px] py-2"
+    style={{
+      boxShadow:
+        activeTab === 'photos'
+          ? '-3px -2px 6px rgba(0,0,0,0.09)'
+          : '0 -1px 4px rgba(0,0,0,0.05)',
+    }}
+  >
+    <Text
+      className={`text-[13px] tracking-[0.3px] ${
+        activeTab === 'photos'
+          ? 'font-semibold text-primary'
+          : 'font-normal text-secondary'
+      }`}
+    >
+      사진
+    </Text>
+  </TouchableOpacity>
+</Animated.View>
         </TouchableOpacity>
       </Animated.View>
     </View>

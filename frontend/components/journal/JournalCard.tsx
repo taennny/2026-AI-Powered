@@ -9,7 +9,7 @@ import {View, Text, TouchableOpacity} from 'react-native';
 
 import {type JournalData} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDateStr, formatTimeAgo} from '@/utils/formatDate';
+import {formatDateStr} from '@/utils/formatDate';
 
 type Props = {
   data: JournalData;
@@ -43,10 +43,15 @@ export default function JournalCard({data, query = ''}: Props) {
       className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px]"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
-      <View className="flex-row justify-between mb-1">
-        <Text className="text-[13px] font-semibold text-primary">{formatDateStr(data.date)}</Text>
-        <Text className="text-xs text-tertiary">{formatTimeAgo(data.created_at)}</Text>
-      </View>
+      <View className="mb-2">
+  <Text className="text-[13px] font-semibold text-primary">
+    위치 기록일 {formatDateStr(data.date)}
+  </Text>
+
+  <Text className="text-[11px] text-tertiary mt-1">
+    작성일 {formatDateStr(data.created_at)}
+  </Text>
+</View>
       <HighlightText
         text={data.title}
         query={query}
