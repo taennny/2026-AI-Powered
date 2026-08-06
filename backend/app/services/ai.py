@@ -147,9 +147,7 @@ async def analyze_and_save(
     # 6. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
     # 지우지 않으면 analyze를 부를 때마다 같은 체류가 통째로 다시 insert되어
     # 타임라인에 같은 카드가 계속 쌓인다.
-    await db.execute(
-        delete(Place).where(Place.daily_record_id == daily_record.id)
-    )
+    await db.execute(delete(Place).where(Place.daily_record_id == daily_record.id))
 
     for stay in stays:
         place = Place(
