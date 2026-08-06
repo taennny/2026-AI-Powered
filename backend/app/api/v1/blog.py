@@ -21,6 +21,7 @@ from app.services.blog import (
     BlogStateError,
     QuotaExceededError,
     create_blog_generation,
+    delete_blog,
     get_blog_by_id,
     get_blog_list,
     publish_blog,
@@ -155,6 +156,19 @@ async def edit_blog(
         raise HTTPException(status_code=404, detail=str(e))
 
     return blog
+
+
+@router.delete("/api/v1/blog/{blog_id}", status_code=204)
+async def remove_blog(
+    blog_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """블로그 삭제 (소프트 삭제 — 주간 생성 횟수는 유지된다)"""
+    try:
+        await delete_blog(db, blog_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/api/v1/blog/{blog_id}/publish", response_model=BlogPublishResponse)
