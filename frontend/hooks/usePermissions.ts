@@ -6,6 +6,7 @@ import * as MediaLibrary from 'expo-media-library';
 
 import {PERMISSION_MESSAGES} from '@/constants/permissionMessages';
 import {startGpsTracking} from '@/hooks/useGpsTracking';
+import {useSettingsStore} from '@/store/settingsStore';
 
 type PermissionMessage = {title: string; message: string};
 
@@ -107,7 +108,14 @@ async function checkLocationAndStartTracking() {
   const granted = await ensureLocationPermissions();
   if (!granted) return;
 
-  await startGpsTracking();
+  // 사용자가 설정에서 껐으면 권한이 있어도 시작하지 않는다.
+  // 복원 전이면 기본값(켬)이라 잠깐 켜졌다 꺼지는 대신, 복원을 기다린다.
+  const settings = useSettingsStore.getState();
+  if (!settings.hasLoaded) await settings.initialize();
+  if (useSettingsStore.getState().isTrackingEnabled) {
+    await startGpsTracking();
+  }
+
   await ensurePhotoLibraryPermission();
 }
 

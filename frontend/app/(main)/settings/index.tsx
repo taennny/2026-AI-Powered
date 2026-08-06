@@ -6,6 +6,8 @@ const MENU_ITEMS = [
   {label: '계정', route: '/(main)/settings/account'},
   {label: '구독', route: '/(main)/settings/subscription'},
   {label: '테마', route: '/(main)/settings/theme'},
+  // 위치 기록 토글이 들어 있다. 사진 모아보기도 여기 붙을 예정
+  {label: '기록', route: '/(main)/settings/records'},
 ] as const;
 
 export default function SettingsScreen() {
