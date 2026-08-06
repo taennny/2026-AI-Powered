@@ -200,7 +200,16 @@ async def get_blog_list(
     filters = [Blog.user_id == user_id]
     if q:
         keyword = f"%{q}%"
-        filters.append(or_(Blog.title.ilike(keyword), Blog.content.ilike(keyword)))
+        # 화면에 보이는 날짜 표기(예: 26.08.06(wed))로도 검색되게 한다.
+        # 포맷은 프론트 formatDate.ts와 동일해야 요일까지 걸린다.
+        date_label = func.to_char(Blog.target_date, "YY.MM.DD(dy)")
+        filters.append(
+            or_(
+                Blog.title.ilike(keyword),
+                Blog.content.ilike(keyword),
+                date_label.ilike(keyword),
+            )
+        )
     if target_date is not None:
         filters.append(Blog.target_date == target_date)
 
