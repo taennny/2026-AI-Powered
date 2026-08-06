@@ -18,7 +18,7 @@ from app.schemas.auth import (
     KakaoLoginRequest,
     KakaoLoginResponse,
 )
-from app.services.auth import register_user, login_user, kakao_login
+from app.services.auth import register_user, login_user, kakao_login, withdraw_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -120,3 +120,12 @@ async def get_me(current_user: User = Depends(get_current_user)):
     """현재 로그인한 유저 정보 조회"""
     # user_id: RevenueCat Purchases.logIn()에 넘길 우리 서비스 식별자
     return {"user_id": current_user.id, "email": current_user.email}
+
+
+@router.delete("/me", status_code=204)
+async def delete_me(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """회원 탈퇴 — 유저 + 연관 데이터 완전 삭제"""
+    await withdraw_user(db, current_user.id)

@@ -1,8 +1,14 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
+from app.models.blog import Blog
+from app.models.daily_record import DailyRecord
+from app.models.gps_log import GpsLog
+from app.models.photos import Photo
+from app.models.place import Place
+from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, LoginRequest
 from app.utils.jwt import create_access_token, create_refresh_token
@@ -137,3 +143,25 @@ async def kakao_login(db: AsyncSession, code: str) -> dict:
         "token_type": "Bearer",
         "is_new_user": is_new_user,
     }
+
+
+async def withdraw_user(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """회원 탈퇴 — 유저 + 연관 데이터 완전 삭제.
+
+    FK 의존성 역순으로 삭제한다 (자식 테이블 먼저).
+    payment, webhook_event는 B의 alembic 마이그레이션이 아직 안 돌아가서
+    실제 DB에 테이블이 없다 — 마이그레이션 반영되면 다시 추가할 것.
+    """
+    await db.execute(delete(Place).where(Place.user_id == user_id))
+    await db.execute(delete(Photo).where(Photo.user_id == user_id))
+    await db.execute(delete(Blog).where(Blog.user_id == user_id))
+    await db.execute(delete(DailyRecord).where(DailyRecord.user_id == user_id))
+    await db.execute(delete(GpsLog).where(GpsLog.user_id == user_id))
+    await db.execute(delete(Subscription).where(Subscription.user_id == user_id))
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user:
+        await db.delete(user)
+
+    await db.commit()
