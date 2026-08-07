@@ -17,6 +17,7 @@ from app.schemas.blog import (
     BlogUpdateRequest,
 )
 from app.services.blog import (
+    build_summary,
     BlogConflictError,
     BlogStateError,
     QuotaExceededError,
@@ -50,7 +51,7 @@ async def list_blogs(
             id=b.id,
             date=b.target_date,
             title=b.title,
-            summary=(b.content[:100] if b.content else None),
+            summary=build_summary(b.content, q),
             thumbnail_url=None,
             is_published=b.is_published,
             created_at=b.created_at,
