@@ -9,15 +9,22 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
-import {KAKAO_APP_REDIRECT, KAKAO_LINK_URL} from '@/constants/kakao';
+import {KAKAO_LINK_APP_REDIRECT} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
-import {fetchMe, deleteAccount, type UserMe} from '@/services/authApi';
+import {
+  fetchMe,
+  deleteAccount,
+  fetchKakaoLinkUrl,
+  type UserMe,
+} from '@/services/authApi';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
   const [user, setUser] = useState<UserMe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     fetchMe()
@@ -58,11 +65,46 @@ export default function AccountScreen() {
   };
 
   const handleKakaoLink = async () => {
+    if (linking) return;
+    setLinking(true);
     try {
-      await WebBrowser.openAuthSessionAsync(KAKAO_LINK_URL, KAKAO_APP_REDIRECT);
+      // 서버가 state 토큰을 심은 카카오 URL을 만들어 준다. 브라우저로 직접
+      // 열면 Authorization 헤더가 안 실려 401이라, axios로 받아서 넘긴다.
+      const authorizeUrl = await fetchKakaoLinkUrl();
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        authorizeUrl,
+        KAKAO_LINK_APP_REDIRECT,
+      );
+
+      // 사용자가 브라우저를 닫으면 dismiss/cancel — 조용히 넘어간다
+      if (result.type !== 'success' || !result.url) return;
+
+      const {queryParams} = Linking.parse(result.url);
+      if (queryParams?.success !== 'true') {
+        const reason = queryParams?.reason;
+        // 백엔드는 실패 사유를 그대로 내려준다. 대부분 그대로 보여줄 수 있는
+        // 한글 문구지만 invalid_state만 코드라 우리가 문장으로 바꾼다.
+        // (state는 5분 만료라 카카오 로그인이 길어지면 실제로 난다)
+        Alert.alert(
+          '연동 실패',
+          reason === 'invalid_state'
+            ? '연동 요청이 만료됐어요. 다시 시도해주세요.'
+            : typeof reason === 'string' && reason
+              ? reason
+              : '카카오 연동에 실패했어요. 다시 시도해주세요.',
+        );
+        return;
+      }
+
+      // 연동 여부는 서버가 판정한다 — 낙관적으로 켜지 않고 다시 물어본다
+      setUser(await fetchMe());
+      Alert.alert('연동 완료', '카카오 계정이 연동됐어요.');
     } catch (error) {
       console.log('kakao link error', error);
       Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setLinking(false);
     }
   };
 
@@ -117,12 +159,13 @@ export default function AccountScreen() {
             ) : (
               <TouchableOpacity
                 onPress={handleKakaoLink}
+                disabled={linking}
                 activeOpacity={0.8}
                 className="flex-row items-center gap-x-[10px] bg-[#FEE500] py-[10px] px-4 rounded-xl self-start"
               >
                 <Text className="text-sm font-bold text-[#3C1E1E]">K</Text>
                 <Text className="text-sm font-semibold text-[#3C1E1E]">
-                  카카오 연동하기
+                  {linking ? '연동 중…' : '카카오 연동하기'}
                 </Text>
               </TouchableOpacity>
             )}

@@ -15,9 +15,6 @@ export const KAKAO_REST_API_KEY =
 /** 백엔드 콜백 — 카카오 개발자 콘솔에 등록된 값과 정확히 일치해야 한다 */
 export const KAKAO_REDIRECT_URI = `${API_BASE_URL}/api/v1/auth/kakao/callback`;
 
-/** 계정 연동 진입점 — 콜백이 source를 그대로 돌려주면 연동 후 설정 화면으로 복귀한다 */
-export const KAKAO_LINK_URL = `${API_BASE_URL}/auth/kakao/link?source=account-link`;
-
 /**
  * 앱으로 돌아오는 딥링크 스킴 — `openAuthSessionAsync`의 returnUrl로 쓴다.
  *
@@ -28,6 +25,16 @@ export const KAKAO_LINK_URL = `${API_BASE_URL}/auth/kakao/link?source=account-li
  * (backend/app/api/v1/auth.py).
  */
 export const KAKAO_APP_REDIRECT = 'roameapp://kakao-login';
+
+/**
+ * 계정 연동이 끝나고 돌아오는 딥링크 — 로그인과 **다른 경로**여야 한다.
+ *
+ * 연동은 새 토큰을 만들지 않는다. 로그인 콜백 화면(`(auth)/kakao-login.tsx`)은
+ * 토큰이 없으면 로그인 화면으로 보내버리므로, 같은 경로를 쓰면
+ * 연동에 성공하고도 로그아웃된다. 백엔드는
+ * `roameapp://kakao-link?success=true|false&reason=...`으로 리다이렉트한다.
+ */
+export const KAKAO_LINK_APP_REDIRECT = 'roameapp://kakao-link';
 
 export function buildKakaoAuthUrl(): string {
   return (
