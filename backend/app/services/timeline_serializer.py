@@ -48,14 +48,10 @@ def _resolve_timezone(name: str | None) -> ZoneInfo:
         return ZoneInfo(DEFAULT_TIMEZONE)
 
 
-def build_timeline_data(
-    daily_record: DailyRecord,
-    user: User,
-    places: list[Place],
-) -> dict:
-    """AI 서버 /generate가 기대하는 timeline_data 구조로 직렬화."""
+def _build_blocks(daily_record: DailyRecord, places: list[Place]) -> list[dict]:
+    """하루치 장소 목록을 blocks로 변환. seq는 그 날 안에서 1부터 시작한다."""
     tz = _resolve_timezone(daily_record.timezone)
-    blocks = [
+    return [
         {
             "seq": seq,
             "start": _local_hhmm(place.arrived_at, tz),
@@ -67,11 +63,57 @@ def build_timeline_data(
         for seq, place in enumerate(places, start=1)
     ]
 
+
+def _build_user(user: User) -> dict:
+    """AI 서버가 읽는 user 블록. 여러 날 payload에서도 최상위에 한 번만 들어간다."""
+    return {
+        "nickname": user.nickname,
+        "taste_tags": [],
+    }
+
+
+def build_timeline_data(
+    daily_record: DailyRecord,
+    user: User,
+    places: list[Place],
+) -> dict:
+    """AI 서버 /generate가 기대하는 timeline_data 구조로 직렬화 (하루짜리)."""
     return {
         "date": daily_record.target_date.isoformat(),
-        "user": {
-            "nickname": user.nickname,
-            "taste_tags": [],
-        },
-        "blocks": blocks,
+        "user": _build_user(user),
+        "blocks": _build_blocks(daily_record, places),
+    }
+
+
+def build_multi_day_timeline_data(
+    days_data: list[tuple[DailyRecord, list[Place]]],
+    user: User,
+) -> dict:
+    """여러 날을 한 편으로 묶는 payload (모아쓰기).
+
+    AI팀 합의 규격:
+      - `days` 배열에 날짜별 {date, blocks}를 담고, 최상위 `blocks`는 넣지 않는다.
+      - `user`는 최상위에 한 번만 둔다.
+      - `timezone` 필드는 넣지 않는다 (여기서 이미 현지 시각으로 변환해 보내므로).
+      - seq는 날짜별로 1부터 다시 시작한다.
+
+    최상위 `date`(시작일)를 여러 날일 때도 유지하는 이유:
+    AI 서버 serialize()가 `data['date']`를 필수 키로 읽기 때문에,
+    AI팀이 days 지원을 넣기 전에 백엔드가 먼저 배포돼도 KeyError로 죽지 않게 하는 안전장치다.
+    (그 덕분에 양쪽 배포 순서를 맞출 필요가 없다)
+
+    days_data는 날짜 오름차순으로 정렬돼 있어야 하며, 기록이 없는 날은 호출 측에서 제외한다.
+    """
+    days = [
+        {
+            "date": daily_record.target_date.isoformat(),
+            "blocks": _build_blocks(daily_record, places),
+        }
+        for daily_record, places in days_data
+    ]
+
+    return {
+        "date": days[0]["date"],
+        "user": _build_user(user),
+        "days": days,
     }

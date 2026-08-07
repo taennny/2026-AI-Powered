@@ -21,6 +21,7 @@ from app.services.blog import (
     BlogStateError,
     QuotaExceededError,
     create_blog_generation,
+    create_period_blog_generation,
     delete_blog,
     get_blog_by_id,
     get_blog_list,
@@ -49,6 +50,7 @@ async def list_blogs(
         BlogListItem(
             id=b.id,
             date=b.target_date,
+            period_end=b.period_end,
             title=b.title,
             summary=(b.content[:100] if b.content else None),
             thumbnail_url=None,
@@ -69,11 +71,20 @@ async def generate_blog(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """AI 블로그 생성 요청 (비동기)"""
+    """AI 블로그 생성 요청 (비동기). 하루짜리 / 여러 날 모아쓰기 모두 처리"""
     try:
-        blog = await create_blog_generation(
-            db, current_user.id, request.daily_record_id, request.style
-        )
+        if request.daily_record_id is not None:
+            blog = await create_blog_generation(
+                db, current_user.id, request.daily_record_id, request.style
+            )
+        else:
+            blog = await create_period_blog_generation(
+                db,
+                current_user.id,
+                request.start_date,
+                request.end_date,
+                request.style,
+            )
     except QuotaExceededError as e:
         # 프론트가 "다음 주 월요일부터" 안내에 바로 쓰도록 reset_at은 KST ISO 문자열
         raise HTTPException(
