@@ -45,6 +45,8 @@ def _register_spatialite_stubs(dbapi_conn, connection_record):
     dbapi_conn.create_function("CreateSpatialIndex", -1, lambda *args: 1)
     dbapi_conn.create_function("DisableSpatialIndex", -1, lambda *args: 1)
     dbapi_conn.create_function("CheckSpatialIndex", -1, lambda *args: 1)
+    # 장소 INSERT에 쓰인다. 블로그 생성은 좌표를 읽지 않으므로 원문을 그대로 저장한다.
+    dbapi_conn.create_function("GeomFromEWKT", 1, lambda wkt: wkt)
     # Postgres 전용 함수라 SQLite엔 없다 (저널 날짜 검색에서 사용)
     dbapi_conn.create_function("to_char", 2, _to_char)
 
