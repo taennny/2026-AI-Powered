@@ -2,18 +2,18 @@ import {useState} from 'react';
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {useThemeColors} from '@/hooks/useThemeColors';
-
-type BillingCycle = 'monthly' | 'annual';
+import {type BillingCycle} from '@/services/subscriptionApi';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
   {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual',  label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
 ];
 
 const BENEFITS = ['테마 적용 가능', '광고 안 보기', '글쓰기 무한'];
 
 type Props = {
-  onSubscribe: () => void;
+  /** 고른 결제 주기를 함께 넘긴다 — 안 넘기면 서버가 무조건 월간으로 만든다 */
+  onSubscribe: (billingCycle: BillingCycle) => void;
 };
 
 export default function FreeView({onSubscribe}: Props) {
@@ -22,7 +22,9 @@ export default function FreeView({onSubscribe}: Props) {
 
   return (
     <View className="flex-1 px-6 pt-5">
-      <Text className="text-base font-bold text-primary mb-5">프리미엄 플랜</Text>
+      <Text className="text-base font-bold text-primary mb-5">
+        프리미엄 플랜
+      </Text>
 
       <View className="gap-y-[14px] mb-6">
         {PLANS.map(plan => {
@@ -41,7 +43,9 @@ export default function FreeView({onSubscribe}: Props) {
                   borderColor: isSelected ? tc.primary : tc.tertiary,
                 }}
               >
-                {isSelected && <View className="w-[10px] h-[10px] rounded-full bg-primary" />}
+                {isSelected && (
+                  <View className="w-[10px] h-[10px] rounded-full bg-primary" />
+                )}
               </View>
               <Text className="text-[15px] text-primary">{plan.label}</Text>
             </TouchableOpacity>
@@ -52,14 +56,23 @@ export default function FreeView({onSubscribe}: Props) {
       <View className="bg-teal-bg rounded-2xl py-[18px] px-5 mb-7 gap-y-2">
         <Text className="text-[13px] text-secondary mb-1">구독 혜택</Text>
         {BENEFITS.map(benefit => (
-          <Text key={benefit} className="text-[15px] font-semibold text-primary">
+          <Text
+            key={benefit}
+            className="text-[15px] font-semibold text-primary"
+          >
             ✓ {benefit}
           </Text>
         ))}
       </View>
 
-      <TouchableOpacity activeOpacity={0.85} onPress={onSubscribe} className="bg-btn-bg rounded-[28px] py-4 items-center">
-        <Text className="text-[15px] font-bold text-btn-text">로미 프리미엄 시작하기</Text>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => onSubscribe(selected)}
+        className="bg-btn-bg rounded-[28px] py-4 items-center"
+      >
+        <Text className="text-[15px] font-bold text-btn-text">
+          로미 프리미엄 시작하기
+        </Text>
       </TouchableOpacity>
     </View>
   );

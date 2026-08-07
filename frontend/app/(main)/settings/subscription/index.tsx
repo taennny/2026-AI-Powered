@@ -8,7 +8,11 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
-import {subscribePremium, cancelSubscription} from '@/services/subscriptionApi';
+import {
+  subscribePremium,
+  cancelSubscription,
+  type BillingCycle,
+} from '@/services/subscriptionApi';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
 import PremiumView from '@/components/subscription/PremiumView';
 import FreeView from '@/components/subscription/FreeView';
@@ -24,8 +28,9 @@ export default function SubscriptionScreen() {
   const loading = !subscription.hasLoaded;
   const isPremium = subscription.isPremium();
 
-  const handleSubscribe = () => {
-    Alert.alert('프리미엄 구독', '로미 프리미엄을 시작할까요?', [
+  const handleSubscribe = (billingCycle: BillingCycle) => {
+    const label = billingCycle === 'annual' ? '연간' : '월간';
+    Alert.alert('프리미엄 구독', `로미 프리미엄을 ${label}으로 시작할까요?`, [
       {text: '취소', style: 'cancel'},
       {
         text: '확인',
@@ -33,7 +38,7 @@ export default function SubscriptionScreen() {
           try {
             // 서버 응답을 받고 나서 상태를 갱신한다 — 먼저 화면을 바꾸면
             // 결제가 실패했을 때 유료 기능이 잠깐 열린다
-            await subscribePremium();
+            await subscribePremium(billingCycle);
 
             // 결제 반영은 웹훅을 거쳐 몇 초 늦을 수 있다. 한 번만 조회하면
             // 아직 free라 결제가 실패한 것처럼 보인다
@@ -118,6 +123,7 @@ export default function SubscriptionScreen() {
         <PremiumView
           subscription={{
             plan: subscription.plan,
+            billing_cycle: subscription.billingCycle,
             is_active: subscription.isActive,
             started_at: subscription.startedAt,
             expires_at: subscription.expiresAt,

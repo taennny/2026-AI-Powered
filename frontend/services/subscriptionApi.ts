@@ -1,7 +1,11 @@
 import {api} from '@/utils/api';
 
+/** 결제 주기. 서버도 같은 문자열을 쓰고 만료일을 30일/365일로 계산한다 */
+export type BillingCycle = 'monthly' | 'annual';
+
 type SubscriptionResponse = {
   plan: 'free' | 'premium';
+  billing_cycle?: BillingCycle;
   is_active: boolean;
   started_at: string | null;
   expires_at: string | null;
@@ -15,6 +19,7 @@ type SubscriptionResponse = {
 
 export type SubscriptionStatus = {
   plan: 'free' | 'premium';
+  billing_cycle: BillingCycle;
   is_active: boolean;
   started_at: string | null;
   expires_at: string | null;
@@ -22,9 +27,13 @@ export type SubscriptionStatus = {
 };
 
 export async function fetchSubscription(): Promise<SubscriptionStatus> {
-  const {data} = await api.get<SubscriptionResponse>('/api/v1/subscriptions/me');
+  const {data} = await api.get<SubscriptionResponse>(
+    '/api/v1/subscriptions/me',
+  );
   return {
     plan: data.plan,
+    // 옛 서버는 안 내려준다 — 그때는 월간으로 본다 (서버 기본값과 같다)
+    billing_cycle: data.billing_cycle ?? 'monthly',
     is_active: data.is_active,
     started_at: data.started_at,
     expires_at: data.expires_at,
@@ -33,8 +42,13 @@ export async function fetchSubscription(): Promise<SubscriptionStatus> {
   };
 }
 
-export async function subscribePremium(): Promise<void> {
-  await api.put('/api/v1/subscriptions/me', {plan_type: 'premium'});
+export async function subscribePremium(
+  billingCycle: BillingCycle = 'monthly',
+): Promise<void> {
+  await api.put('/api/v1/subscriptions/me', {
+    plan_type: 'premium',
+    billing_cycle: billingCycle,
+  });
 }
 
 export async function cancelSubscription(): Promise<void> {

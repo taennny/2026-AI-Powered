@@ -1,6 +1,7 @@
 import {fetchSubscription} from '@/services/subscriptionApi';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
 import {useThemeStore} from '@/store/themeStore';
+import {clearWasPremium, getWasPremium} from '@/utils/subscriptionStorage';
 
 jest.mock('@/services/subscriptionApi', () => ({
   fetchSubscription: jest.fn(),
@@ -10,6 +11,7 @@ const mockFetch = fetchSubscription as jest.Mock;
 
 const premium = (expiresAt: string | null = '2099-01-01T00:00:00Z') => ({
   plan: 'premium',
+  billing_cycle: 'monthly',
   is_active: true,
   started_at: '2026-01-01T00:00:00Z',
   expires_at: expiresAt,
@@ -18,6 +20,7 @@ const premium = (expiresAt: string | null = '2099-01-01T00:00:00Z') => ({
 
 const free = {
   plan: 'free',
+  billing_cycle: 'monthly',
   is_active: false,
   started_at: null,
   expires_at: null,
@@ -25,10 +28,12 @@ const free = {
 };
 
 describe('subscriptionStore', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     mockFetch.mockReset();
     useSubscriptionStore.getState().reset();
     useThemeStore.setState({themeId: 'basic'});
+    // reset()의 정리는 fire-and-forget이라 여기서 확실히 끝내고 시작한다
+    await clearWasPremium();
   });
 
   it('서버가 준 값을 그대로 반영한다', async () => {
@@ -142,9 +147,13 @@ describe('subscriptionStore', () => {
     beforeEach(() => jest.useFakeTimers());
     afterEach(() => jest.useRealTimers());
 
-    /** 대기와 promise를 함께 흘린다 */
+    /**
+     * 대기와 promise를 함께 흘린다.
+     * refresh() 한 번에 AsyncStorage 왕복(만료 판정용)까지 끼므로
+     * 재조회 횟수보다 넉넉히 돌린다.
+     */
     const runAll = async (promise: Promise<boolean>) => {
-      for (let i = 0; i < 10; i += 1) {
+      for (let i = 0; i < 60; i += 1) {
         await Promise.resolve();
         jest.runOnlyPendingTimers();
       }
@@ -196,6 +205,15 @@ describe('subscriptionStore', () => {
     });
   });
 
+  // 안 보내면 서버가 무조건 월간으로 만든다 — 연간을 고른 사람이 30일 뒤 끊긴다
+  it('서버가 준 결제 주기를 반영한다', async () => {
+    mockFetch.mockResolvedValue({...premium(), billing_cycle: 'annual'});
+
+    await useSubscriptionStore.getState().refresh();
+
+    expect(useSubscriptionStore.getState().billingCycle).toBe('annual');
+  });
+
   it('reset은 다음 계정을 위해 상태를 비운다', async () => {
     mockFetch.mockResolvedValue(premium());
     await useSubscriptionStore.getState().refresh();
@@ -204,5 +222,100 @@ describe('subscriptionStore', () => {
 
     expect(useSubscriptionStore.getState().isPremium()).toBe(false);
     expect(useSubscriptionStore.getState().hasLoaded).toBe(false);
+  });
+
+  describe('만료 안내', () => {
+    it('프리미엄이었다가 끊기면 justExpired가 켜진다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+
+      mockFetch.mockResolvedValueOnce(free);
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().justExpired).toBe(true);
+    });
+
+    // 만료는 대개 앱이 꺼져 있을 때 지난다. 메모리 비교만으로는 못 잡는다
+    it('앱을 껐다 켜도 잡는다 — 디스크에 남긴 값과 비교한다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+
+      // 앱 재시작: 스토어는 초기 상태로 돌아가지만 디스크 값은 남는다
+      useSubscriptionStore.setState({
+        plan: 'free',
+        isActive: false,
+        expiresAt: null,
+        justExpired: false,
+        hasLoaded: false,
+      });
+
+      mockFetch.mockResolvedValueOnce(free);
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().justExpired).toBe(true);
+    });
+
+    // 비행기 모드일 뿐인데 "구독이 만료됐어요"가 뜨면 안 된다
+    it('조회 실패로 free가 된 것은 만료로 보지 않는다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+
+      mockFetch.mockRejectedValueOnce(new Error('network'));
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().isPremium()).toBe(false);
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+      // 디스크 값도 건드리지 않는다 — 다음에 진짜 만료를 잡아야 한다
+      expect(await getWasPremium()).toBe(true);
+    });
+
+    it('계속 무료인 사용자에게는 뜨지 않는다', async () => {
+      mockFetch.mockResolvedValue(free);
+
+      await useSubscriptionStore.getState().refresh();
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+    });
+
+    it('해지를 예약했을 뿐 만료 전이면 뜨지 않는다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+
+      mockFetch.mockResolvedValueOnce({...premium(), will_renew: false});
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().isPremium()).toBe(true);
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+    });
+
+    it('안내한 뒤에는 꺼진다 — 복귀할 때마다 다시 뜨면 안 된다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+      mockFetch.mockResolvedValueOnce(free);
+      await useSubscriptionStore.getState().refresh();
+
+      useSubscriptionStore.getState().acknowledgeExpiry();
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+
+      // 이후 복귀에서 다시 조회해도 켜지지 않는다
+      mockFetch.mockResolvedValueOnce(free);
+      await useSubscriptionStore.getState().refresh();
+
+      expect(useSubscriptionStore.getState().justExpired).toBe(false);
+    });
+
+    // 프리미엄 쓰던 계정이 로그아웃한 뒤 무료 계정이 들어오는 경우
+    it('로그아웃하면 디스크 기록도 지운다', async () => {
+      mockFetch.mockResolvedValueOnce(premium());
+      await useSubscriptionStore.getState().refresh();
+      expect(await getWasPremium()).toBe(true);
+
+      useSubscriptionStore.getState().reset();
+      await Promise.resolve();
+
+      expect(await getWasPremium()).toBe(false);
+    });
   });
 });

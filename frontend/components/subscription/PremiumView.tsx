@@ -1,10 +1,12 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 
-import {type SubscriptionStatus} from '@/services/subscriptionApi';
+import {
+  type BillingCycle,
+  type SubscriptionStatus,
+} from '@/services/subscriptionApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
-type BillingCycle = 'monthly' | 'annual';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
   {id: 'monthly', label: '월 ₩7,500'},
@@ -18,8 +20,7 @@ function getDaysCount(startedAt: string): number {
 
 export default function PremiumView({subscription, onCancel}: Props) {
   const tc = useThemeColors();
-  // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
-  const currentBilling: BillingCycle = 'monthly';
+  const currentBilling = subscription.billing_cycle;
 
   const daysCount = subscription.started_at
     ? getDaysCount(subscription.started_at)

@@ -13,12 +13,19 @@
 import {create} from 'zustand';
 
 import {DEFAULT_THEME, PREMIUM_THEMES} from '@/constants/themes';
-import {fetchSubscription} from '@/services/subscriptionApi';
+import {fetchSubscription, type BillingCycle} from '@/services/subscriptionApi';
 import {useThemeStore} from '@/store/themeStore';
+import {
+  clearWasPremium,
+  getWasPremium,
+  setWasPremium,
+} from '@/utils/subscriptionStorage';
 
 type SubscriptionStore = {
   // 서버가 주는 값 — readonly로 대입을 막는다. 갱신은 refresh()만.
   readonly plan: 'free' | 'premium';
+  /** 월간/연간 — 표시용이다. 개방 판정에는 쓰지 않는다 */
+  readonly billingCycle: BillingCycle;
   readonly isActive: boolean;
   readonly startedAt: string | null;
   readonly expiresAt: string | null;
@@ -31,9 +38,16 @@ type SubscriptionStore = {
   /** 한 번이라도 서버 응답을 받았는지 — 첫 로딩 표시에 쓴다 */
   readonly hasLoaded: boolean;
   readonly isLoading: boolean;
+  /**
+   * 프리미엄이었다가 방금 끊긴 것을 확인했는지 — **안내 문구 전용**이다.
+   * 기능 개방 판정에는 쓰지 않는다. 안내한 뒤 acknowledgeExpiry()로 끈다.
+   */
+  readonly justExpired: boolean;
   /** 프리미엄 기능 개방 여부 — 이 값만 보고 판단할 것 */
   isPremium: () => boolean;
   refresh: () => Promise<void>;
+  /** 만료 안내를 띄운 뒤 호출 — 복귀할 때마다 다시 뜨지 않게 한다 */
+  acknowledgeExpiry: () => void;
   /** 결제 직후용 — 상태가 바뀔 때까지 몇 번 더 조회한다 */
   refreshUntilChanged: (wasPremium: boolean) => Promise<boolean>;
   reset: () => void;
@@ -50,6 +64,7 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const FREE = {
   plan: 'free' as const,
+  billingCycle: 'monthly' as const,
   isActive: false,
   startedAt: null,
   expiresAt: null,
@@ -66,6 +81,7 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   ...FREE,
   hasLoaded: false,
   isLoading: false,
+  justExpired: false,
 
   isPremium: () => {
     const {plan, isActive, expiresAt} = get();
@@ -75,10 +91,16 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
   refresh: async () => {
     set({isLoading: true});
 
+    // 서버가 실제로 답했는지 — 조회 실패(규칙 2의 free 강등)를 만료로
+    // 오인하면 안 된다. 비행기 모드일 뿐인데 "구독이 만료됐어요"가 뜬다.
+    let answered = false;
+
     try {
       const sub = await fetchSubscription();
+      answered = true;
       set({
         plan: sub.plan,
+        billingCycle: sub.billing_cycle,
         isActive: sub.is_active,
         startedAt: sub.started_at,
         expiresAt: sub.expires_at,
@@ -91,14 +113,25 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
       set({hasLoaded: true, isLoading: false});
     }
 
+    const premium = get().isPremium();
+
     // 규칙 3 — 구독이 끊긴 채로 프리미엄 테마가 남아 있으면 되돌린다
-    if (!get().isPremium()) {
+    if (!premium) {
       const {themeId, setTheme} = useThemeStore.getState();
       if (PREMIUM_THEMES.includes(themeId)) {
         setTheme(DEFAULT_THEME);
       }
     }
+
+    if (!answered) return;
+
+    // 만료는 대개 앱이 꺼져 있을 때 지나므로 디스크에 남긴 직전 값과 비교한다
+    const wasPremium = await getWasPremium();
+    if (wasPremium && !premium) set({justExpired: true});
+    if (wasPremium !== premium) await setWasPremium(premium);
   },
+
+  acknowledgeExpiry: () => set({justExpired: false}),
 
   /**
    * 구독 상태가 바뀔 때까지 몇 번 더 조회한다.
@@ -117,5 +150,10 @@ export const useSubscriptionStore = create<SubscriptionStore>((set, get) => ({
     return false;
   },
 
-  reset: () => set({...FREE, hasLoaded: false, isLoading: false}),
+  reset: () => {
+    set({...FREE, hasLoaded: false, isLoading: false, justExpired: false});
+    // 디스크 기록도 지운다. 안 지우면 프리미엄 쓰던 계정이 로그아웃한 뒤
+    // 무료 계정이 로그인할 때, 그 사람에게 "구독이 만료됐어요"가 뜬다
+    void clearWasPremium();
+  },
 }));

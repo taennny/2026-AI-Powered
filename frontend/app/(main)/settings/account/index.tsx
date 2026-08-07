@@ -11,8 +11,10 @@ import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 
+import {APP_STORE_SUBSCRIPTIONS_URL} from '@/constants/store';
 import {KAKAO_LINK_APP_REDIRECT} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
+import {useSubscriptionStore} from '@/store/subscriptionStore';
 import {
   fetchMe,
   deleteAccount,
@@ -22,6 +24,7 @@ import {
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
+  const isPremium = useSubscriptionStore(s => s.isPremium());
   const [user, setUser] = useState<UserMe | null>(null);
   const [loading, setLoading] = useState(true);
   const [linking, setLinking] = useState(false);
@@ -39,29 +42,42 @@ export default function AccountScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      '회원탈퇴',
-      '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.',
-      [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '탈퇴',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteAccount();
-              await logout();
-              router.replace('/(auth)/login');
-            } catch {
-              Alert.alert(
-                '오류',
-                '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.',
-              );
-            }
-          },
+    // 구독의 실체는 앱스토어에 있다. 우리 서버 데이터를 지워도 결제는 그대로
+    // 살아 있어 탈퇴한 사람에게 계속 청구된다 — 반드시 먼저 알린다.
+    const message = isPremium
+      ? '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.\n\n' +
+        '구독은 자동으로 해지되지 않아요. App Store > 구독에서 직접 해지하지 않으면 결제가 계속됩니다.'
+      : '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.';
+
+    Alert.alert('회원탈퇴', message, [
+      ...(isPremium
+        ? [
+            {
+              text: '구독 관리 열기',
+              onPress: () => {
+                void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+              },
+            },
+          ]
+        : []),
+      {text: '취소', style: 'cancel' as const},
+      {
+        text: '탈퇴',
+        style: 'destructive' as const,
+        onPress: async () => {
+          try {
+            await deleteAccount();
+            await logout();
+            router.replace('/(auth)/login');
+          } catch {
+            Alert.alert(
+              '오류',
+              '탈퇴 처리 중 문제가 발생했어요. 다시 시도해주세요.',
+            );
+          }
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const handleKakaoLink = async () => {
