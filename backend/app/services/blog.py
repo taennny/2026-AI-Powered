@@ -198,6 +198,34 @@ async def get_blog_by_id(
     return blog
 
 
+SUMMARY_LENGTH = 100  # 목록 미리보기 길이
+
+
+def build_summary(content: str | None, q: str | None = None) -> str | None:
+    """목록 미리보기. 검색어가 본문에 있으면 그 주변을 잘라 보여준다.
+
+    앞 100자만 보여주면 검색으로 찾은 단어가 화면에 안 나와 왜 걸렸는지 알 수 없다.
+    제목·날짜로만 매치된 경우(본문에 검색어 없음)는 기존처럼 앞부분을 보여준다.
+    """
+    if not content:
+        return None
+
+    start = 0
+    if q:
+        idx = content.lower().find(q.lower())
+        if idx != -1:
+            # 매치를 가운데 두고 자른다
+            start = max(0, idx - (SUMMARY_LENGTH - len(q)) // 2)
+
+    end = min(len(content), start + SUMMARY_LENGTH)
+    start = max(0, end - SUMMARY_LENGTH)  # 끝에 닿으면 앞으로 당겨 길이 유지
+
+    snippet = content[start:end]
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(content) else ""
+    return f"{prefix}{snippet}{suffix}"
+
+
 async def get_blog_list(
     db: AsyncSession,
     user_id: uuid.UUID,
