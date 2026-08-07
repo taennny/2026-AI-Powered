@@ -1,5 +1,6 @@
 import {View, Text, TouchableOpacity} from 'react-native';
 
+import {ANNUAL_LABEL, MONTHLY_LABEL} from '@/constants/pricing';
 import {
   type BillingCycle,
   type SubscriptionStatus,
@@ -9,8 +10,8 @@ import {useThemeColors} from '@/hooks/useThemeColors';
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
 
 const PLANS: {id: BillingCycle; label: string}[] = [
-  {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'monthly', label: MONTHLY_LABEL},
+  {id: 'annual', label: ANNUAL_LABEL},
 ];
 
 function getDaysCount(startedAt: string): number {

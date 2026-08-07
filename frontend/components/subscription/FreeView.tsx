@@ -2,11 +2,12 @@ import {useState} from 'react';
 import {View, Text, TouchableOpacity} from 'react-native';
 
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {ANNUAL_LABEL, MONTHLY_LABEL} from '@/constants/pricing';
 import {type BillingCycle} from '@/services/subscriptionApi';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
-  {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'monthly', label: MONTHLY_LABEL},
+  {id: 'annual', label: ANNUAL_LABEL},
 ];
 
 const BENEFITS = ['테마 적용 가능', '광고 안 보기', '글쓰기 무한'];

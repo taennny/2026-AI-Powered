@@ -266,7 +266,7 @@ RevenueCat이 검증한 뒤 백엔드로 웹훅을 보냅니다.
 | 상품 등록 | App Store Connect에 월간·연간 두 개 |
 | SDK 설치 | `react-native-purchases` (네이티브 → 재빌드) |
 | `purchases.ts` | `TODO(결제)` 자리에 `Purchases.logIn` / `logOut` |
-| 가격 표시 | 지금은 `₩7,500` 하드코딩. `getOfferings()`가 주는 실제 가격으로 — 지역·환율에 따라 달라집니다 |
+| 가격 표시 | `constants/pricing.ts` 한 곳에 모아뒀습니다(월 ₩6,500 / 연 ₩39,000, 할인율은 계산). `getOfferings()`가 주는 실제 가격으로 바꿔야 합니다 — 지역·환율에 따라 달라집니다 |
 | 결제 호출 | `Purchases.purchasePackage()` → 성공 시 `refreshUntilChanged(false)` |
 | 해지 경로 | 지금은 우리 서버에 `PUT`. 실제 구독은 앱스토어에 있으므로 구독 관리 화면(`constants/store.ts`의 `APP_STORE_SUBSCRIPTIONS_URL`)으로 보내야 합니다 |
 
@@ -363,6 +363,7 @@ npx jest gpsTask      # 파일 하나
 |---|---|---|
 | `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
+| `__tests__/pricing.test.ts` | `constants/pricing.ts` | 할인율을 손으로 적지 않고 두 가격에서 계산, 레이블에 그 값이 들어감 |
 | `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분, 로그인·연동 딥링크 분리 |
 | `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
