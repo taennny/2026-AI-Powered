@@ -165,3 +165,29 @@ async def withdraw_user(db: AsyncSession, user_id: uuid.UUID) -> None:
         await db.delete(user)
 
     await db.commit()
+
+
+async def link_kakao_account(db: AsyncSession, user_id: uuid.UUID, code: str) -> None:
+    """이미 로그인된 유저 계정에 카카오 연동"""
+    from app.services.kakao import get_kakao_token, get_kakao_user_info
+
+    kakao_token_data = await get_kakao_token(code)
+    kakao_access_token = kakao_token_data.get("access_token")
+
+    kakao_user_info = await get_kakao_user_info(kakao_access_token)
+    kakao_id = str(kakao_user_info.get("id"))
+
+    # 이 카카오 계정이 이미 다른 유저에게 연동돼있으면 막는다
+    existing_result = await db.execute(select(User).where(User.social_id == kakao_id))
+    existing = existing_result.scalar_one_or_none()
+    if existing and existing.id != user_id:
+        raise ValueError("이미 다른 계정에 연동된 카카오 계정입니다")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise ValueError("유저를 찾을 수 없습니다")
+
+    user.social_id = kakao_id
+    user.updated_at = datetime.now(timezone.utc)
+    await db.commit()

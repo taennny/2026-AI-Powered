@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,7 +20,13 @@ from app.schemas.auth import (
     KakaoLoginRequest,
     KakaoLoginResponse,
 )
-from app.services.auth import register_user, login_user, kakao_login, withdraw_user
+from app.services.auth import (
+    register_user,
+    login_user,
+    kakao_login,
+    withdraw_user,
+    link_kakao_account,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -100,15 +108,39 @@ async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_
 
 
 @router.get("/kakao/callback")
-async def kakao_callback(code: str, db: AsyncSession = Depends(get_db)):
-    """카카오 로그인 콜백"""
+async def kakao_callback(
+    code: str, state: str | None = None, db: AsyncSession = Depends(get_db)
+):
+    """카카오 로그인/연동 콜백"""
+    from app.utils.jwt import decode_token
+
+    if state:
+        # 연동 모드 — state 토큰에서 user_id 추출
+        try:
+            payload = decode_token(state)
+            if payload.get("type") != "kakao_link":
+                raise ValueError("유효하지 않은 연동 요청입니다")
+            user_id = uuid.UUID(payload["sub"])
+        except ValueError:
+            return RedirectResponse(
+                url="roameapp://kakao-link?success=false&reason=invalid_state"
+            )
+
+        try:
+            await link_kakao_account(db, user_id, code)
+            return RedirectResponse(url="roameapp://kakao-link?success=true")
+        except ValueError as e:
+            return RedirectResponse(
+                url=f"roameapp://kakao-link?success=false&reason={str(e)}"
+            )
+
+    # 기존 로그인/가입 모드
     try:
         result = await kakao_login(db, code)
         access_token = result["access_token"]
         refresh_token = result["refresh_token"]
         is_new_user = result["is_new_user"]
 
-        # 프론트 딥링크로 리다이렉트
         redirect_url = f"roameapp://kakao-login?accessToken={access_token}&refreshToken={refresh_token}&isNewUser={is_new_user}"
         return RedirectResponse(url=redirect_url)
     except ValueError as e:
@@ -133,3 +165,14 @@ async def delete_me(
 ):
     """회원 탈퇴 — 유저 + 연관 데이터 완전 삭제"""
     await withdraw_user(db, current_user.id)
+
+
+@router.get("/kakao/link")
+async def kakao_link_start(current_user: User = Depends(get_current_user)):
+    """카카오 계정 연동 시작 — 카카오 인가 URL 반환"""
+    from app.services.kakao import get_kakao_authorize_url
+    from app.utils.jwt import create_link_state_token
+
+    state = create_link_state_token(str(current_user.id))
+    authorize_url = get_kakao_authorize_url(state)
+    return {"authorize_url": authorize_url}
