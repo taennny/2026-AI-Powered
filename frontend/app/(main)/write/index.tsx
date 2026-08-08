@@ -1,7 +1,8 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -35,7 +36,16 @@ const [companion, setCompanion] = useState('');
 const [feeling, setFeeling] = useState('');
 const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+useEffect(() => {
+  if (!isLoading) return;
 
+  const subscription = BackHandler.addEventListener(
+    'hardwareBackPress',
+    () => true,
+  );
+
+  return () => subscription.remove();
+}, [isLoading]);
   const canSubmit =
   place.trim().length > 0 &&
   companion.trim().length > 0 &&
