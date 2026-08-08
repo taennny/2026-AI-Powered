@@ -256,24 +256,33 @@ RevenueCat이 검증한 뒤 백엔드로 웹훅을 보냅니다.
 `user_id`가 없으면 웹훅이 와도 누구 결제인지 매칭되지 않습니다. 로그인 경로가 셋
 (이메일 / 카카오 버튼 / 카카오 딥링크)이라 `(main)/_layout`에서 인증 상태로 한 번만 부릅니다.
 
-> **SDK는 아직 설치 전입니다.** App Store Connect에 상품을 등록해야 하고, 그러려면
-> Apple Developer Program($99/년)이 필요합니다.
+SDK는 설치돼 있습니다(`react-native-purchases`). **남은 건 콘솔 설정입니다** —
+App Store Connect 상품 등록, 유료 계약(Paid Applications Agreement), RevenueCat
+대시보드 구성. 키(`EXPO_PUBLIC_REVENUECAT_IOS_KEY`)가 없으면 `isPurchaseAvailable()`이
+false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로 동작합니다.**
 
-계정이 준비되면 할 일 (SDK 호출 한 줄이 아닙니다):
+| 규칙 | 이유 |
+|---|---|
+| 상품 ID는 백엔드와 글자 단위로 같아야 한다 | `services/purchases.ts`의 `PRODUCT_IDS`와 백엔드 `revenuecat_webhook.py`의 `PRODUCT_PLAN_MAP`. 다르면 결제는 되는데 웹훅이 어느 플랜인지 몰라 구독이 안 열립니다 (`com.picknavi.roame.premium.monthly` / `.annual`) |
+| 앱은 SDK의 구독 상태를 **판정에 쓰지 않는다** | SDK 캐시와 서버가 어긋날 때 웹훅으로 정산하는 서버가 맞습니다. 그래서 Entitlement를 들여다보지 않고, 결제 후 `refreshUntilChanged(false)`로 서버에 물어봅니다 |
+| 가격은 `getOfferings()`가 준 것을 쓴다 | 같은 상품이 나라마다 다른 금액으로 청구됩니다. 못 받아오면 `constants/pricing.ts`의 국내 기준 값으로 그립니다 |
+| 결제 취소는 오류가 아니다 | 사용자가 시스템 다이얼로그를 닫은 것입니다. `purchase()`가 `'cancelled'`를 따로 돌려주고, 화면은 아무것도 띄우지 않습니다 |
+| 해지·결제수단 변경은 **앱스토어로 보낸다** | 구독의 실체가 Apple에 있어 우리 DB만 바꾸면 결제가 계속됩니다. `constants/store.ts`의 `APP_STORE_SUBSCRIPTIONS_URL` |
+| **구매 복원이 있어야 한다** | 기기 변경·재설치 때 되찾을 경로가 없으면 **Apple 심사에서 리젝됩니다.** `FreeView` 하단의 "구매 복원" |
+
+`subscriptionApi.ts`의 `subscribePremium`·`cancelSubscription`은 **화면에서 부르지
+않습니다**(`@deprecated`). 앱이 그 API로 plan을 바꾸면 Apple과 우리 DB가 어긋나
+결제하지 않은 사용자가 프리미엄이 되거나 해지했는데 청구가 이어집니다.
+
+계정이 준비되면 할 콘솔 작업:
 
 | | 내용 |
 |---|---|
-| 상품 등록 | App Store Connect에 월간·연간 두 개 |
-| SDK 설치 | `react-native-purchases` (네이티브 → 재빌드) |
-| `purchases.ts` | `TODO(결제)` 자리에 `Purchases.logIn` / `logOut` |
-| 가격 표시 | `constants/pricing.ts` 한 곳에 모아뒀습니다(월 ₩6,500 / 연 ₩39,000, 할인율은 계산). `getOfferings()`가 주는 실제 가격으로 바꿔야 합니다 — 지역·환율에 따라 달라집니다 |
-| 결제 호출 | `Purchases.purchasePackage()` → 성공 시 `refreshUntilChanged(false)` |
-| 해지 경로 | 지금은 우리 서버에 `PUT`. 실제 구독은 앱스토어에 있으므로 구독 관리 화면(`constants/store.ts`의 `APP_STORE_SUBSCRIPTIONS_URL`)으로 보내야 합니다 |
-
-> **탈퇴해도 앱스토어 구독은 살아 있습니다.** 우리 서버의 구독 행을 지워도 결제는
-> Apple에 남아 탈퇴한 사람에게 계속 청구됩니다. 우리가 대신 해지할 수 없으므로
-> `settings/account`의 탈퇴 확인 다이얼로그가 프리미엄일 때 이를 알리고
-> 구독 관리 화면으로 가는 버튼을 함께 띄웁니다. 앱스토어 심사에서도 보는 항목입니다.
+| App Store Connect | 자동 갱신 구독 2개를 **위 상품 ID 그대로** 등록 |
+| 유료 계약 | Paid Applications Agreement(은행·세금). **이게 없으면 상품이 계속 "준비 안 됨"이라 결제가 아예 안 됩니다** |
+| RevenueCat | 앱 연결 → App Store Connect API 키 → Entitlement/Offering 구성 |
+| 웹훅 | RevenueCat에 URL + Authorization 비밀값. 백엔드 `REVENUECAT_WEBHOOK_SECRET`과 같아야 합니다 |
+| 샌드박스 | 테스터 계정 생성 후 실기기 테스트 |
 
 ### BottomSheet
 
@@ -329,7 +338,7 @@ utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
-services/purchases.ts     결제 SDK에 user_id 알림 (SDK 설치 전, 배선만)
+services/purchases.ts     결제 SDK — 초기화·사용자 식별·가격 조회·결제·복원
 utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 reset_at까지 읽음)
 ```
 
@@ -467,7 +476,7 @@ npx jest gpsTask      # 파일 하나
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| **인앱결제** | `settings/subscription` | 배선(사용자 식별·`will_renew`·재조회 재시도)은 끝났습니다. 남은 작업은 위 "결제" 섹션의 표 참고. **Apple Developer Program($99/년)이 전제입니다** |
+| **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
 | **모아쓰기(여러 날 묶어쓰기)** | 캘린더 + `write` | 캘린더 다중 선택 → "N일 선택됨 · 글쓰기". **요청 형식이 백엔드·AI와 협의 중**이라 대기 중입니다 (배열/범위, 개수 제한, 빈 날짜 처리, 횟수 차감 규칙) |
 | 리포트 | — | 와이어프레임 대기 |
 | 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
