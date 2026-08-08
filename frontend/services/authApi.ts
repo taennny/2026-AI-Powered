@@ -57,7 +57,7 @@ export interface UserMe {
    * 결제 웹훅이 어느 계정 것인지 매칭된다.
    */
   user_id?: string;
-  // 백엔드 /me는 아직 카카오 연동 여부를 안 준다 (추후 확장)
+  /** 백엔드가 `social_id != null`로 판정해 내려준다 */
   is_kakao_linked?: boolean;
 }
 
@@ -68,4 +68,19 @@ export async function fetchMe(): Promise<UserMe> {
 
 export async function deleteAccount(): Promise<void> {
   await api.delete('/api/v1/auth/me');
+}
+
+/**
+ * 카카오 연동 시작 URL을 받아온다.
+ *
+ * **브라우저로 직접 열면 안 되는 엔드포인트다.** 서버가 `Authorization` 헤더로
+ * 누구의 연동인지 판단해 state 토큰(5분 만료)에 user_id를 심는데, 시스템
+ * 브라우저는 앱이 들고 있는 토큰을 모르므로 401이 난다. 여기서 axios로 받아
+ * (인터셉터가 토큰을 붙인다) 돌려받은 URL만 브라우저에 넘긴다.
+ */
+export async function fetchKakaoLinkUrl(): Promise<string> {
+  const response = await api.get<{authorize_url: string}>(
+    '/api/v1/auth/kakao/link',
+  );
+  return response.data.authorize_url;
 }

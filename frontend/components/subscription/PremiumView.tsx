@@ -1,14 +1,18 @@
-import {View, Text, TouchableOpacity} from 'react-native';
+import {Linking, View, Text, TouchableOpacity} from 'react-native';
 
-import {type SubscriptionStatus} from '@/services/subscriptionApi';
+import {APP_STORE_SUBSCRIPTIONS_URL} from '@/constants/store';
+import {ANNUAL_LABEL, MONTHLY_LABEL} from '@/constants/pricing';
+import {
+  type BillingCycle,
+  type SubscriptionStatus,
+} from '@/services/subscriptionApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
-type BillingCycle = 'monthly' | 'annual';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
-  {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'monthly', label: MONTHLY_LABEL},
+  {id: 'annual', label: ANNUAL_LABEL},
 ];
 
 function getDaysCount(startedAt: string): number {
@@ -18,8 +22,7 @@ function getDaysCount(startedAt: string): number {
 
 export default function PremiumView({subscription, onCancel}: Props) {
   const tc = useThemeColors();
-  // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
-  const currentBilling: BillingCycle = 'monthly';
+  const currentBilling = subscription.billing_cycle;
 
   const daysCount = subscription.started_at
     ? getDaysCount(subscription.started_at)
@@ -66,7 +69,12 @@ export default function PremiumView({subscription, onCancel}: Props) {
       </View>
 
       <View className="gap-y-2 mt-auto pb-20">
-        <TouchableOpacity>
+        {/* 결제 수단도 우리가 못 바꾼다 — 앱스토어 구독 관리로 보낸다 */}
+        <TouchableOpacity
+          onPress={() => {
+            void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+          }}
+        >
           <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
         {/* 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다 */}

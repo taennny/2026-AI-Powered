@@ -66,4 +66,15 @@ describe('constants/kakao', () => {
     expect(KAKAO_APP_REDIRECT).toBe('roameapp://kakao-login');
     expect(KAKAO_APP_REDIRECT).not.toBe(KAKAO_REDIRECT_URI);
   });
+
+  // 같은 경로를 쓰면 kakao-login 화면이 "토큰 없음"으로 보고 로그인으로 튕긴다.
+  // 연동은 새 토큰을 만들지 않으므로 연동에 성공하고도 로그아웃된다.
+  it('연동 딥링크는 로그인 딥링크와 경로가 갈린다', () => {
+    const {KAKAO_APP_REDIRECT, KAKAO_LINK_APP_REDIRECT} = load(
+      'https://api.roame.co.kr',
+    );
+
+    expect(KAKAO_LINK_APP_REDIRECT).toBe('roameapp://kakao-link');
+    expect(KAKAO_LINK_APP_REDIRECT).not.toBe(KAKAO_APP_REDIRECT);
+  });
 });

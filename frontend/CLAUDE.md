@@ -41,6 +41,7 @@ app/
     │   ├── index.tsx                # home으로 redirect
     │   ├── home/index.tsx           # Calendar + BottomSheet
     │   └── journal-list/index.tsx   # 검색 + FlatList (무한 스크롤)
+    ├── kakao-link.tsx               # 카카오 연동 딥링크 폴백 (아래 "카카오 연동" 참고)
     ├── write/index.tsx              # 프롬프트 입력 → AI 생성
     ├── write-preview/index.tsx      # 미리보기/저장 (리스트에서 진입 시 상세 조회)
     └── settings/                    # index, account, subscription, theme, records
@@ -58,8 +59,31 @@ app/
 로그아웃 → authStore.logout() → removeTokens() + isAuthenticated=false
           → (main)/_layout이 stopGpsTracking() 후 /(auth)/login
 카카오   → WebBrowser.openAuthSessionAsync() → roameapp://kakao-login?accessToken=...
-          → kakao-login.tsx가 저장 후 홈 (source=account-link면 settings/account로 복귀)
+          → login.tsx가 반환 URL을 파싱해 저장 후 홈
+          (kakao-login.tsx는 딥링크가 라우터로 흘러들어올 때의 폴백)
 ```
+
+### 카카오 연동 (로그인과 다른 흐름입니다)
+
+**로그인은 토큰을 만들고, 연동은 만들지 않습니다.** 이걸 섞으면 연동에 성공하고도
+로그아웃됩니다 — 그래서 딥링크 경로부터 갈라놨습니다.
+
+```
+설정 > 계정 "카카오 연동하기"
+├── fetchKakaoLinkUrl()  GET /api/v1/auth/kakao/link   ← axios(토큰 필요)
+│   서버가 user_id를 담은 5분 만료 JWT를 state로 심은 카카오 URL을 준다
+├── openAuthSessionAsync(그 URL, roameapp://kakao-link)
+├── 카카오 로그인 → 백엔드 콜백이 state로 "연동"임을 알아채고 social_id 저장
+└── roameapp://kakao-link?success=true|false&reason=... → 반환 URL 파싱
+    성공이면 fetchMe()로 재조회 (is_kakao_linked를 낙관적으로 켜지 않는다)
+```
+
+| 규칙 | 이유 |
+|---|---|
+| `/kakao/link`를 **브라우저로 직접 열지 않는다** | 이 엔드포인트는 `Authorization` 헤더로 누구의 연동인지 판단합니다. 시스템 브라우저는 앱의 토큰을 모르므로 401입니다. axios로 URL만 받아서 브라우저에 넘깁니다 |
+| 딥링크는 `kakao-link`, 로그인은 `kakao-login` | 같은 경로를 쓰면 `kakao-login.tsx`가 "토큰 없음"으로 보고 `/(auth)/login`으로 보냅니다 |
+| 결과는 `openAuthSessionAsync`의 **반환값**으로 처리한다 | 로그인(`login.tsx`)과 같은 방식입니다. `(main)/kakao-link.tsx`는 딥링크가 브라우저 세션이 아니라 라우터로 흘러들어올 때의 폴백일 뿐이라 **안내를 띄우지 않습니다** — 양쪽이 다 띄우면 두 번 뜹니다 |
+| 실패 사유는 백엔드 문구를 그대로 쓴다 | `reason`이 사람이 읽을 한글입니다. 단 `invalid_state`만 코드라 프론트가 문장으로 바꿉니다 (state가 5분 만료라 카카오 로그인이 길어지면 실제로 납니다) |
 
 **토큰 값의 단일 출처는 `tokenStorage`(디스크)입니다.** `authStore`는 `isAuthenticated`
 불리언만 들고 있고, 화면 가드(`(main)/_layout.tsx`)를 리렌더시키는 용도입니다.
@@ -80,6 +104,8 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `POST /api/v1/auth/password-reset/request` | `sendResetEmail` | `(auth)/find-password.tsx` |
 | `POST /api/v1/auth/password-reset/confirm` | `resetPassword` | `(auth)/reset-password.tsx` |
 | `GET /api/v1/auth/me` | `fetchMe` | `settings/account/index.tsx` |
+| `DELETE /api/v1/auth/me` | `deleteAccount` | `settings/account/index.tsx` (204, cascade) |
+| `GET /api/v1/auth/kakao/link` | `fetchKakaoLinkUrl` | `settings/account/index.tsx` (연동 시작 URL) |
 | `GET /api/v1/calendar/{year}/{month}` | `fetchCalendarMonth` | `hooks/useCalendar.ts` |
 | `GET /api/v1/calendar/{date}/timeline` | `fetchTimeline` | `hooks/useCalendar.ts` |
 | `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`page`·`size` 사용) |
@@ -97,9 +123,6 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 `DELETE /api/v1/blog/{id}`(글 삭제 — 204, 소프트 삭제),
 `POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
 `POST /api/v1/webhooks/revenuecat`(결제 웹훅 — 앱이 부르는 게 아니라 RevenueCat이 부릅니다).
-
-응답에서 읽고 있으나 아직 서버로 안 보내는 값: `billing_cycle`
-(월/연 선택 UI는 `FreeView`에 있으나 고른 값이 `subscribePremium()`까지 전달되지 않습니다).
 
 외부 링크: 문의하기는 카카오 오픈채팅(`settings/index.tsx`의 `SUPPORT_CHAT_URL`)으로,
 `Linking.openURL` 전에 확인 다이얼로그를 띄웁니다.
@@ -197,6 +220,22 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 인앱결제는 시스템 다이얼로그라 앱 밖에서 완료될 수 있어 복귀 갱신이 특히 중요합니다.
 로그아웃 시 `(main)/_layout`이 `reset()`으로 비웁니다 — 다음 계정이 물려받으면 안 됩니다.
 
+**만료 안내** — 프리미엄이 끊기면 `useSubscriptionSync`가 Alert을 띄웁니다
+(`justExpired` → 안내 → `acknowledgeExpiry()`). 세 가지를 지킵니다:
+
+| | |
+|---|---|
+| 직전 상태를 **디스크에** 남긴다 (`utils/subscriptionStorage.ts`) | 만료는 대개 앱이 꺼져 있을 때 지납니다. 앱을 켜면 스토어가 free에서 시작하므로 메모리 비교로는 "프리미엄이었다"를 알 길이 없습니다 |
+| **조회에 성공했을 때만** 만료로 본다 | 규칙 2(실패 시 free 강등)를 만료로 오인하면 비행기 모드일 뿐인데 "구독이 만료됐어요"가 뜹니다. 실패 시 디스크 값도 건드리지 않아 다음에 진짜 만료를 잡습니다 |
+| 안내 **전에** 플래그를 끈다 | 사용자가 알림을 닫기 전에 앱 복귀로 `refresh()`가 또 돌면 안내가 쌓입니다 |
+
+이 값은 **안내용이지 판정용이 아닙니다.** 기능 개방은 언제나 `isPremium()`만 봅니다.
+
+**결제 주기**(`billingCycle`) — `FreeView`에서 고른 값이 `subscribePremium(cycle)`로
+서버까지 갑니다. 서버는 `monthly`/`annual`을 받아 만료일을 30일/365일로 계산하므로
+**안 보내면 연간을 고른 사람이 30일 뒤 끊깁니다.** `PremiumView`의 현재 플랜 표시도
+서버가 주는 `billing_cycle`을 씁니다. 이 값도 표시·요청용이지 판정용이 아닙니다.
+
 > 프론트의 `isPremium()`은 **UI 표시용이지 보안 경계가 아닙니다.**
 > 비용이 드는 기능은 서버가 막습니다 — 무료 사용자의 AI 글 생성은 **주 3회**로 제한되고
 > (월요일 새벽 4시 KST 리셋), 초과하면 백엔드가 429를 반환합니다.
@@ -217,20 +256,33 @@ RevenueCat이 검증한 뒤 백엔드로 웹훅을 보냅니다.
 `user_id`가 없으면 웹훅이 와도 누구 결제인지 매칭되지 않습니다. 로그인 경로가 셋
 (이메일 / 카카오 버튼 / 카카오 딥링크)이라 `(main)/_layout`에서 인증 상태로 한 번만 부릅니다.
 
-> **SDK는 아직 설치 전입니다.** App Store Connect에 상품을 등록해야 하고, 그러려면
-> Apple Developer Program($99/년)이 필요합니다.
+SDK는 설치돼 있습니다(`react-native-purchases`). **남은 건 콘솔 설정입니다** —
+App Store Connect 상품 등록, 유료 계약(Paid Applications Agreement), RevenueCat
+대시보드 구성. 키(`EXPO_PUBLIC_REVENUECAT_IOS_KEY`)가 없으면 `isPurchaseAvailable()`이
+false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로 동작합니다.**
 
-계정이 준비되면 할 일 (SDK 호출 한 줄이 아닙니다):
+| 규칙 | 이유 |
+|---|---|
+| 상품 ID는 백엔드와 글자 단위로 같아야 한다 | `services/purchases.ts`의 `PRODUCT_IDS`와 백엔드 `revenuecat_webhook.py`의 `PRODUCT_PLAN_MAP`. 다르면 결제는 되는데 웹훅이 어느 플랜인지 몰라 구독이 안 열립니다 (`com.picknavi.roame.premium.monthly` / `.annual`) |
+| 앱은 SDK의 구독 상태를 **판정에 쓰지 않는다** | SDK 캐시와 서버가 어긋날 때 웹훅으로 정산하는 서버가 맞습니다. 그래서 Entitlement를 들여다보지 않고, 결제 후 `refreshUntilChanged(false)`로 서버에 물어봅니다 |
+| 가격은 `getOfferings()`가 준 것을 쓴다 | 같은 상품이 나라마다 다른 금액으로 청구됩니다. 못 받아오면 `constants/pricing.ts`의 국내 기준 값으로 그립니다 |
+| 결제 취소는 오류가 아니다 | 사용자가 시스템 다이얼로그를 닫은 것입니다. `purchase()`가 `'cancelled'`를 따로 돌려주고, 화면은 아무것도 띄우지 않습니다 |
+| 해지·결제수단 변경은 **앱스토어로 보낸다** | 구독의 실체가 Apple에 있어 우리 DB만 바꾸면 결제가 계속됩니다. `constants/store.ts`의 `APP_STORE_SUBSCRIPTIONS_URL` |
+| **구매 복원이 있어야 한다** | 기기 변경·재설치 때 되찾을 경로가 없으면 **Apple 심사에서 리젝됩니다.** `FreeView` 하단의 "구매 복원" |
+
+`subscriptionApi.ts`의 `subscribePremium`·`cancelSubscription`은 **화면에서 부르지
+않습니다**(`@deprecated`). 앱이 그 API로 plan을 바꾸면 Apple과 우리 DB가 어긋나
+결제하지 않은 사용자가 프리미엄이 되거나 해지했는데 청구가 이어집니다.
+
+계정이 준비되면 할 콘솔 작업:
 
 | | 내용 |
 |---|---|
-| 상품 등록 | App Store Connect에 월간·연간 두 개 |
-| SDK 설치 | `react-native-purchases` (네이티브 → 재빌드) |
-| `purchases.ts` | `TODO(결제)` 자리에 `Purchases.logIn` / `logOut` |
-| `FreeView` | 월/연 선택 UI는 이미 있으나 **고른 값이 밖으로 안 나갑니다**(`onSubscribe: () => void`). `onSubscribe(cycle)`로 넘겨야 합니다 |
-| 가격 표시 | 지금은 `₩7,500` 하드코딩. `getOfferings()`가 주는 실제 가격으로 — 지역·환율에 따라 달라집니다 |
-| 결제 호출 | `Purchases.purchasePackage()` → 성공 시 `refreshUntilChanged(false)` |
-| 해지 경로 | 지금은 우리 서버에 `PUT`. 실제 구독은 앱스토어에 있으므로 구독 관리 화면(`itms-apps://apps.apple.com/account/subscriptions`)으로 보내야 합니다 |
+| App Store Connect | 자동 갱신 구독 2개를 **위 상품 ID 그대로** 등록 |
+| 유료 계약 | Paid Applications Agreement(은행·세금). **이게 없으면 상품이 계속 "준비 안 됨"이라 결제가 아예 안 됩니다** |
+| RevenueCat | 앱 연결 → App Store Connect API 키 → Entitlement/Offering 구성 |
+| 웹훅 | RevenueCat에 URL + Authorization 비밀값. 백엔드 `REVENUECAT_WEBHOOK_SECRET`과 같아야 합니다 |
+| 샌드박스 | 테스터 계정 생성 후 실기기 테스트 |
 
 ### BottomSheet
 
@@ -260,8 +312,10 @@ GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결�
 store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
 store/themeStore.ts     themeId, themeVars / setTheme, initialize
-store/subscriptionStore.ts  plan, isActive, expiresAt, willRenew, hasLoaded
-                        / isPremium(), refresh, refreshUntilChanged, reset
+store/subscriptionStore.ts  plan, billingCycle, isActive, expiresAt, willRenew,
+                        hasLoaded, justExpired
+                        / isPremium(), refresh, refreshUntilChanged,
+                          acknowledgeExpiry, reset
 store/settingsStore.ts  isTrackingEnabled, hasLoaded / initialize, setTrackingEnabled
                         위치 기록 토글. 기본 켬, AsyncStorage 저장.
                         끄면 stopGpsTracking(), 켜면 startGpsTracking()
@@ -275,7 +329,7 @@ hooks/usePermissions.ts   권한 확인·요청·거부 안내 (아래 "권한 �
 hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
-hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀)
+hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀) + 만료 안내
 hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
 hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
@@ -283,7 +337,8 @@ utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
 utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책" 참고)
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
-services/purchases.ts     결제 SDK에 user_id 알림 (SDK 설치 전, 배선만)
+utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
+services/purchases.ts     결제 SDK — 초기화·사용자 식별·가격 조회·결제·복원
 utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 reset_at까지 읽음)
 ```
 
@@ -317,14 +372,15 @@ npx jest gpsTask      # 파일 하나
 |---|---|---|
 | `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
-| `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분 |
+| `__tests__/pricing.test.ts` | `constants/pricing.ts` | 할인율을 손으로 적지 않고 두 가격에서 계산, 레이블에 그 값이 들어감 |
+| `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분, 로그인·연동 딥링크 분리 |
 | `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
 | `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
-| `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도 |
+| `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도, 결제 주기 반영, 만료 안내(앱 재시작 후에도 감지·조회 실패는 만료 아님·로그아웃 시 기록 삭제) |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
 | `__tests__/useJournalList.test.ts` | `useJournalList` | 디바운스, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
@@ -407,13 +463,9 @@ npx jest gpsTask      # 파일 하나
 | 문제 | 위치 | 영향 | 담당 |
 |---|---|---|---|
 | **비밀번호 재설정이 껍데기** | `backend/app/api/v1/auth.py:78-89` | 두 엔드포인트가 아무 일도 안 하고 성공 응답만 반환합니다. 이메일도 안 나가고 비밀번호도 안 바뀌는데 앱에는 성공으로 보여, 비밀번호를 잊으면 계정 복구가 불가능합니다 | 백엔드 |
-| **회원탈퇴 API 없음** | `DELETE /api/v1/auth/me` | 서버에 DELETE 메서드가 없어 405. 프론트는 구현돼 있습니다 | 백엔드 |
-| **카카오 연동 API 없음** | `/auth/kakao/link` | 404. 엔드포인트뿐 아니라 흐름 설계가 먼저 필요합니다 (아래 참고) | 백엔드 |
+| **연동 URL을 리다이렉트로 준다** | `backend/app/api/v1/auth.py` `kakao_link_start` | `RedirectResponse` 대신 `{"authorize_url": ...}` JSON이어야 합니다. 이 엔드포인트는 `Authorization` 헤더가 필요한데 앱은 브라우저로 여는 구조라 지금은 401입니다. 프론트는 JSON을 가정해 배선을 끝냈습니다 | 백엔드 |
 | 카카오 로그인 시 이메일 중복 | `services/auth.py:76` | `social_id`로만 찾고 없으면 새로 만드는데 `users.email`이 unique라, 같은 이메일로 가입한 사람이 카카오로 로그인하면 IntegrityError가 납니다 | 백엔드 |
-| 카카오 연동 콜백이 로그인 화면으로 튕김 | `(auth)/kakao-login.tsx:23` | 이 화면이 로그인 콜백용이라 토큰이 없으면 무조건 `/(auth)/login`으로 보냅니다. 연동은 새 토큰이 필요 없으므로, 백엔드 엔드포인트가 생겨도 그대로면 연동 성공 시 로그아웃됩니다 | 프론트(auth) |
 | `daily_records.timezone` 값이 안 채워짐 | analyze 경로 | 컬럼은 생겼지만 비어 있어 `Asia/Seoul` 폴백으로 동작합니다. 하루 경계도 KST 자정이라 **새벽 0~4시 GPS가 유실**됩니다 | 백엔드(analyze 담당) |
-| 사진 `taken_at`이 KST 고정 | `backend/app/services/photos.py` | EXIF `OffsetTimeOriginal`을 무시해 해외에서 찍은 사진이 엉뚱한 장소에 붙습니다. 기존 저장분도 9시간 밀려 있습니다 | 백엔드 |
-| presigned URL 과다 생성 | `backend/app/services/calendar.py:134` | 매칭된 사진 전부에 URL을 만드는데 프론트는 첫 장만 씁니다 | 백엔드 |
 | 검색어가 미리보기 밖에 있으면 안 보임 | `backend/app/api/v1/blog.py:50` | `summary`가 `content[:100]` 고정이라, 본문 200자 지점이 검색돼도 카드에서 확인할 수 없습니다 | 백엔드 |
 | AI 장소 매칭이 카테고리 순서에 의존 | `ai/server/modules/gps.py` | 거리 비교 없이 먼저 조회한 카테고리가 이깁니다. 카페에 있어도 300m 안 음식점으로 기록됩니다. 조회 카테고리도 4종뿐이라 병원·학교·마트 등은 "알 수 없음" | AI(강태윤) |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts:78` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
@@ -424,18 +476,15 @@ npx jest gpsTask      # 파일 하나
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| **인앱결제** | `settings/subscription` | 배선(사용자 식별·`will_renew`·재조회 재시도)은 끝났습니다. 남은 작업은 위 "결제" 섹션의 표 참고. **Apple Developer Program($99/년)이 전제입니다** |
-| `billing_cycle` 미전달 | `FreeView` → `subscriptionApi` | 월/연 선택 UI는 있는데 고른 값이 서버로 안 갑니다. 인앱결제 작업 때 함께 |
+| **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
 | **모아쓰기(여러 날 묶어쓰기)** | 캘린더 + `write` | 캘린더 다중 선택 → "N일 선택됨 · 글쓰기". **요청 형식이 백엔드·AI와 협의 중**이라 대기 중입니다 (배열/범위, 개수 제한, 빈 날짜 처리, 횟수 차감 규칙) |
 | 리포트 | — | 와이어프레임 대기 |
 | 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
 | 사진 모아보기 | `settings/records` | 다른 담당자 구현 중. 설정 > 기록 화면에 붙일 자리를 만들어 뒀습니다 |
 | 개인정보처리방침 | `settings/index.tsx` | 링크가 비어 있습니다. **앱스토어 심사 필수** — 문서를 쓰고 공개 URL(Notion 게시 등)을 만들어야 합니다. 위치 상시 수집·사진 업로드가 있어 수집 항목을 꼼꼼히 적어야 합니다 |
 | 남은 생성 횟수 표시 | 글쓰기 | 지금은 429가 떠야만 `used/limit`을 알 수 있습니다. `GET /subscriptions/me`에 넣어주면 "이번 주 1/3" 안내가 가능합니다 |
-| 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:105` | 백엔드가 `isNewUser`를 주는데 프론트가 무시해서 `카카오유저1234`로 남습니다. 정보 입력 화면을 만들지 기획 판단 필요 |
+| 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:107` | 백엔드는 카카오 `properties.nickname`을 받아 쓰고 **못 받을 때만** `카카오유저1234`로 폴백합니다(`services/auth.py:88`) — 고정이 아닙니다. 먼저 볼 것은 **카카오 콘솔의 프로필 정보 동의항목**. 화면을 만들려면 닉네임 수정 API(`PATCH /me` 부재)가 전제이고, 지금은 닉네임이 앱 어디에도 안 보여 우선순위가 낮습니다 |
 | PostCard 탭 동작 미정 | `PostCard.tsx` | `TimelinePlace`에 `blogId`가 없어 저널로 못 보냅니다. 사진 뷰어 / 장소 상세 / 장소명 수정 중 결정 필요 |
-| 구독 만료 시 안내 없음 | `subscriptionStore` | 테마는 basic으로 되돌리지만 사용자에게 알리지 않습니다 |
-| 백그라운드 GPS env 정리 | `hooks/useGpsTracking.ts` | `EXPO_PUBLIC_BG_GPS` 개발용 토글 |
 
 ## 백엔드·AI 협의 중
 
@@ -443,7 +492,9 @@ npx jest gpsTask      # 파일 하나
 새로 만듭니다. 그래서 (a) 이메일로 가입한 사람이 연동을 시도하면 별개 계정이 생기고,
 (b) 같은 이메일이면 unique 제약에 걸립니다.
 `social_id`로 못 찾았을 때 **email로도 찾아 기존 계정에 붙이면** 두 문제가 함께 풀리고,
-"카카오로 한 번 로그인하면 자동 연동"이 되어 `/auth/kakao/link` 자체가 불필요해질 수 있습니다.
+"카카오로 한 번 로그인하면 자동 연동"이 됩니다.
+`/auth/kakao/link`(state 기반)는 이미 들어왔지만 **로그인 경로의 이메일 중복은 그대로**라,
+사용자가 설정 > 계정에서 연동을 거쳐야만 계정이 합쳐집니다.
 
 **2. 모아쓰기 요청 형식** — 배열인지 범위인지, 개수 제한, 기록 없는 날 처리,
 생성 횟수 차감 규칙(1회), 무료 사용자 허용 여부. 정해지면 프론트가 다중 선택 UI를 붙입니다.
