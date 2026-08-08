@@ -169,10 +169,10 @@ async def delete_me(
 
 @router.get("/kakao/link")
 async def kakao_link_start(current_user: User = Depends(get_current_user)):
-    """카카오 계정 연동 시작 — 카카오 로그인 페이지로 리다이렉트"""
+    """카카오 계정 연동 시작 — 카카오 인가 URL 반환"""
     from app.services.kakao import get_kakao_authorize_url
     from app.utils.jwt import create_link_state_token
 
     state = create_link_state_token(str(current_user.id))
     authorize_url = get_kakao_authorize_url(state)
-    return RedirectResponse(url=authorize_url)
+    return {"authorize_url": authorize_url}
