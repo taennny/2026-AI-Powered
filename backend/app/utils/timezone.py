@@ -27,3 +27,16 @@ def week_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
     start = datetime.combine(monday, time(hour=settings.DAY_BOUNDARY_HOUR), tzinfo=KST)
     end = start + timedelta(days=7)
     return start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+
+
+def day_bounds(target_date, now: datetime | None = None) -> tuple[datetime, datetime]:
+    """target_date에 해당하는 하루의 [시작, 끝) — DAY_BOUNDARY_HOUR(예: 04:00) KST 기준, UTC aware로 반환.
+
+    예: DAY_BOUNDARY_HOUR=4일 때 target_date=2026-08-06이면
+    2026-08-06 04:00 KST ~ 2026-08-07 04:00 KST (배타적) 범위.
+    """
+    start = datetime.combine(
+        target_date, time(hour=settings.DAY_BOUNDARY_HOUR), tzinfo=KST
+    )
+    end = start + timedelta(days=1)
+    return start.astimezone(timezone.utc), end.astimezone(timezone.utc)

@@ -32,3 +32,12 @@ def decode_token(token: str) -> dict:
         return payload
     except JWTError:
         raise ValueError("유효하지 않은 토큰입니다")
+
+
+def create_link_state_token(user_id: str) -> str:
+    """카카오 계정 연동용 state 토큰 생성 (5분 만료)"""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    payload = {"sub": user_id, "exp": expire, "type": "kakao_link"}
+    return jwt.encode(
+        payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM
+    )

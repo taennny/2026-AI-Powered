@@ -4,7 +4,7 @@ import calendar
 from datetime import date
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import and_, exists, func, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.daily_record import DailyRecord
@@ -12,6 +12,7 @@ from app.models.gps_log import GpsLog
 from app.models.photos import Photo
 from app.models.place import Place
 from app.services.storage import get_presigned_url
+from app.utils.timezone import day_bounds
 
 try:
     from app.models.blog import Blog
@@ -81,13 +82,15 @@ async def get_timeline(
     if not record:
         return None
 
+    # GPS 로그도 하루 경계(04:00 KST) 기준으로 조회
+    start_dt, end_dt = day_bounds(target_date)
     gps_result = await db.execute(
         select(GpsLog)
         .where(
             and_(
                 GpsLog.user_id == user_id,
-                func.date(func.timezone("Asia/Seoul", GpsLog.recorded_at))
-                == target_date,
+                GpsLog.recorded_at >= start_dt,
+                GpsLog.recorded_at < end_dt,
             )
         )
         .order_by(GpsLog.recorded_at)
@@ -131,9 +134,11 @@ async def get_timeline(
             and place.left_at
             and place.arrived_at <= p.taken_at <= place.left_at
         ]
+
+        # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
         photo_urls = []
-        for photo in place_photos:
-            url = await get_presigned_url(photo.storage_key)
+        if place_photos:
+            url = await get_presigned_url(place_photos[0].storage_key)
             photo_urls.append(url)
 
         place_list.append(

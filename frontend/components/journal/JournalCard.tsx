@@ -3,7 +3,7 @@ import {router} from 'expo-router';
 
 import {type JournalData} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDateStr, formatTimeAgo} from '@/utils/formatDate';
+import {formatDateStr} from '@/utils/formatDate';
 
 type Props = {
   data: JournalData;
@@ -59,17 +59,21 @@ export default function JournalCard({data, query = ''}: Props) {
       className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px]"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
-      <View className="flex-row justify-between mb-1">
-        {/* 화면에 보이는 '26.08.01(thu)' 그대로에 하이라이트를 건다 —
-            사용자는 보이는 문자열로 검색한다 */}
-        <HighlightText
-          text={formatDateStr(data.date)}
-          query={query}
-          className="text-[13px] font-semibold text-primary"
-          highlightColor={tc.tealAccent}
-        />
-        <Text className="text-xs text-tertiary">{formatTimeAgo(data.created_at)}</Text>
-      </View>
+<View className="mb-2">
+  <HighlightText
+    text={`위치 기록일 ${formatDateStr(data.date)}`}
+    query={query}
+    className="text-[13px] font-semibold text-primary"
+    highlightColor={tc.tealAccent}
+  />
+
+  <HighlightText
+    text={`작성일 ${formatDateStr(data.created_at)}`}
+    query={query}
+    className="text-[11px] text-tertiary mt-1"
+    highlightColor={tc.tealAccent}
+  />
+</View>
       <HighlightText
         text={data.title}
         query={query}

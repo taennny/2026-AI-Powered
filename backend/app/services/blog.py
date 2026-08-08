@@ -15,7 +15,11 @@ from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
 from app.services.subscription import get_user_subscription
-from app.services.timeline_serializer import build_timeline_data, map_style
+from app.services.timeline_serializer import (
+    build_multi_day_timeline_data,
+    build_timeline_data,
+    map_style,
+)
 from app.utils.timezone import week_bounds
 
 logger = logging.getLogger(__name__)
@@ -67,23 +71,13 @@ async def get_weekly_usage(
     return used, end
 
 
-async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
-    """블로그의 하루 기록 + 유저 + 장소들을 timeline_data로 직렬화."""
-    daily_record = (
-        await db.execute(
-            select(DailyRecord).where(DailyRecord.id == blog.daily_record_id)
-        )
-    ).scalar_one_or_none()
-    if daily_record is None:
-        raise ValueError("하루 기록을 찾을 수 없습니다")
-
-    user = (await db.execute(select(User).where(User.id == blog.user_id))).scalar_one()
-
-    places = list(
+async def _load_places(db: AsyncSession, daily_record_id: uuid.UUID) -> list[Place]:
+    """하루 기록에 속한 장소를 방문 순서대로 조회."""
+    return list(
         (
             await db.execute(
                 select(Place)
-                .where(Place.daily_record_id == blog.daily_record_id)
+                .where(Place.daily_record_id == daily_record_id)
                 .order_by(Place.arrived_at)
                 .options(defer(Place.location))  # 블로그 생성엔 좌표 불필요
             )
@@ -92,13 +86,75 @@ async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
         .all()
     )
 
+
+async def _build_multi_day_timeline(db: AsyncSession, blog: Blog, user: User) -> dict:
+    """모아쓰기 블로그의 기간 내 기록들을 날짜순으로 모아 여러 날 payload 생성."""
+    daily_records = list(
+        (
+            await db.execute(
+                select(DailyRecord)
+                .where(
+                    DailyRecord.user_id == blog.user_id,
+                    DailyRecord.target_date >= blog.target_date,
+                    DailyRecord.target_date <= blog.period_end,
+                )
+                .order_by(DailyRecord.target_date)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    # 기록이 없는 날은 그냥 빠진다 (여행 중 쉰 날까지 빈 블록으로 보낼 필요 없음)
+    if not daily_records:
+        raise ValueError("해당 기간에 기록이 없습니다")
+
+    days_data = [
+        (record, await _load_places(db, record.id)) for record in daily_records
+    ]
+    return build_multi_day_timeline_data(days_data, user)
+
+
+async def _build_timeline_for_blog(db: AsyncSession, blog: Blog) -> dict:
+    """블로그의 기록 + 유저 + 장소들을 timeline_data로 직렬화.
+
+    period_end가 있으면 여러 날 payload, 없으면 기존 하루짜리 형식 그대로.
+    """
+    user = (await db.execute(select(User).where(User.id == blog.user_id))).scalar_one()
+
+    if blog.period_end is not None:
+        return await _build_multi_day_timeline(db, blog, user)
+
+    daily_record = (
+        await db.execute(
+            select(DailyRecord).where(DailyRecord.id == blog.daily_record_id)
+        )
+    ).scalar_one_or_none()
+    if daily_record is None:
+        raise ValueError("하루 기록을 찾을 수 없습니다")
+
+    places = await _load_places(db, blog.daily_record_id)
+
     return build_timeline_data(daily_record, user, places)
+
+
+async def _check_quota(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """무료 사용자 주간 한도 검사 (프리미엄은 무제한).
+
+    모아쓰기도 며칠을 묶든 생성 1회로 센다 — AI 호출이 한 번이기 때문.
+    """
+    subscription = await get_user_subscription(db, user_id)
+    if subscription.plan_type != "premium":
+        used, reset_at = await get_weekly_usage(db, user_id)
+        if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
+            raise QuotaExceededError(
+                limit=settings.FREE_WEEKLY_BLOG_LIMIT, used=used, reset_at=reset_at
+            )
 
 
 async def create_blog_generation(
     db: AsyncSession, user_id: uuid.UUID, daily_record_id: uuid.UUID, style: str
 ) -> Blog:
-    """블로그 생성 요청 → pending 상태로 DB 저장"""
+    """블로그 생성 요청 → pending 상태로 DB 저장 (하루짜리)"""
     result = await db.execute(
         select(DailyRecord).where(
             DailyRecord.id == daily_record_id,
@@ -109,14 +165,7 @@ async def create_blog_generation(
     if not daily_record:
         raise ValueError("해당 하루 기록을 찾을 수 없습니다")
 
-    # 무료 사용자 주간 한도 검사 (프리미엄은 무제한)
-    subscription = await get_user_subscription(db, user_id)
-    if subscription.plan_type != "premium":
-        used, reset_at = await get_weekly_usage(db, user_id)
-        if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
-            raise QuotaExceededError(
-                limit=settings.FREE_WEEKLY_BLOG_LIMIT, used=used, reset_at=reset_at
-            )
+    await _check_quota(db, user_id)
 
     # 같은 하루 기록으로 생성이 진행 중이면 중복 요청 거절 (완료/실패 건은 허용)
     # 삭제된 건은 사용자에게 안 보이므로 새 생성을 막으면 안 된다.
@@ -142,6 +191,66 @@ async def create_blog_generation(
         content="",
         style=style,
         target_date=daily_record.target_date,
+        generation_status=GenerationStatus.PENDING,
+    )
+    db.add(blog)
+    await db.commit()
+    await db.refresh(blog)
+    return blog
+
+
+async def create_period_blog_generation(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    start_date: date,
+    end_date: date,
+    style: str,
+) -> Blog:
+    """여러 날 모아쓰기 생성 요청 → pending 상태로 DB 저장.
+
+    target_date가 시작일, period_end가 종료일이며 daily_record_id는 비운다.
+    기간 유효성(역전·상한)은 요청 스키마에서 이미 검증된다.
+    """
+    await _check_quota(db, user_id)
+
+    # 같은 기간으로 생성이 진행 중이면 중복 요청 거절 (하루짜리와 같은 규칙)
+    in_progress = (
+        await db.execute(
+            select(Blog.id).where(
+                Blog.user_id == user_id,
+                Blog.target_date == start_date,
+                Blog.period_end == end_date,
+                Blog.deleted_at.is_(None),
+                Blog.generation_status.in_(
+                    [GenerationStatus.PENDING, GenerationStatus.GENERATING]
+                ),
+            )
+        )
+    ).first()
+    if in_progress:
+        raise BlogConflictError("이미 생성이 진행 중입니다")
+
+    # 기간 안에 기록이 하나도 없으면 쓸 내용이 없으므로 404
+    has_record = (
+        await db.execute(
+            select(DailyRecord.id).where(
+                DailyRecord.user_id == user_id,
+                DailyRecord.target_date >= start_date,
+                DailyRecord.target_date <= end_date,
+            )
+        )
+    ).first()
+    if not has_record:
+        raise ValueError("해당 기간에 기록이 없습니다")
+
+    blog = Blog(
+        user_id=user_id,
+        daily_record_id=None,
+        title="생성 중...",
+        content="",
+        style=style,
+        target_date=start_date,
+        period_end=end_date,
         generation_status=GenerationStatus.PENDING,
     )
     db.add(blog)
@@ -196,6 +305,34 @@ async def get_blog_by_id(
     if not blog:
         raise ValueError("블로그를 찾을 수 없습니다")
     return blog
+
+
+SUMMARY_LENGTH = 100  # 목록 미리보기 길이
+
+
+def build_summary(content: str | None, q: str | None = None) -> str | None:
+    """목록 미리보기. 검색어가 본문에 있으면 그 주변을 잘라 보여준다.
+
+    앞 100자만 보여주면 검색으로 찾은 단어가 화면에 안 나와 왜 걸렸는지 알 수 없다.
+    제목·날짜로만 매치된 경우(본문에 검색어 없음)는 기존처럼 앞부분을 보여준다.
+    """
+    if not content:
+        return None
+
+    start = 0
+    if q:
+        idx = content.lower().find(q.lower())
+        if idx != -1:
+            # 매치를 가운데 두고 자른다
+            start = max(0, idx - (SUMMARY_LENGTH - len(q)) // 2)
+
+    end = min(len(content), start + SUMMARY_LENGTH)
+    start = max(0, end - SUMMARY_LENGTH)  # 끝에 닿으면 앞으로 당겨 길이 유지
+
+    snippet = content[start:end]
+    prefix = "…" if start > 0 else ""
+    suffix = "…" if end < len(content) else ""
+    return f"{prefix}{snippet}{suffix}"
 
 
 async def get_blog_list(

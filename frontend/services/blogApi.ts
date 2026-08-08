@@ -1,5 +1,10 @@
 import {api} from '@/utils/api';
 
+
+export async function deleteBlog(blogId: string): Promise<void> {
+  await api.delete(`/api/v1/blog/${blogId}`);
+}
+
 export type JournalData = {
   id: string;
   date: string;              // 'YYYY-MM-DD'
@@ -48,8 +53,10 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
-};
-
+  target_data: string;
+  created_at: string;
+  photo_urls?: string[];
+}
 export async function generateBlog(
   body: GenerateBlogRequest,
 ): Promise<GenerateBlogResponse> {

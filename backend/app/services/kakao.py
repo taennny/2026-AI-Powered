@@ -2,6 +2,17 @@ import httpx
 from app.config import settings
 
 
+def get_kakao_authorize_url(state: str) -> str:
+    """카카오 인가 URL 생성 (계정 연동 시작용)"""
+    return (
+        "https://kauth.kakao.com/oauth/authorize"
+        f"?client_id={settings.KAKAO_REST_API_KEY}"
+        f"&redirect_uri={settings.KAKAO_REDIRECT_URI}"
+        "&response_type=code"
+        f"&state={state}"
+    )
+
+
 async def get_kakao_token(code: str) -> dict:
     """인가 코드로 카카오 액세스 토큰 받기"""
     async with httpx.AsyncClient() as client:

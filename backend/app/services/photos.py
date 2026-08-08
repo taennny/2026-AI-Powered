@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import piexif
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,11 @@ from app.utils.timezone import KST
 
 
 def _parse_exif(file_bytes: bytes) -> dict:
-    """EXIF에서 촬영 시각 추출"""
+    """EXIF에서 촬영 시각 추출.
+
+    OffsetTimeOriginal(촬영지 UTC 오프셋)이 있으면 그 시간대를 쓰고,
+    없으면 KST로 간주한다 (기존 폴백 유지 — 한국에서 찍은 사진 다수 대응).
+    """
     result = {"taken_at": None}
 
     try:
@@ -21,9 +25,17 @@ def _parse_exif(file_bytes: bytes) -> dict:
         dt_bytes = exif_ifd.get(piexif.ExifIFD.DateTimeOriginal)
         if dt_bytes:
             dt_str = dt_bytes.decode("utf-8")
-            result["taken_at"] = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S").replace(
-                tzinfo=KST
-            )
+            naive_dt = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")
+
+            offset_bytes = exif_ifd.get(piexif.ExifIFD.OffsetTimeOriginal)
+            tz = KST
+            if offset_bytes:
+                offset_str = offset_bytes.decode("utf-8").strip()
+                sign = 1 if offset_str.startswith("+") else -1
+                hours, minutes = offset_str[1:].split(":")
+                tz = timezone(sign * timedelta(hours=int(hours), minutes=int(minutes)))
+
+            result["taken_at"] = naive_dt.replace(tzinfo=tz)
 
     except Exception:
         pass
