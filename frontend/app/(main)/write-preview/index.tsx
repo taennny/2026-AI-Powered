@@ -11,8 +11,9 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 
-import {fetchBlogDetail, updateBlog} from '@/services/blogApi';
+import {deleteBlog, fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+
 
 export default function WritePreviewScreen() {
   const router = useRouter();
@@ -32,6 +33,7 @@ export default function WritePreviewScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   const needsFetch = !!blogId && !title;
+  const isNewBlog = !!title;
   const [isLoading, setIsLoading] = useState(needsFetch);
 
   useEffect(() => {
@@ -72,17 +74,60 @@ export default function WritePreviewScreen() {
   return parsedDate.toLocaleDateString('ko-KR');
 };
 
-  const handleCancelPress = () => {
-    Alert.alert('작성 취소', '수정 중인 글을 취소할까요?', [
-      {text: '계속 수정', style: 'cancel'},
+ const handleCancelPress = () => {
+  Alert.alert(
+    isNewBlog ? '작성 취소' : '수정 취소',
+    isNewBlog
+      ? '생성한 글을 삭제하고 작성을 취소할까요?'
+      : '수정한 내용을 저장하지 않고 나갈까요?',
+    [
+      {text: '계속 작성', style: 'cancel'},
       {
         text: '취소',
         style: 'destructive',
-        onPress: () => router.replace('/(main)/(tabs)/journal-list'),
-      },
-    ]);
-  };
+        onPress: async () => {
+          if (isNewBlog && blogId) {
+            try {
+              await deleteBlog(blogId);
+            } catch {
+              Alert.alert(
+                '오류',
+                '글을 삭제하지 못했습니다. 다시 시도해주세요.',
+              );
+              return;
+            }
+          }
 
+          router.replace('/(main)/(tabs)/journal-list');
+        },
+      },
+    ],
+  );
+};
+
+const handleDeletePress = () => {
+  if (!blogId) return;
+
+  Alert.alert(
+    '글 삭제',
+    '정말 이 글을 삭제하시겠습니까?\n삭제해도 생성 횟수는 돌아오지 않습니다.',
+    [
+      {text: '취소', style: 'cancel'},
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteBlog(blogId);
+            router.replace('/(main)/(tabs)/journal-list');
+          } catch {
+            Alert.alert('오류', '글을 삭제하지 못했습니다.');
+          }
+        },
+      },
+    ],
+  );
+};
   const handleSavePress = async () => {
     if (!canSave) {
       Alert.alert('알림', '제목과 내용을 입력해주세요.');
@@ -130,6 +175,13 @@ export default function WritePreviewScreen() {
         <TouchableOpacity onPress={handleCancelPress}>
           <Text className="text-xs text-muted">Cancel</Text>
         </TouchableOpacity>
+
+        {!isNewBlog && (
+    <TouchableOpacity onPress={handleDeletePress}>
+      <Text className="text-xs text-red-500">Delete</Text>
+    </TouchableOpacity>
+  )}
+
 
         <TouchableOpacity
           onPress={handleSavePress}

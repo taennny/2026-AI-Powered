@@ -1,5 +1,10 @@
 import {api} from '@/utils/api';
 
+
+export async function deleteBlog(blogId: string): Promise<void> {
+  await api.delete(`/api/v1/blog/${blogId}`);
+}
+
 export type JournalData = {
   id: string;
   date: string;              // 'YYYY-MM-DD'

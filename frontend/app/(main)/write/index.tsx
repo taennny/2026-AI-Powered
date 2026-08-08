@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useLocalSearchParams, useRouter} from 'expo-router';
+import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
   generateBlog,
@@ -125,7 +125,15 @@ const [prompt, setPrompt] = useState('');
   };
 
   if (isLoading) {
-    return (
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          gestureEnabled: false,
+          headerBackVisible: false,
+        }}
+      />
+
       <SafeAreaView className="flex-1 bg-surface justify-center items-center">
         <ActivityIndicator size="large" />
 
@@ -133,8 +141,9 @@ const [prompt, setPrompt] = useState('');
           로미가 열심히 적고 있어요.
         </Text>
       </SafeAreaView>
-    );
-  }
+    </>
+  );
+}
 
   return (
     <SafeAreaView className="flex-1 bg-surface">

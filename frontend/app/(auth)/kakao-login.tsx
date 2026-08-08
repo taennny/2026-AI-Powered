@@ -19,6 +19,10 @@ export default function KakaoLoginScreen() {
   useEffect(() => {
     const handleKakaoLogin = async () => {
       try {
+        if (source === 'account-link') {
+  router.replace('/(main)/settings/account');
+  return;
+}
         if (!accessToken || !refreshToken) {
   Alert.alert(
     '카카오 로그인 실패',
