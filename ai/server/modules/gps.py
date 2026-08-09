@@ -65,12 +65,10 @@ def detect_stays(gps_logs: list) -> list:
     for _, row in df.iterrows():
         if row["is_staying"]:
             if current_stay is None:
-                current_stay = {
-                    "start_time": row["time"],
-                    "lat": row["lat"],
-                    "lng": row["lng"],
-                }
+                current_stay = {"start_time": row["time"], "lats": [], "lngs": []}
             current_stay["end_time"] = row["time"]
+            current_stay["lats"].append(float(row["lat"]))
+            current_stay["lngs"].append(float(row["lng"]))
         else:
             if current_stay is not None:
                 _append_if_valid(stays, current_stay)
@@ -83,28 +81,62 @@ def detect_stays(gps_logs: list) -> list:
 
 
 def _append_if_valid(stays: list, stay: dict) -> None:
+    """최소 체류시간을 넘긴 구간만, 체류 중심점(centroid) 좌표로 확정해 추가한다."""
     duration_min = (stay["end_time"] - stay["start_time"]).total_seconds() // 60
-    if duration_min >= MIN_STAY_MINUTES:
-        stays.append(stay)
+    if duration_min < MIN_STAY_MINUTES:
+        return
+    # 첫 점 대신 체류 구간 평균 좌표로 매칭 — 실제 머문 자리에 더 가깝다
+    stay["lat"] = sum(stay["lats"]) / len(stay["lats"])
+    stay["lng"] = sum(stay["lngs"]) / len(stay["lngs"])
+    stays.append(stay)
 
 
 # ──────────────────────────────────────────
 # 카카오 장소 매칭
 # ──────────────────────────────────────────
-KAKAO_CATEGORIES = ["FD6", "CE7", "AT4", "SW8"]  # 음식점, 카페, 관광, 지하철
-KAKAO_SEARCH_RADIUS = 300  # 미터
+# 라이프로그 "체류형" 장소 카테고리. 순서에 의존하지 않고(아래 _nearest_place)
+# 전부 조회해 최단거리를 고른다.
+#   FD6 음식점 / CE7 카페 / AT4 관광명소 / CT1 문화시설 /
+#   AD5 숙박 / MT1 대형마트 / CS2 편의점
+KAKAO_STAY_CATEGORIES = ["FD6", "CE7", "AT4", "CT1", "AD5", "MT1", "CS2"]
+# 이동 지점(지하철역 등) — 체류형 후보가 전혀 없을 때만 폴백으로 사용
+KAKAO_TRANSIT_CATEGORIES = ["SW8"]
+
+PRIMARY_RADIUS_M = 80  # 체류 반경(50m)에 가깝게: 실제 머문 자리 우선
+FALLBACK_RADIUS_M = 200  # 1차에서 못 찾으면 넓혀서 재시도
 _UNKNOWN_PLACE = {"place_name": "알 수 없음", "category": ""}
 
 
 def get_place_info(lat: float, lng: float) -> dict:
-    """좌표 주변 카카오 장소 정보를 반환한다. 실패 시 기본값 반환."""
+    """좌표에 가장 가까운 카카오 장소를 반환한다. 실패 시 기본값.
+
+    카테고리 순서가 아니라 실제 거리로 선택한다:
+      1) 체류형 카테고리 전역 최단거리 (좁은 반경 → 없으면 넓혀서)
+      2) 그래도 없으면 이동 지점(지하철 등)까지 포함
+    """
     if not settings.KAKAO_API_KEY:
         logger.warning("KAKAO_API_KEY가 설정되지 않았습니다.")
         return dict(_UNKNOWN_PLACE)
 
-    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, PRIMARY_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, FALLBACK_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_TRANSIT_CATEGORIES, FALLBACK_RADIUS_M)
+    return best or dict(_UNKNOWN_PLACE)
 
-    for code in KAKAO_CATEGORIES:
+
+def _nearest_place(
+    lat: float, lng: float, categories: list, radius_m: int
+) -> dict | None:
+    """여러 카테고리를 모두 조회해 카카오 distance 기준 최단거리 1곳 반환.
+
+    카테고리 목록 순서에 의존하지 않는다(거리 최소 우선). 후보 없으면 None.
+    """
+    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    best = None  # (distance_m, place_dict)
+
+    for code in categories:
         try:
             res = requests.get(
                 "https://dapi.kakao.com/v2/local/search/category.json",
@@ -112,7 +144,7 @@ def get_place_info(lat: float, lng: float) -> dict:
                 params={
                     "x": lng,
                     "y": lat,
-                    "radius": KAKAO_SEARCH_RADIUS,
+                    "radius": radius_m,
                     "sort": "distance",
                     "category_group_code": code,
                 },
@@ -120,18 +152,24 @@ def get_place_info(lat: float, lng: float) -> dict:
             )
             res.raise_for_status()
             documents = res.json().get("documents", [])
-            if documents:
-                place = documents[0]
-                return {
-                    "place_name": place["place_name"],
-                    "category": place["category_name"],
-                }
+            if not documents:
+                continue
+            nearest = documents[0]  # sort=distance → 그 카테고리 내 최근접
+            distance_m = int(nearest.get("distance") or 0)
+            if best is None or distance_m < best[0]:
+                best = (
+                    distance_m,
+                    {
+                        "place_name": nearest["place_name"],
+                        "category": nearest["category_name"],
+                    },
+                )
         except requests.exceptions.Timeout:
             logger.warning("카카오 API 타임아웃 (category: %s)", code)
         except requests.exceptions.RequestException as e:
             logger.error("카카오 API 오류 (category: %s): %s", code, e)
 
-    return dict(_UNKNOWN_PLACE)
+    return best[1] if best else None
 
 
 # ──────────────────────────────────────────
