@@ -37,16 +37,6 @@ export default function RecordsSettingsScreen() {
                 onValueChange={value => void setTrackingEnabled(value)}
                 trackColor={{true: tc.tealAccent}}
               />
-              <TouchableOpacity
-  activeOpacity={0.7}
-  onPress={() => router.push('/(main)/(tabs)/photo-folder')}
-  className="pt-2"
->
-  <Text className="text-[15px] text-primary">사진 모아보기</Text>
-  <Text className="text-[13px] leading-[19px] text-secondary mt-2 pr-[32%]">
-    타임라인에 기록된 사진을 한곳에서 확인할 수 있어요.
-  </Text>
-</TouchableOpacity>
             </View>
 
             {/* 끄면 그날 타임라인이 통째로 비게 되므로 결과를 분명히 알린다 */}
