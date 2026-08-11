@@ -3,7 +3,7 @@ import {router} from 'expo-router';
 
 import {type JournalData} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDateStr} from '@/utils/formatDate';
+import {formatDateStr, formatDateFromISO} from '@/utils/formatDate';
 
 type Props = {
   data: JournalData;
@@ -68,7 +68,7 @@ export default function JournalCard({data, query = ''}: Props) {
   />
 
   <HighlightText
-    text={`작성일 ${formatDateStr(data.created_at)}`}
+    text={`작성일 ${formatDateFromISO(data.created_at)}`}
     query={query}
     className="text-[11px] text-tertiary mt-1"
     highlightColor={tc.tealAccent}

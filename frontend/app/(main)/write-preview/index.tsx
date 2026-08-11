@@ -30,6 +30,9 @@ export default function WritePreviewScreen() {
 
   const [journalTitle, setJournalTitle] = useState(title || '');
   const [journalContent, setJournalContent] = useState(content || '');
+  const [journalTargetDate, setJournalTargetDate] = useState(targetData || '');
+  const [journalCreatedAt, setJournalCreatedAt] = useState(createdAt || '');
+
   const [isSaving, setIsSaving] = useState(false);
 
   const needsFetch = !!blogId && !title;
@@ -46,6 +49,8 @@ export default function WritePreviewScreen() {
         if (!isActive) return;
         setJournalTitle(detail.title);
         setJournalContent(detail.content);
+        setJournalTargetDate(detail.target_date);
+        setJournalCreatedAt(detail.created_at);
       })
       .catch(() => {
         if (!isActive) return;
@@ -206,12 +211,12 @@ const handleDeletePress = () => {
       >
         <View className="w-[90%] mb-5">
   <Text className="text-sm font-semibold text-primary">
-    위치 기록 날짜 {formatDate(targetData)}
-  </Text>
+  위치 기록 날짜 {formatDate(journalTargetDate)}
+</Text>
 
-  <Text className="mt-1 text-xs text-muted">
-    기록일 {formatDate(createdAt)}
-  </Text>
+<Text className="mt-1 text-xs text-muted">
+  작성일 {formatDate(journalCreatedAt)}
+</Text>
 </View>
         <TextInput
           className="text-base font-bold text-primary mb-4"

@@ -108,7 +108,7 @@ useEffect(() => {
   blogId: String(blog.blog_id),
   title: blog.title,
   content: blog.content,
-  targetData: blog.target_data,
+  targetData: blog.target_date,
   createdAt: blog.created_at,
 },
       });

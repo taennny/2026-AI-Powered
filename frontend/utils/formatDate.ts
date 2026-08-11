@@ -17,6 +17,11 @@ export function toDateKey(date: Date): string {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
+/** ISO 8601 → 'YY.MM.DD(day)' */
+export function formatDateFromISO(iso: string): string {
+  return formatDate(new Date(iso));
+}
+
 /**
  * 순간(instant) → 그 순간이 속한 논리적 하루의 'YYYY-MM-DD'.
  *
