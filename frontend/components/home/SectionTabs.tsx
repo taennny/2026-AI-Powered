@@ -97,14 +97,12 @@ export default function SectionTabs() {
   }}
 >
   <Text
-    className={`text-[13px] tracking-[0.3px] ${
-      activeTab === 'home'
-        ? 'font-semibold text-primary'
-        : 'font-normal text-secondary'
-    }`}
-  >
-    {' '}
-  </Text>
+  className={`text-[13px] tracking-[0.3px] ${
+    activeTab === 'home'
+      ? 'font-semibold text-primary'
+      : 'font-normal text-secondary'
+  }`}
+/>
 </TouchableOpacity>
       </Animated.View>
 
@@ -125,14 +123,12 @@ export default function SectionTabs() {
   }}
 >
   <Text
-    className={`text-[13px] tracking-[0.3px] ${
-      activeTab === 'journal'
-        ? 'font-semibold text-primary'
-        : 'font-normal text-secondary'
-    }`}
-  >
-    {' '}
-  </Text>
+  className={`text-[13px] tracking-[0.3px] ${
+    activeTab === 'journal'
+      ? 'font-semibold text-primary'
+      : 'font-normal text-secondary'
+  }`}
+/>
 </TouchableOpacity>
       </Animated.View>
     </View>
