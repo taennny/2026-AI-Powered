@@ -1,5 +1,0 @@
-flask
-flask-restx
-flask-cors
-openai
-python-dotenv
