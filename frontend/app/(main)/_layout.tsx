@@ -50,5 +50,9 @@ export default function MainLayout() {
     router.replace('/(auth)/login');
   }, [isAuthenticated]);
 
-  return <Stack screenOptions={{headerShown: false}} />;
+  // 스와이프로 빠져나가면 글쓰기·미리보기의 취소 처리를 건너뛴다.
+  // 설정만 settings/_layout.tsx에서 다시 켠다
+  return (
+    <Stack screenOptions={{headerShown: false, gestureEnabled: false}} />
+  );
 }

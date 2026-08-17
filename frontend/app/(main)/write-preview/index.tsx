@@ -1,7 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   Text,
   TextInput,
@@ -109,6 +110,25 @@ export default function WritePreviewScreen() {
     ],
   );
 };
+
+/**
+ * 안드로이드 뒤로가기를 Cancel과 같은 경로로 — 그냥 두면 생성한 글이
+ * 서버에 남은 채 화면만 사라진다. iOS는 제스처를 꺼서 막았다.
+ */
+const backActionRef = useRef<() => void>(() => {});
+backActionRef.current = () => {
+  if (isSaving) return;
+  handleCancelPress();
+};
+
+useEffect(() => {
+  const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+    backActionRef.current();
+    return true; // 기본 뒤로가기 차단 — 이동은 확인 후 handleCancelPress가 한다
+  });
+
+  return () => subscription.remove();
+}, []);
 
 const handleDeletePress = () => {
   if (!blogId) return;
