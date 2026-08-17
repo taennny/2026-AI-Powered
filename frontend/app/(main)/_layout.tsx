@@ -53,8 +53,10 @@ export default function MainLayout() {
   }, [isAuthenticated]);
 
   // 스와이프로 빠져나가면 글쓰기·미리보기의 취소 처리를 건너뛴다.
-  // 설정만 settings/_layout.tsx에서 다시 켠다
+  // 설정은 예외 — 여기서 홈으로 나가는 것도, 설정 안쪽 이동(settings/_layout)도 허용한다
   return (
-    <Stack screenOptions={{headerShown: false, gestureEnabled: false}} />
+    <Stack screenOptions={{headerShown: false, gestureEnabled: false}}>
+      <Stack.Screen name="settings" options={{gestureEnabled: true}} />
+    </Stack>
   );
 }

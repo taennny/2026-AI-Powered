@@ -227,8 +227,10 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 
 `(main)`은 **iOS 스와이프 뒤로가기를 끕니다**(`gestureEnabled: false`). 글쓰기·미리보기에서
 스와이프로 빠져나가면 취소 처리를 건너뛰어 생성한 글이 서버에 남습니다.
-설정만 예외라 `settings/_layout.tsx`가 자기 스택에서 다시 켭니다 — 제스처 설정은
-네비게이터 단위라 바깥은 끈 채 안쪽만 켤 수 있습니다.
+
+설정만 예외입니다. 두 군데에서 켭니다 — `(main)/_layout`의 `<Stack.Screen name="settings">`가
+설정에서 홈으로 나가는 것을, `settings/_layout.tsx`가 설정 안쪽 이동을 담당합니다.
+제스처 설정은 네비게이터 단위라 바깥을 끈 채 안쪽만 켤 수 있습니다.
 
 안드로이드 하드웨어 뒤로가기는 별개라 `write-preview`가 `BackHandler`로 직접 막고
 Cancel과 같은 확인 경로로 보냅니다.
