@@ -14,6 +14,14 @@ import {useLocalSearchParams, useRouter} from 'expo-router';
 
 import {deleteBlog, fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {clearCalendarCache} from '@/hooks/useCalendar';
+import {clearJournalCache} from '@/hooks/useJournalList';
+
+/** 글이 사라졌으니 캐시도 버린다 — 안 버리면 지운 글과 캘린더 동그라미가 잠깐 되살아난다 */
+function invalidateAfterDelete() {
+  clearCalendarCache();
+  clearJournalCache();
+}
 
 
 export default function WritePreviewScreen() {
@@ -95,6 +103,7 @@ export default function WritePreviewScreen() {
           if (isNewBlog && blogId) {
             try {
               await deleteBlog(blogId);
+              invalidateAfterDelete();
             } catch {
               Alert.alert(
                 '오류',
@@ -144,6 +153,7 @@ const handleDeletePress = () => {
         onPress: async () => {
           try {
             await deleteBlog(blogId);
+            invalidateAfterDelete();
             router.replace('/(main)/(tabs)/journal-list');
           } catch {
             Alert.alert('오류', '글을 삭제하지 못했습니다.');

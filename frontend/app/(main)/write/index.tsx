@@ -15,20 +15,31 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
+  buildDateTarget,
   generateBlog,
   waitForBlogGeneration,
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {describeBlogGenerationError} from '@/utils/blogGenerationError';
+import {useDateSelectionStore} from '@/store/dateSelectionStore';
 
 export default function WriteScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {dailyRecordId} = useLocalSearchParams<{
+  const {dailyRecordId, dates} = useLocalSearchParams<{
     dailyRecordId?: string;
+    /** 모아쓰기 — 'YYYY-MM-DD' 오름차순 콤마 목록 */
+    dates?: string;
   }>();
+
+  const dateKeys = useMemo(
+    () => (dates ? dates.split(',').filter(Boolean) : []),
+    [dates],
+  );
+  const isMultiDay = dateKeys.length > 0;
+  const clearSelection = useDateSelectionStore(s => s.clear);
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [place, setPlace] = useState('');
@@ -50,7 +61,7 @@ useEffect(() => {
   place.trim().length > 0 &&
   companion.trim().length > 0 &&
   feeling.trim().length > 0 &&
-  !!dailyRecordId;
+  (isMultiDay || !!dailyRecordId);
 
   const dateStr = useMemo(() => {
     const today = new Date();
@@ -73,7 +84,7 @@ useEffect(() => {
   };
 
   const handleWritePress = async () => {
-    if (!dailyRecordId) {
+    if (!isMultiDay && !dailyRecordId) {
       Alert.alert('오류', '날짜 기록 정보가 없습니다.');
       return;
     }
@@ -95,12 +106,17 @@ useEffect(() => {
   .join('\n');
 
       const generateResult = await generateBlog({
-        daily_record_id: dailyRecordId,
+        ...(isMultiDay
+          ? buildDateTarget(dateKeys)
+          : {daily_record_id: dailyRecordId}),
         user_note: userNote,
         writing_style: writingStyle,
       });
 
       const blog = await waitForBlogGeneration(generateResult.blog_id);
+
+      // 글이 나왔으면 선택은 끝났다 — 안 비우면 홈에 돌아가도 선택 모드가 남는다
+      if (isMultiDay) clearSelection();
 
       router.push({
         pathname: '/(main)/write-preview',

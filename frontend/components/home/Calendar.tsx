@@ -10,6 +10,10 @@ import {
 
 import {type CalendarDay} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {
+  isSelecting as hasSelection,
+  useDateSelectionStore,
+} from '@/store/dateSelectionStore';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -48,6 +52,10 @@ function Calendar({
   eventDays = [],
 }: Props) {
   const tc = useThemeColors();
+
+  const selected = useDateSelectionStore(s => s.selected);
+  const toggleSelected = useDateSelectionStore(s => s.toggle);
+  const selecting = hasSelection(selected);
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
 
@@ -192,26 +200,44 @@ function Calendar({
       {weeks.map((week, wi) => (
         <View key={wi} className="flex-row border-t-[0.5px] border-line">
           {week.map((day, di) => {
-            const eventDay = day
-              ? eventByDay.get(`${monthPrefix}-${String(day).padStart(2, '0')}`)
-              : undefined;
-            const highlighted = day !== null && day === selectedDay;
+            const dateKey = day
+              ? `${monthPrefix}-${String(day).padStart(2, '0')}`
+              : null;
+            const eventDay = dateKey ? eventByDay.get(dateKey) : undefined;
+            const isPicked = dateKey !== null && dateKey in selected;
+            // 선택 모드에서는 단일 선택 강조를 숨긴다 — 어느 쪽이 글쓰기 대상인지 헷갈린다
+            const highlighted = !selecting && day !== null && day === selectedDay;
 
             return (
               <TouchableOpacity
                 key={di}
                 disabled={!day}
-                onPress={() => day && onDateSelect?.(new Date(year, month, day))}
+                onPress={() => {
+                  if (!day || !dateKey) return;
+                  if (selecting) toggleSelected(dateKey, !!eventDay?.has_timeline);
+                  else onDateSelect?.(new Date(year, month, day));
+                }}
+                onLongPress={() =>
+                  dateKey && toggleSelected(dateKey, !!eventDay?.has_timeline)
+                }
                 className="flex-1 items-center py-[10px]"
               >
                 {day !== null && (
                   <>
                     <View
-                      className="w-8 h-8 rounded-full items-center justify-center"
-                      style={{backgroundColor: highlighted ? tc.tealAccent : 'transparent'}}
+                      className={`w-8 h-8 items-center justify-center ${
+                        isPicked ? 'rounded-md' : 'rounded-full'
+                      }`}
+                      style={{
+                        backgroundColor: isPicked
+                          ? tc.tealDark
+                          : highlighted
+                            ? tc.tealAccent
+                            : 'transparent',
+                      }}
                     >
                       <Text
-                        className={`text-[15px] ${highlighted ? 'font-bold text-white' : 'font-normal text-primary'}`}
+                        className={`text-[15px] ${highlighted || isPicked ? 'font-bold text-white' : 'font-normal text-primary'}`}
                       >
                         {day}
                       </Text>
