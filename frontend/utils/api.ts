@@ -38,15 +38,8 @@ let failedQueue: Array<{
 }> = [];
 
 /**
- * 재발급을 기다리던 요청들을 정리한다.
- *
- * **큐에 들어온 요청은 반드시 둘 중 하나로 끝나야 한다.** 여기 항목들은
- * `new Promise`로 호출부에 매달려 있어서, resolve도 reject도 안 하고 지나가면
- * 그 요청은 영원히 끝나지 않는다 — 화면은 무한 로딩이 되고, axios 타임아웃은
- * 이미 응답(401)을 받은 뒤라 걸리지 않는다.
- *
- * 그래서 "토큰이 있으면 재시도, 없으면 실패"로만 가른다. 예전에는
- * `if (error) ... else if (token) ...`이라 둘 다 없으면 조용히 빠져나갔다.
+ * 큐의 요청은 반드시 resolve나 reject 중 하나로 끝나야 한다 — 그냥 지나가면
+ * 호출부에 매달린 채 영원히 안 끝난다(axios 타임아웃은 이미 응답을 받아 안 걸린다).
  */
 function processQueue(error: unknown, token: string | null = null) {
   failedQueue.forEach(({resolve, reject}) => {
@@ -88,13 +81,8 @@ api.interceptors.response.use(
         const refreshToken = await getRefreshToken();
 
         if (!refreshToken) {
-          // 재발급을 시도조차 못 하므로 기다리던 요청도 여기서 끊는다.
-          // 빠뜨리면 그 요청들이 매달릴 뿐 아니라 failedQueue에 그대로 남아,
-          // 다음 로그인 때 재발급이 성공하는 순간 이전 세션의 요청이
-          // 새 사용자의 토큰으로 재전송된다.
-          //
-          // isRefreshing으로 문을 잠갔으면 어느 출구로 나가든 반드시
-          // processQueue를 거쳐야 한다 — 여기가 그 출구 중 하나다.
+          // 큐를 안 끊으면 매달릴 뿐 아니라, 다음 로그인 때 이전 세션 요청이
+          // 새 사용자 토큰으로 재전송된다
           processQueue(error, null);
           await removeTokens();
           useAuthStore.getState().clearAuth();

@@ -54,12 +54,7 @@ function Calendar({
   const translateX = useRef(new Animated.Value(0)).current;
   const opacity = useRef(new Animated.Value(1)).current;
 
-  /**
-   * 달을 바꾸면서 밀려나는 애니메이션.
-   * 진행 방향으로 빠져나간 뒤, 새 달이 반대편에서 들어온다.
-   *
-   * `delta`가 +1이면 다음 달(왼쪽으로 빠짐), -1이면 이전 달.
-   */
+  /** 달 전환 애니메이션. `delta` +1이면 다음 달, -1이면 이전 달 */
   const changeMonth = useCallback(
     (delta: number) => {
       Animated.parallel([
@@ -101,11 +96,8 @@ function Calendar({
   const goToNextMonth = useCallback(() => changeMonth(1), [changeMonth]);
 
   /**
-   * 가로 스와이프로 달 이동.
-   *
-   * 세로 움직임이 더 크면 잡지 않는다 — 바텀시트가 세로 드래그를 쓰기 때문에
-   * 여기서 가로만 확실할 때 가져와야 서로 뺏지 않는다.
-   * `onMoveShouldSetPanResponder`만 쓰므로 날짜 탭은 그대로 동작한다.
+   * 가로 스와이프로 달 이동. 세로가 더 크면 잡지 않는다 —
+   * 바텀시트의 세로 드래그와 서로 뺏지 않기 위해서다.
    */
   const panResponder = useMemo(
     () =>
@@ -135,7 +127,7 @@ function Calendar({
     [changeMonth, translateX],
   );
 
-  // 달이 바뀔 때만 다시 만든다 — 시트를 드래그할 때마다 42칸을 새로 짜던 것을 막는다
+  // 달이 바뀔 때만 다시 만든다 — 시트 드래그마다 42칸을 새로 짜지 않도록
   const weeks = useMemo<(number | null)[][]>(() => {
     const firstDayOfWeek = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -151,10 +143,7 @@ function Calendar({
     );
   }, [year, month]);
 
-  /**
-   * 날짜 → 기록 여부. 예전에는 칸마다 `eventDays.find()`로 훑어서
-   * 최악 42 × 31번을 비교했다. Map으로 한 번만 만들어 O(1)로 본다.
-   */
+  /** 날짜 → 기록 여부. 칸마다 훑지 않도록 Map으로 한 번만 만든다 */
   const eventByDay = useMemo(() => {
     const map = new Map<string, CalendarDay>();
     for (const d of eventDays) map.set(d.date, d);
@@ -163,7 +152,7 @@ function Calendar({
 
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
 
-  // 선택 날짜는 하나뿐이다 — 칸마다 Date를 만들 필요 없이 일(day) 숫자만 비교한다
+  // 칸마다 Date를 만들지 않고 일(day) 숫자만 비교한다
   const selectedDay =
     selectedDate &&
     selectedDate.getFullYear() === year &&
@@ -248,11 +237,5 @@ function Calendar({
   );
 }
 
-/**
- * 바텀시트를 드래그하면 홈이 리렌더되는데(setVisibleH), 그때마다 달력 42칸을
- * 다시 그릴 이유가 없다. props가 그대로면 건너뛴다.
- *
- * 부모가 `selectedDate`·`viewDate`를 state로 들고 있고 콜백은 setState 함수를
- * 그대로 넘기므로, 실제로 값이 바뀔 때만 참조가 달라진다.
- */
+/** 시트를 드래그할 때마다 달력 42칸을 다시 그릴 이유가 없다 */
 export default memo(Calendar);
