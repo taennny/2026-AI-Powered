@@ -1,4 +1,4 @@
-import {memo, useCallback, useMemo, useRef} from 'react';
+import {memo, useCallback, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,13 @@ import {
   Animated,
   PanResponder,
   Dimensions,
+  StyleSheet,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import {type CalendarDay} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {type ThemeColors} from '@/constants/themes';
 import {
   isSelecting as hasSelection,
   useDateSelectionStore,
@@ -35,6 +38,92 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+/** 선택 오버레이가 켜지고 꺼지는 시간 */
+const PICK_FADE_MS = 180;
+
+type DayCellProps = {
+  day: number | null;
+  eventDay?: CalendarDay;
+  isPicked: boolean;
+  highlighted: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+  tc: ThemeColors;
+};
+
+/**
+ * 날짜 한 칸. 셀마다 애니메이션 값이 필요해 컴포넌트로 뺐다 —
+ * `map` 안에서는 훅을 못 쓴다.
+ */
+function DayCell({
+  day,
+  eventDay,
+  isPicked,
+  highlighted,
+  onPress,
+  onLongPress,
+  tc,
+}: DayCellProps) {
+  const pickOpacity = useRef(new Animated.Value(isPicked ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(pickOpacity, {
+      toValue: isPicked ? 1 : 0,
+      duration: PICK_FADE_MS,
+      useNativeDriver: true,
+    }).start();
+  }, [isPicked, pickOpacity]);
+
+  return (
+    <TouchableOpacity
+      disabled={!day}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      // 누르는 동안 흐려지면 롱프레스로 칠해진 회색이 안 보인다 —
+      // 손을 떼야 선택된 것처럼 느껴진다
+      activeOpacity={1}
+      className="flex-1 items-center py-[10px]"
+    >
+      {/* 칸 전체를 덮는 오버레이 (아이폰 캘린더와 같은 방식).
+          숫자 뒤 도형으로 표시하면 단일 선택 동그라미와 모양이 경쟁한다 */}
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: `${tc.tealDark}33`,
+          opacity: pickOpacity,
+        }}
+      />
+
+      {day !== null && (
+        <>
+          <View
+            className="w-8 h-8 rounded-full items-center justify-center"
+            style={{
+              backgroundColor: highlighted ? tc.tealAccent : 'transparent',
+            }}
+          >
+            <Text
+              className={`text-[15px] ${highlighted ? 'font-bold text-white' : 'font-normal text-primary'}`}
+            >
+              {day}
+            </Text>
+          </View>
+
+          {eventDay?.has_timeline && (
+            <View className="flex-row gap-x-[3px] mt-[3px]">
+              <View className="w-1 h-1 rounded-full bg-teal-accent" />
+              {eventDay.has_journal && (
+                <View className="w-1 h-1 rounded-full bg-teal-dark" />
+              )}
+            </View>
+          )}
+        </>
+      )}
+    </TouchableOpacity>
+  );
+}
 
 type Props = {
   selectedDate?: Date;
@@ -205,55 +294,34 @@ function Calendar({
               : null;
             const eventDay = dateKey ? eventByDay.get(dateKey) : undefined;
             const isPicked = dateKey !== null && dateKey in selected;
-            // 선택 모드에서는 단일 선택 강조를 숨긴다 — 어느 쪽이 글쓰기 대상인지 헷갈린다
-            const highlighted = !selecting && day !== null && day === selectedDay;
+            // 선택 모드에서도 그대로 둔다 — 시트에는 이 날짜의 타임라인이
+            // 계속 떠 있어서, 지우면 어느 날 기록인지 알 수 없어진다
+            const highlighted = day !== null && day === selectedDay;
 
             return (
-              <TouchableOpacity
+              <DayCell
                 key={di}
-                disabled={!day}
+                day={day}
+                eventDay={eventDay}
+                isPicked={isPicked}
+                highlighted={highlighted}
+                tc={tc}
                 onPress={() => {
                   if (!day || !dateKey) return;
-                  if (selecting) toggleSelected(dateKey, !!eventDay?.has_timeline);
-                  else onDateSelect?.(new Date(year, month, day));
+                  if (selecting) {
+                    void Haptics.selectionAsync();
+                    toggleSelected(dateKey, !!eventDay?.has_timeline);
+                  } else {
+                    onDateSelect?.(new Date(year, month, day));
+                  }
                 }}
-                onLongPress={() =>
-                  dateKey && toggleSelected(dateKey, !!eventDay?.has_timeline)
-                }
-                className="flex-1 items-center py-[10px]"
-              >
-                {day !== null && (
-                  <>
-                    <View
-                      className={`w-8 h-8 items-center justify-center ${
-                        isPicked ? 'rounded-md' : 'rounded-full'
-                      }`}
-                      style={{
-                        backgroundColor: isPicked
-                          ? tc.tealDark
-                          : highlighted
-                            ? tc.tealAccent
-                            : 'transparent',
-                      }}
-                    >
-                      <Text
-                        className={`text-[15px] ${highlighted || isPicked ? 'font-bold text-white' : 'font-normal text-primary'}`}
-                      >
-                        {day}
-                      </Text>
-                    </View>
-
-                    {eventDay?.has_timeline && (
-                      <View className="flex-row gap-x-[3px] mt-[3px]">
-                        <View className="w-1 h-1 rounded-full bg-teal-accent" />
-                        {eventDay.has_journal && (
-                          <View className="w-1 h-1 rounded-full bg-teal-dark" />
-                        )}
-                      </View>
-                    )}
-                  </>
-                )}
-              </TouchableOpacity>
+                onLongPress={() => {
+                  if (!dateKey) return;
+                  // 선택 모드 진입은 탭보다 무겁게 — 상태가 바뀌는 동작이다
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  toggleSelected(dateKey, !!eventDay?.has_timeline);
+                }}
+              />
             );
           })}
         </View>
