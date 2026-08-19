@@ -32,3 +32,8 @@ class User(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+    # 회원탈퇴 시각. null이면 활성 계정.
+    # 실제 탈퇴 처리(조회 제외·재가입 정책 등)는 auth 쪽에서 담당한다.
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
