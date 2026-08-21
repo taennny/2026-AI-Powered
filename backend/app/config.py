@@ -31,11 +31,20 @@ class Settings(BaseSettings):
     # 생성 쿼터
     FREE_WEEKLY_BLOG_LIMIT: int = 3  # 무료 사용자 주간 AI 생성 한도. 회의 확정값 3
     DAY_BOUNDARY_HOUR: int = 4  # 하루 경계(새벽 4시). 주 리셋도 이 시각 기준
+    # 한 편으로 묶을 수 있는 최대 일수(모아쓰기). 회의 미확정이라 넉넉히 잡음
+    MAX_BLOG_PERIOD_DAYS: int = 31
 
     # Kakao
     KAKAO_REST_API_KEY: str = ""
     KAKAO_REDIRECT_URI: str = ""
     KAKAO_CLIENT_SECRET: str = ""
+
+    # Mail
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_SERVER: str = ""
+    MAIL_PORT: int = 587
 
     class Config:
         env_file = ".env"

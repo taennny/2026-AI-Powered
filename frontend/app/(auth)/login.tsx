@@ -14,7 +14,7 @@ import {useRouter} from 'expo-router';
 
 import {
   buildKakaoAuthUrl,
-  KAKAO_REDIRECT_URI,
+  KAKAO_APP_REDIRECT,
   KAKAO_REST_API_KEY,
 } from '@/constants/kakao';
 import {saveTokens} from '@/utils/tokenStorage';
@@ -79,12 +79,16 @@ export default function LoginScreen() {
     }
 
     try {
+      // returnUrl은 앱 딥링크다. 백엔드 콜백을 주면
+      // 토큰이 만들어지기 전에 세션이 닫힐 수 있다.
       const result = await WebBrowser.openAuthSessionAsync(
         buildKakaoAuthUrl(),
-        KAKAO_REDIRECT_URI,
+        KAKAO_APP_REDIRECT,
       );
 
-      if (result.type !== 'success') return;
+      if (result.type !== 'success') {
+        return;
+      }
 
       if (!result.url) {
         throw new Error('Redirect URL이 없습니다.');
@@ -94,18 +98,19 @@ export default function LoginScreen() {
       const accessToken = queryParams?.accessToken;
       const refreshToken = queryParams?.refreshToken;
 
-      if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
+      if (
+        typeof accessToken !== 'string' ||
+        typeof refreshToken !== 'string'
+      ) {
         throw new Error('토큰을 받지 못했습니다.');
       }
 
-      // authApi의 login()과 달리 여기서 직접 저장한다 — 디스크와 메모리 둘 다
       await saveTokens(accessToken, refreshToken);
       setAuthenticated();
 
-      // TODO: isNewUser === 'true'면 추후 회원정보 입력 화면으로 분기
       router.replace('/');
     } catch (error) {
-      console.log('kakao login error', error);
+      console.error('kakao login error', error);
       setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
     }
   };

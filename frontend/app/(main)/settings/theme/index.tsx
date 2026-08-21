@@ -81,7 +81,11 @@ export default function ThemeScreen() {
               <Text className="text-[15px] text-primary">{item.label}</Text>
             </TouchableOpacity>
 
-            <View
+            {/* 예시 영역도 선택에 쓴다 — 미리보기를 보다가 바로 고르는 게 자연스럽다.
+                가로 스와이프는 TouchableOpacity가 탭만 잡으므로 그대로 동작한다 */}
+            <TouchableOpacity
+              onPress={() => handleSelect(item.id)}
+              activeOpacity={0.7}
               style={{
                 height: PREVIEW_H,
                 borderRadius: 24,

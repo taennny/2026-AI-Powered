@@ -1,7 +1,8 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -11,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useLocalSearchParams, useRouter} from 'expo-router';
+import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
   generateBlog,
@@ -30,10 +31,26 @@ export default function WriteScreen() {
   }>();
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
-  const [prompt, setPrompt] = useState('');
+  const [place, setPlace] = useState('');
+const [companion, setCompanion] = useState('');
+const [feeling, setFeeling] = useState('');
+const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+useEffect(() => {
+  if (!isLoading) return;
 
-  const canSubmit = prompt.trim().length > 0 && !!dailyRecordId;
+  const subscription = BackHandler.addEventListener(
+    'hardwareBackPress',
+    () => true,
+  );
+
+  return () => subscription.remove();
+}, [isLoading]);
+  const canSubmit =
+  place.trim().length > 0 &&
+  companion.trim().length > 0 &&
+  feeling.trim().length > 0 &&
+  !!dailyRecordId;
 
   const dateStr = useMemo(() => {
     const today = new Date();
@@ -68,10 +85,18 @@ export default function WriteScreen() {
 
     try {
       setIsLoading(true);
+      const userNote = [
+  `오늘 간 장소: ${place.trim()}`,
+  `함께한 사람: ${companion.trim()}`,
+  `오늘의 감정: ${feeling.trim()}`,
+  prompt.trim() ? `추가 요청: ${prompt.trim()}` : '',
+]
+  .filter(Boolean)
+  .join('\n');
 
       const generateResult = await generateBlog({
         daily_record_id: dailyRecordId,
-        user_note: prompt.trim(),
+        user_note: userNote,
         writing_style: writingStyle,
       });
 
@@ -80,10 +105,12 @@ export default function WriteScreen() {
       router.push({
         pathname: '/(main)/write-preview',
         params: {
-          blogId: String(blog.blog_id),
-          title: blog.title,
-          content: blog.content,
-        },
+  blogId: String(blog.blog_id),
+  title: blog.title,
+  content: blog.content,
+  targetData: blog.target_date,
+  createdAt: blog.created_at,
+},
       });
     } catch (error) {
       const {title, message, showSubscription} =
@@ -108,7 +135,15 @@ export default function WriteScreen() {
   };
 
   if (isLoading) {
-    return (
+  return (
+    <>
+      <Stack.Screen
+        options={{
+          gestureEnabled: false,
+          headerBackVisible: false,
+        }}
+      />
+
       <SafeAreaView className="flex-1 bg-surface justify-center items-center">
         <ActivityIndicator size="large" />
 
@@ -116,8 +151,9 @@ export default function WriteScreen() {
           로미가 열심히 적고 있어요.
         </Text>
       </SafeAreaView>
-    );
-  }
+    </>
+  );
+}
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
@@ -156,16 +192,55 @@ export default function WriteScreen() {
         </View>
 
         <ScrollView className="flex-1 px-[22px] pt-[18px]">
-          <TextInput
-            className="text-sm text-primary leading-[22px]"
-            style={{minHeight: 260, textAlignVertical: 'top'}}
-            value={prompt}
-            onChangeText={setPrompt}
-            multiline
-            placeholder="내용을 입력하세요"
-            placeholderTextColor={tc.tertiary}
-            textAlignVertical="top"
-          />
+         <Text className="mb-2 text-sm font-semibold text-primary">
+  오늘 간 장소는 어디인가요?
+</Text>
+
+<TextInput
+  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+  value={place}
+  onChangeText={setPlace}
+  placeholder="예) 서울숲, 성수동, 부산 해운대"
+  placeholderTextColor={tc.tertiary}
+/>
+
+<Text className="mb-2 text-sm font-semibold text-primary">
+  누구와 함께하셨나요?
+</Text>
+
+<TextInput
+  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+  value={companion}
+  onChangeText={setCompanion}
+  placeholder="예) 친구, 가족, 연인, 혼자"
+  placeholderTextColor={tc.tertiary}
+/>
+
+<Text className="mb-2 text-sm font-semibold text-primary">
+  오늘의 감정은 어떠셨나요?
+</Text>
+
+<TextInput
+  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+  style={{minHeight: 90, textAlignVertical: 'top'}}
+  value={feeling}
+  onChangeText={setFeeling}
+  multiline
+  placeholder="오늘의 기분이나 인상 깊었던 감정을 적어주세요."
+  placeholderTextColor={tc.tertiary}
+/>
+<Text className="mb-2 text-sm font-semibold text-primary">
+  추가로 남기고 싶은 내용이 있나요?
+</Text>
+<TextInput
+  className="mb-6 rounded-md border border-line px-4 py-3 text-sm text-primary"
+  style={{minHeight: 120, textAlignVertical: 'top'}}
+  value={prompt}
+  onChangeText={setPrompt}
+  multiline
+  placeholder="AI가 글을 작성할 때 참고할 내용을 자유롭게 적어주세요. (선택)"
+  placeholderTextColor={tc.tertiary}
+/>
         </ScrollView>
 
         <View className="h-[72px] border-t border-line bg-surface px-[22px] items-end justify-center">
