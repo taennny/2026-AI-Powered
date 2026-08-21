@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     KAKAO_REDIRECT_URI: str = ""
     KAKAO_CLIENT_SECRET: str = ""
 
+    # Mail
+    MAIL_USERNAME: str = ""
+    MAIL_PASSWORD: str = ""
+    MAIL_FROM: str = ""
+    MAIL_SERVER: str = ""
+    MAIL_PORT: int = 587
+
     class Config:
         env_file = ".env"
         extra = "ignore"
