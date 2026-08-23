@@ -113,6 +113,7 @@ def get_place_info(lat: float, lng: float) -> dict:
     카테고리 순서가 아니라 실제 거리로 선택한다:
       1) 체류형 카테고리 전역 최단거리 (좁은 반경 → 없으면 넓혀서)
       2) 그래도 없으면 이동 지점(지하철 등)까지 포함
+      3) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
     """
     if not settings.KAKAO_API_KEY:
         logger.warning("KAKAO_API_KEY가 설정되지 않았습니다.")
@@ -123,6 +124,8 @@ def get_place_info(lat: float, lng: float) -> dict:
         best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, FALLBACK_RADIUS_M)
     if best is None:
         best = _nearest_place(lat, lng, KAKAO_TRANSIT_CATEGORIES, FALLBACK_RADIUS_M)
+    if best is None:
+        best = _reverse_geocode(lat, lng)  # POI 없으면 동네 이름이라도
     return best or dict(_UNKNOWN_PLACE)
 
 
@@ -170,6 +173,38 @@ def _nearest_place(
             logger.error("카카오 API 오류 (category: %s): %s", code, e)
 
     return best[1] if best else None
+
+
+def _reverse_geocode(lat: float, lng: float) -> dict | None:
+    """POI 매칭 실패 시 좌표를 대략적 위치(행정동)로 변환. 실패 시 None.
+
+    카카오 coord2address 로 동 단위 지역명을 얻는다. 정확한 지번/도로명이
+    아니라 '○○동 인근' 수준의 대략적 위치다.
+    """
+    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    try:
+        res = requests.get(
+            "https://dapi.kakao.com/v2/local/geo/coord2address.json",
+            headers=headers,
+            params={"x": lng, "y": lat},
+            timeout=5,
+        )
+        res.raise_for_status()
+        documents = res.json().get("documents", [])
+        if not documents:
+            return None
+        addr = documents[0].get("address") or {}
+        region = (
+            addr.get("region_3depth_name")  # 동
+            or addr.get("region_2depth_name")  # 구
+            or addr.get("region_1depth_name")  # 시/도
+        )
+        if not region:
+            return None
+        return {"place_name": f"{region} 인근", "category": "위치"}
+    except requests.exceptions.RequestException as e:
+        logger.warning("역지오코딩 실패: %s", e)
+        return None
 
 
 # ──────────────────────────────────────────

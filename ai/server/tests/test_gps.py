@@ -113,7 +113,34 @@ def test_transit_not_chosen_when_stay_place_exists(monkeypatch):
     assert info["place_name"] == "카페"
 
 
-def test_unknown_when_nothing_found(monkeypatch):
+def test_reverse_geocode_fallback_when_no_poi(monkeypatch):
+    """POI가 하나도 없으면 좌표→동네로 폴백한다 ('알 수 없음' 대신)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if "coord2address" in url:
+            return _FakeResp(
+                [
+                    {
+                        "address": {
+                            "region_1depth_name": "서울",
+                            "region_2depth_name": "성동구",
+                            "region_3depth_name": "성수동2가",
+                        }
+                    }
+                ]
+            )
+        return _FakeResp([])  # 모든 POI 카테고리 없음
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+
+    info = gps.get_place_info(37.5, 127.0)
+    assert info["place_name"] == "성수동2가 인근"
+    assert info["category"] == "위치"
+
+
+def test_unknown_when_everything_fails(monkeypatch):
+    """POI도 역지오코딩도 다 비면 그제야 '알 수 없음'."""
     monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
     monkeypatch.setattr(gps.requests, "get", lambda *a, **k: _FakeResp([]))
     assert gps.get_place_info(37.5, 127.0)["place_name"] == "알 수 없음"
