@@ -20,8 +20,8 @@ def test_detect_stays_uses_centroid():
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
         _log(base, 37.5000, 127.0000),
-        _log(base + timedelta(minutes=5), 37.5002, 127.0002),
-        _log(base + timedelta(minutes=10), 37.5001, 127.0001),
+        _log(base + timedelta(minutes=2), 37.5002, 127.0002),
+        _log(base + timedelta(minutes=4), 37.5001, 127.0001),
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
@@ -37,6 +37,66 @@ def test_detect_stays_skips_short_stays():
         _log(base + timedelta(minutes=1), 37.5, 127.0),  # 1분뿐
     ]
     assert gps.detect_stays(logs) == []
+
+
+def _stay_run(base, start_min, end_min, lat=37.5, lng=127.0, step=1):
+    """[start_min, end_min] 구간을 step분 간격으로 같은 좌표 로그 생성."""
+    return [
+        _log(base + timedelta(minutes=m), lat, lng)
+        for m in range(start_min, end_min + 1, step)
+    ]
+
+
+def test_bridges_short_gap_same_location():
+    """앱이 잠깐 죽어 GPS가 ≤3분 끊겨도, 같은 자리면 한 체류로 이어붙인다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0),
+        _log(base + timedelta(minutes=1), 37.5, 127.0),
+        _log(base + timedelta(minutes=2), 37.5, 127.0),
+        # 여기서 3분 끊김(앱 종료) — base+2 → base+5
+        _log(base + timedelta(minutes=5), 37.5, 127.0),
+        _log(base + timedelta(minutes=6), 37.5, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    dur = (stays[0]["end_time"] - stays[0]["start_time"]).total_seconds() / 60
+    assert dur == pytest.approx(6)  # 끊긴 구간까지 포함해 하나로
+
+
+def test_long_gap_splits():
+    """3분 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = _stay_run(base, 0, 4) + _stay_run(base, 10, 14)  # 사이 6분 공백
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 2
+
+
+def test_jitter_outlier_does_not_split():
+    """한두 점 튐(반경 밖)이 있어도 같은 자리 체류는 쪼개지지 않는다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0),
+        _log(base + timedelta(minutes=1), 37.5, 127.0),
+        _log(base + timedelta(minutes=2), 37.5, 127.0),
+        _log(base + timedelta(minutes=3), 37.5006, 127.0),  # ~66m 튐(단일)
+        _log(base + timedelta(minutes=4), 37.5, 127.0),
+        _log(base + timedelta(minutes=5), 37.5, 127.0),
+        _log(base + timedelta(minutes=6), 37.5, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+
+
+def test_moved_within_3min_not_merged():
+    """3분 안에라도 다른 곳으로 이동했으면 합치지 않는다 (별도 체류)."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 카페(0~4분) → 1분 뒤 ~180m 떨어진 식당(5~9분)
+    logs = _stay_run(base, 0, 4, lat=37.5, lng=127.0) + _stay_run(
+        base, 5, 9, lat=37.5, lng=127.0020
+    )
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 2
 
 
 # ──────────────────────────────────────────
