@@ -1,0 +1,11 @@
+# AI 서버 CI(테스트)용 경량 의존성.
+# CLIP용 torch/transformers/pillow 는 지연 로드라 테스트엔 불필요 → 제외(가볍고 빠름).
+flask
+flask-restx
+flask-cors
+python-dotenv
+geopy
+pandas
+requests
+openai
+pytest
