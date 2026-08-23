@@ -37,12 +37,16 @@ let failedQueue: Array<{
   reject: (error: unknown) => void;
 }> = [];
 
+/**
+ * 큐의 요청은 반드시 resolve나 reject 중 하나로 끝나야 한다 — 그냥 지나가면
+ * 호출부에 매달린 채 영원히 안 끝난다(axios 타임아웃은 이미 응답을 받아 안 걸린다).
+ */
 function processQueue(error: unknown, token: string | null = null) {
-  failedQueue.forEach(promise => {
-    if (error) {
-      promise.reject(error);
-    } else if (token) {
-      promise.resolve(token);
+  failedQueue.forEach(({resolve, reject}) => {
+    if (token) {
+      resolve(token);
+    } else {
+      reject(error ?? new Error('TOKEN_REFRESH_FAILED'));
     }
   });
   failedQueue = [];
@@ -77,6 +81,9 @@ api.interceptors.response.use(
         const refreshToken = await getRefreshToken();
 
         if (!refreshToken) {
+          // 큐를 안 끊으면 매달릴 뿐 아니라, 다음 로그인 때 이전 세션 요청이
+          // 새 사용자 토큰으로 재전송된다
+          processQueue(error, null);
           await removeTokens();
           useAuthStore.getState().clearAuth();
           return Promise.reject(error);

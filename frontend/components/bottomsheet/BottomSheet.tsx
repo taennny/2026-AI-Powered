@@ -20,7 +20,6 @@ import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 import PostCard from '@/components/bottomsheet/PostCard';
-//import MapPreview from '@/components/bottomsheet/MapPreview';
 
 type Props = {
   selectedDate?: Date;

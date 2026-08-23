@@ -3,7 +3,7 @@ import {create} from 'zustand';
 type TimelineStore = {
   placesCount: number;
   setTimeline: (count: number) => void;
-  /** analyze 응답으로 받은 오늘의 daily_record id — 글쓰기 요청에 필요 */
+  /** 지금 보고 있는 날짜의 daily_record id — 글쓰기 요청에 필요 */
   dailyRecordId: string | null;
   setDailyRecordId: (id: string | null) => void;
   /** 강제 재조회 신호 — 화면 이동 없이 다시 받아야 할 때 증가시킨다 (useCalendar가 구독) */

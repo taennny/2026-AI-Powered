@@ -49,7 +49,14 @@ async def get_monthly_calendar(
 
         if BLOG_MODEL_AVAILABLE:
             has_journal_result = await db.execute(
-                select(exists().where(Blog.daily_record_id == record.id))
+                select(
+                    exists().where(
+                        and_(
+                            Blog.daily_record_id == record.id,
+                            Blog.deleted_at.is_(None),
+                        )
+                    )
+                )
             )
             has_journal = has_journal_result.scalar()
         else:

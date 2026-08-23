@@ -12,14 +12,10 @@ import {logicalToday, toDateKey} from '@/utils/formatDate';
 import {syncPhotosForDate} from '@/utils/photoSync';
 
 /**
- * 마지막으로 성공한 조회 결과를 모듈에 남긴다.
+ * 마지막 성공 결과를 모듈에 남긴다 — 탭 레이아웃이 `Slot`이라 홈↔저널을
+ * 오갈 때마다 화면이 언마운트되기 때문이다. 갱신은 뒤에서 진행한다.
  *
- * 탭 레이아웃이 `Slot`이라 홈↔저널을 오갈 때마다 화면이 통째로 언마운트된다.
- * 캐시가 없으면 돌아올 때마다 빈 화면을 보다가 네트워크가 끝나야 채워진다.
- * 캐시를 초기값으로 깔아 즉시 보여주고, 갱신은 뒤에서 진행한다.
- *
- * 키가 다르면(다른 달·다른 날짜) 쓰지 않는다 — 엉뚱한 날짜의 기록을 보여주면 안 된다.
- * 로그아웃 시 `(main)/_layout`이 비운다 — 다음 계정이 물려받으면 안 된다.
+ * 키가 다르면 쓰지 않는다. 로그아웃 시 `(main)/_layout`이 비운다.
  */
 let cachedMonth: {key: string; days: CalendarDay[]} | null = null;
 let cachedTimeline: {key: string; places: TimelinePlace[]} | null = null;
@@ -32,8 +28,7 @@ export function clearCalendarCache(): void {
 }
 
 export function useCalendar() {
-  // 새벽 4시 이전이면 아직 '어제'다 — 자정 넘겨 앱을 열었을 때
-  // 기록이 없는 새 날짜가 선택되는 것을 막는다
+  // 새벽 4시 이전이면 아직 '어제' — 빈 날짜가 선택되는 것을 막는다
   const [selectedDate, setSelectedDate] = useState<Date>(logicalToday);
   const [viewDate, setViewDate] = useState<Date>(() => {
     const today = logicalToday();
@@ -58,14 +53,14 @@ export function useCalendar() {
         setCalendarDays(data.days);
       })
       .catch(() => {
-        // 실패한 결과를 캐시에 남기면 다음 진입에서 옛 데이터가 되살아난다
+        // 실패를 캐시에 남기면 다음 진입에서 옛 데이터가 되살아난다
         if (cachedMonth?.key === key) cachedMonth = null;
         setCalendarDays([]);
       });
   }, [viewDate]);
 
   const loadTimeline = useCallback(() => {
-    // selectedDate는 이미 '며칠'이 정해진 달력 날짜다 — 경계 보정을 다시 하면 안 된다
+    // 이미 '며칠'이 정해진 달력 날짜 — 경계 보정을 다시 하면 안 된다
     const key = toDateKey(selectedDate);
     fetchTimeline(key)
       .then(data => {
@@ -73,8 +68,9 @@ export function useCalendar() {
         setPlaces(data.places);
         setTimeline(data.places.length);
 
-        // 백엔드가 아직 안 주면 undefined — 그때는 analyze 응답으로 채워진 값을
-        // 그대로 둔다. 내려주기 시작하면 선택한 날짜의 id로 자동 교체된다.
+        // 고른 날짜의 id로 덮어쓴다 — analyze가 채운 값은 항상 '오늘'이라
+        // 어제 카드에서 글을 쓰면 오늘 기록으로 갔다.
+        // undefined 가드는 구버전 서버 대응일 뿐이다
         if (data.daily_record_id !== undefined) {
           setDailyRecordId(data.daily_record_id);
         }

@@ -1,15 +1,9 @@
-/**
- * 하루의 경계 시각(기기 로컬). 자정이 아니라 새벽 4시다 — 회의 결정.
- * 자정 직후의 활동은 "전날 밤"으로 묶이고, 자정을 걸친 체류가 이틀로 쪼개져
- * 중복 계상되던 문제도 이걸로 사라진다.
- */
+/** 하루의 경계(기기 로컬). 자정이 아니라 새벽 4시 — 회의 결정 */
 export const DAY_BOUNDARY_HOUR = 4;
 
 /**
- * 달력 날짜 → 'YYYY-MM-DD'.
- *
- * **이미 "며칠"이 정해진 값에 쓴다** (캘린더에서 고른 날짜 등).
- * 경계 보정을 하지 않는다 — 사용자가 5일을 골랐으면 그냥 5일이다.
+ * 달력 날짜 → 'YYYY-MM-DD'. **이미 "며칠"이 정해진 값에 쓴다.**
+ * 경계 보정을 하지 않는다 — 5일을 골랐으면 그냥 5일이다.
  */
 export function toDateKey(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -23,23 +17,15 @@ export function formatDateFromISO(iso: string): string {
 }
 
 /**
- * 순간(instant) → 그 순간이 속한 논리적 하루의 'YYYY-MM-DD'.
- *
- * **실제 시각에 쓴다** (GPS 로그 timestamp, 지금 이 순간 등).
- * 새벽 4시 이전은 전날로 넘긴다: 8/6 02:00 → '2026-08-05'.
- *
- * 기기 로컬 기준이라 `Intl`의 timeZone 지원에 기대지 않는다.
- * 서버가 같은 계산을 할 수 있도록 tz 문자열은 별도로 함께 보낸다(utils/timezone.ts).
+ * 순간 → 그 순간이 속한 논리적 하루. **실제 시각에 쓴다**(GPS timestamp 등).
+ * 새벽 4시 이전은 전날: 8/6 02:00 → '2026-08-05'.
  */
 export function toLogicalDateKey(date: Date): string {
   const shifted = new Date(date.getTime() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
   return toDateKey(shifted);
 }
 
-/**
- * 지금이 속한 논리적 하루를 가리키는 Date (그 날짜의 로컬 자정).
- * 캘린더의 "오늘"과 선택 기본값에 쓴다 — 새벽 2시에 앱을 열면 전날이 선택된다.
- */
+/** 논리적 하루의 로컬 자정 — 새벽 2시에 앱을 열면 전날이 선택된다 */
 export function logicalToday(): Date {
   const shifted = new Date(Date.now() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
   return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
