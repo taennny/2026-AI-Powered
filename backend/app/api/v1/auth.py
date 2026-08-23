@@ -26,6 +26,8 @@ from app.services.auth import (
     kakao_login,
     withdraw_user,
     link_kakao_account,
+    request_password_reset,
+    confirm_password_reset,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -84,16 +86,23 @@ async def refresh_token(request: RefreshRequest, db: AsyncSession = Depends(get_
 
 
 @router.post("/password-reset/request")
-async def password_reset_request(request: PasswordResetRequest):
+async def password_reset_request(
+    request: PasswordResetRequest, db: AsyncSession = Depends(get_db)
+):
     """비밀번호 재설정 이메일 발송"""
-    # Sprint 1에서는 이메일 발송 없이 성공 응답만 반환
+    await request_password_reset(db, request.email)
     return {"message": "비밀번호 재설정 링크를 이메일로 발송했습니다"}
 
 
 @router.post("/password-reset/confirm")
-async def password_reset_confirm(request: PasswordResetConfirm):
+async def password_reset_confirm(
+    request: PasswordResetConfirm, db: AsyncSession = Depends(get_db)
+):
     """새 비밀번호 설정"""
-    # Sprint 1에서는 토큰 검증 없이 성공 응답만 반환
+    try:
+        await confirm_password_reset(db, request.token, request.new_password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
 
 

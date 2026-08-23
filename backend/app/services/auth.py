@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete, select
 
@@ -13,6 +13,8 @@ from app.models.user import User
 from app.schemas.auth import RegisterRequest, LoginRequest
 from app.utils.jwt import create_access_token, create_refresh_token
 import bcrypt
+import secrets
+import hashlib
 
 
 def hash_password(password: str) -> str:
@@ -146,11 +148,11 @@ async def kakao_login(db: AsyncSession, code: str) -> dict:
 
 
 async def withdraw_user(db: AsyncSession, user_id: uuid.UUID) -> None:
-    """회원 탈퇴 — 유저 + 연관 데이터 완전 삭제.
-
-    FK 의존성 역순으로 삭제한다 (자식 테이블 먼저).
-    payment, webhook_event는 B의 alembic 마이그레이션이 아직 안 돌아가서
-    실제 DB에 테이블이 없다 — 마이그레이션 반영되면 다시 추가할 것.
+    """회원 탈퇴
+    User row는 삭제하지 않고 개인정보만 익명화 + deleted_at 처리한다.
+    Payment/Subscription 등 결제 관련 기록 보존을 위해 User row 자체를 남긴다.
+    나머지 연관 데이터(장소/사진/블로그/일일기록/GPS로그/구독)는 완전 삭제한다.
+    payments, webhook_events는 손대지 않는다 (그대로 보존).
     """
     await db.execute(delete(Place).where(Place.user_id == user_id))
     await db.execute(delete(Photo).where(Photo.user_id == user_id))
@@ -162,7 +164,12 @@ async def withdraw_user(db: AsyncSession, user_id: uuid.UUID) -> None:
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user:
-        await db.delete(user)
+        user.email = f"deleted_{user_id}@withdrawn.roame"
+        user.password_hash = None
+        user.nickname = "탈퇴한 사용자"
+        user.social_id = None
+        user.refresh_token = None
+        user.deleted_at = datetime.now(timezone.utc)
 
     await db.commit()
 
@@ -190,4 +197,51 @@ async def link_kakao_account(db: AsyncSession, user_id: uuid.UUID, code: str) ->
 
     user.social_id = kakao_id
     user.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+
+async def request_password_reset(db: AsyncSession, email: str) -> None:
+    """비밀번호 재설정 이메일 발송"""
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    # 존재하지 않는 이메일이어도 응답은 동일하게 (이메일 존재 여부 노출 방지)
+    if not user or user.deleted_at is not None:
+        return
+
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    user.reset_token_hash = token_hash
+    user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    await db.commit()
+
+    reset_link = f"roame://reset-password?token={raw_token}"
+
+    from app.services.email import send_password_reset_email
+
+    await send_password_reset_email(user.email, reset_link)
+
+
+async def confirm_password_reset(
+    db: AsyncSession, token: str, new_password: str
+) -> None:
+    """토큰 검증 후 새 비밀번호로 변경"""
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    result = await db.execute(select(User).where(User.reset_token_hash == token_hash))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise ValueError("유효하지 않은 토큰입니다")
+
+    if (
+        user.reset_token_expires_at is None
+        or user.reset_token_expires_at < datetime.now(timezone.utc)
+    ):
+        raise ValueError("만료된 토큰입니다")
+
+    user.password_hash = hash_password(new_password)
+    user.reset_token_hash = None
+    user.reset_token_expires_at = None
     await db.commit()
