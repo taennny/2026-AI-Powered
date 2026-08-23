@@ -373,7 +373,9 @@ hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀) + 만료 안내
-hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
+hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 페이지네이션
+                          query(입력 중)와 appliedQuery(지금 목록의 검색어)를 나눠 둡니다.
+                          하이라이트·빈 목록 문구는 appliedQuery를 씁니다
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
 hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
 utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
@@ -429,7 +431,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
-| `__tests__/useJournalList.test.ts` | `useJournalList` | 디바운스, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
+| `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
 `jest.setup.js`가 두 가지를 합니다:
 

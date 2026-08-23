@@ -79,7 +79,8 @@ describe('useJournalList', () => {
     await flush();
 
     act(() => result.current.setQuery('여행'));
-    await flush(300);
+    act(() => result.current.search());
+    await flush();
 
     expect(mockFetch).toHaveBeenLastCalledWith({
       q: '여행',
@@ -88,21 +89,76 @@ describe('useJournalList', () => {
     });
   });
 
-  it('타이핑 중에는 요청하지 않는다 (디바운스)', async () => {
+  it('타이핑만으로는 요청하지 않는다 — 검색을 눌러야 나간다', async () => {
     mockFetch.mockResolvedValue(page([], 0));
     const {result} = renderHook(() => useJournalList());
     await flush();
     mockFetch.mockClear();
 
     act(() => result.current.setQuery('여'));
-    await flush(100);
+    await flush();
     act(() => result.current.setQuery('여행'));
-    await flush(100);
+    await flush();
     act(() => result.current.setQuery('여행기'));
-    await flush(300);
+    await flush();
+
+    expect(mockFetch).not.toHaveBeenCalled();
+
+    act(() => result.current.search());
+    await flush();
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch).toHaveBeenCalledWith({q: '여행기', page: 1, size: 20});
+  });
+
+  // 하이라이트가 이 값을 쓴다. 입력 중인 글자를 쓰면 아직 안 바뀐 목록 위에
+  // 새 검색어가 칠해졌다가 뒤늦게 '결과 없음'으로 바뀐다
+  it('appliedQuery는 응답이 반영될 때 함께 바뀐다', async () => {
+    mockFetch.mockResolvedValueOnce(page(['a'], 1));
+    const {result} = renderHook(() => useJournalList());
+    await flush();
+
+    let resolveSearch: (v: unknown) => void = () => {};
+    mockFetch.mockImplementationOnce(
+      () => new Promise(resolve => (resolveSearch = resolve)),
+    );
+
+    act(() => result.current.setQuery('위치 기록일'));
+    act(() => result.current.search());
+
+    // 응답 전 — 목록도 하이라이트 기준도 그대로여야 한다
+    expect(result.current.appliedQuery).toBe('');
+    expect(result.current.journals.map(j => j.id)).toEqual(['a']);
+
+    await act(async () => {
+      resolveSearch(page([], 0));
+      await Promise.resolve();
+    });
+
+    expect(result.current.appliedQuery).toBe('위치 기록일');
+    expect(result.current.journals).toEqual([]);
+  });
+
+  it('검색창을 닫으면 검색어를 지우고 전체 목록으로 돌아온다', async () => {
+    mockFetch.mockResolvedValue(page(['a'], 1));
+    const {result} = renderHook(() => useJournalList());
+    await flush();
+
+    act(() => result.current.setQuery('여행'));
+    act(() => result.current.search());
+    await flush();
+    mockFetch.mockClear();
+
+    act(() => result.current.clearSearch());
+    await flush();
+
+    expect(result.current.query).toBe('');
+    expect(result.current.appliedQuery).toBe('');
+    expect(mockFetch).toHaveBeenLastCalledWith({
+      q: undefined,
+      page: 1,
+      size: 20,
+    });
   });
 
   it('늦게 온 이전 검색 응답이 최신 결과를 덮어쓰지 않는다', async () => {
@@ -118,10 +174,12 @@ describe('useJournalList', () => {
     await flush();
 
     act(() => result.current.setQuery('여행'));
-    await flush(300);
+    act(() => result.current.search());
+    await flush();
 
     act(() => result.current.setQuery('카페'));
-    await flush(300);
+    act(() => result.current.search());
+    await flush();
 
     // 뒤늦게 '여행' 응답이 도착
     await act(async () => {
@@ -157,6 +215,25 @@ describe('useJournalList', () => {
       'd',
     ]);
     expect(result.current.hasMore).toBe(false);
+  });
+
+  // 검색어를 고쳐 쓰다 말고 스크롤하면, 이어붙일 페이지가 다른 검색의 결과가 된다
+  it('더 불러오기는 입력 중인 검색어가 아니라 목록의 검색어를 쓴다', async () => {
+    mockFetch.mockResolvedValue(page(['a', 'b'], 4));
+    const {result} = renderHook(() => useJournalList());
+    await flush();
+
+    act(() => result.current.setQuery('카페'));
+    mockFetch.mockClear();
+
+    act(() => result.current.loadMore());
+    await flush();
+
+    expect(mockFetch).toHaveBeenLastCalledWith({
+      q: undefined,
+      page: 2,
+      size: 20,
+    });
   });
 
   it('다 불러왔으면 더 요청하지 않는다', async () => {
@@ -221,7 +298,8 @@ describe('useJournalList', () => {
 
       mockFetch.mockResolvedValue(page(['searched'], 1));
       act(() => first.result.current.setQuery('여행'));
-      await flush(300);
+      act(() => first.result.current.search());
+      await flush();
       first.unmount();
 
       const {result} = renderHook(() => useJournalList());
