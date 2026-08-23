@@ -32,15 +32,20 @@ ns = Namespace(
 # ──────────────────────────────────────────
 # 체류 감지 (baseline: 거리 임계값)
 # ──────────────────────────────────────────
-STAY_RADIUS_M = 50  # 이 거리 이내면 체류로 판단
+STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
 MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
+# 정상 GPS 수집 간격은 30초. 그보다 큰 끊김이라도 이 값 이하이고 같은 자리면
+# (앱이 잠깐 종료돼 GPS가 끊긴 경우 등) 하나의 체류로 이어붙인다. 초과 시엔 경계.
+GAP_BRIDGE_MINUTES = 3
 
 
 def detect_stays(gps_logs: list) -> list:
     """GPS 로그에서 체류 구간을 추출한다.
 
-    반환: [ { "start_time": Timestamp, "end_time": Timestamp,
-              "lat": float, "lng": float } ]
+    앵커(체류 중심점) 기준으로 군집화하며, 정상 간격을 넘는 GPS 끊김도
+    GAP_BRIDGE_MINUTES 이하이고 같은 자리면 하나의 체류로 이어붙인다.
+
+    반환: [ { "start_time", "end_time", "lat", "lng" } ]  (lat/lng = 중심점)
     """
     if len(gps_logs) < 2:
         return []
@@ -49,46 +54,85 @@ def detect_stays(gps_logs: list) -> list:
     df["time"] = pd.to_datetime(df["time"])
     df = df.sort_values("time").reset_index(drop=True)
 
-    distances = []
-    for i in range(len(df) - 1):
-        p1 = (df.loc[i, "lat"], df.loc[i, "lng"])
-        p2 = (df.loc[i + 1, "lat"], df.loc[i + 1, "lng"])
-        distances.append(geodesic(p1, p2).meters)
-    distances.append(0)
-
-    df["distance_m"] = distances
-    df["is_staying"] = df["distance_m"] < STAY_RADIUS_M
-
-    stays = []
-    current_stay = None
-
+    # 1) 앵커 기반 원시 군집화 (gap ≤ 3분 + 같은 자리 → 이어붙임)
+    segments = []
+    current = None
     for _, row in df.iterrows():
-        if row["is_staying"]:
-            if current_stay is None:
-                current_stay = {"start_time": row["time"], "lats": [], "lngs": []}
-            current_stay["end_time"] = row["time"]
-            current_stay["lats"].append(float(row["lat"]))
-            current_stay["lngs"].append(float(row["lng"]))
+        t, lat, lng = row["time"], float(row["lat"]), float(row["lng"])
+        if current is None:
+            current = _new_segment(t, lat, lng)
+            continue
+        gap_min = (t - current["last_time"]).total_seconds() / 60
+        dist = geodesic((lat, lng), current["anchor"]).meters
+        if gap_min <= GAP_BRIDGE_MINUTES and dist <= STAY_RADIUS_M:
+            _extend_segment(current, t, lat, lng)
         else:
-            if current_stay is not None:
-                _append_if_valid(stays, current_stay)
-                current_stay = None
+            segments.append(current)
+            current = _new_segment(t, lat, lng)
+    if current is not None:
+        segments.append(current)
 
-    if current_stay is not None:
-        _append_if_valid(stays, current_stay)
+    # 2) 이동/이상치(단일 점) 제거 → GPS 튐으로 갈라진 인접 체류가 다시 붙도록
+    segments = [s for s in segments if len(s["lats"]) >= 2]
 
+    # 3) 같은 자리 + 짧은 간격(≤3분)으로 나뉜 체류 병합 (튐·앱 종료 복원)
+    segments = _merge_adjacent(segments)
+
+    # 4) 최소 체류시간 필터 + 중심점 확정
+    stays = []
+    for seg in segments:
+        duration_min = (seg["end_time"] - seg["start_time"]).total_seconds() / 60
+        if duration_min < MIN_STAY_MINUTES:
+            continue
+        seg["lat"] = sum(seg["lats"]) / len(seg["lats"])
+        seg["lng"] = sum(seg["lngs"]) / len(seg["lngs"])
+        stays.append(seg)
     return stays
 
 
-def _append_if_valid(stays: list, stay: dict) -> None:
-    """최소 체류시간을 넘긴 구간만, 체류 중심점(centroid) 좌표로 확정해 추가한다."""
-    duration_min = (stay["end_time"] - stay["start_time"]).total_seconds() // 60
-    if duration_min < MIN_STAY_MINUTES:
-        return
-    # 첫 점 대신 체류 구간 평균 좌표로 매칭 — 실제 머문 자리에 더 가깝다
-    stay["lat"] = sum(stay["lats"]) / len(stay["lats"])
-    stay["lng"] = sum(stay["lngs"]) / len(stay["lngs"])
-    stays.append(stay)
+def _new_segment(t, lat: float, lng: float) -> dict:
+    return {
+        "start_time": t,
+        "end_time": t,
+        "last_time": t,
+        "lats": [lat],
+        "lngs": [lng],
+        "anchor": (lat, lng),
+    }
+
+
+def _extend_segment(seg: dict, t, lat: float, lng: float) -> None:
+    seg["end_time"] = t
+    seg["last_time"] = t
+    seg["lats"].append(lat)
+    seg["lngs"].append(lng)
+    # 앵커를 running centroid로 갱신 — 점이 쌓일수록 한두 점 튐에 견고
+    seg["anchor"] = (
+        sum(seg["lats"]) / len(seg["lats"]),
+        sum(seg["lngs"]) / len(seg["lngs"]),
+    )
+
+
+def _merge_adjacent(segments: list) -> list:
+    """같은 자리 + 짧은 간격(≤GAP_BRIDGE_MINUTES)으로 나뉜 인접 체류를 병합한다."""
+    if not segments:
+        return segments
+    merged = [segments[0]]
+    for seg in segments[1:]:
+        prev = merged[-1]
+        gap_min = (seg["start_time"] - prev["end_time"]).total_seconds() / 60
+        dist = geodesic(seg["anchor"], prev["anchor"]).meters
+        if gap_min <= GAP_BRIDGE_MINUTES and dist <= STAY_RADIUS_M:
+            prev["end_time"] = seg["end_time"]
+            prev["lats"] += seg["lats"]
+            prev["lngs"] += seg["lngs"]
+            prev["anchor"] = (
+                sum(prev["lats"]) / len(prev["lats"]),
+                sum(prev["lngs"]) / len(prev["lngs"]),
+            )
+        else:
+            merged.append(seg)
+    return merged
 
 
 # ──────────────────────────────────────────
