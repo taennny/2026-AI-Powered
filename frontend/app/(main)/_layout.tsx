@@ -9,6 +9,7 @@ import {useDailyAnalyze} from '@/hooks/useDailyAnalyze';
 import {usePhotoSync} from '@/hooks/usePhotoSync';
 import {clearCalendarCache} from '@/hooks/useCalendar';
 import {clearJournalCache} from '@/hooks/useJournalList';
+import {useDateSelectionStore} from '@/store/dateSelectionStore';
 import {clearPhotoSyncState} from '@/utils/photoSync';
 import {stopGpsTracking} from '@/hooks/useGpsTracking';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
@@ -42,6 +43,7 @@ export default function MainLayout() {
     // 캘린더·저널이 잠깐 보인다
     clearCalendarCache();
     clearJournalCache();
+    useDateSelectionStore.getState().clear();
     void clearPhotoSyncState();
     // 로그아웃·회원탈퇴·토큰 만료가 모두 여기를 지난다.
     // 백그라운드 태스크는 화면이 사라져도 살아남으므로 명시적으로 꺼야 한다 —
@@ -50,5 +52,11 @@ export default function MainLayout() {
     router.replace('/(auth)/login');
   }, [isAuthenticated]);
 
-  return <Stack screenOptions={{headerShown: false}} />;
+  // 스와이프로 빠져나가면 글쓰기·미리보기의 취소 처리를 건너뛴다.
+  // 설정은 예외 — 여기서 홈으로 나가는 것도, 설정 안쪽 이동(settings/_layout)도 허용한다
+  return (
+    <Stack screenOptions={{headerShown: false, gestureEnabled: false}}>
+      <Stack.Screen name="settings" options={{gestureEnabled: true}} />
+    </Stack>
+  );
 }

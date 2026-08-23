@@ -1,7 +1,8 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   Text,
   TextInput,
@@ -13,6 +14,18 @@ import {useLocalSearchParams, useRouter} from 'expo-router';
 
 import {deleteBlog, fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {clearCalendarCache} from '@/hooks/useCalendar';
+import {clearJournalCache} from '@/hooks/useJournalList';
+
+/**
+ * 글 목록이 달라졌으니 캐시를 버린다 — 삭제·저장 양쪽 다 필요하다.
+ * 안 버리면 지운 글과 캘린더 동그라미가 잠깐 되살아나고,
+ * 새로 쓴 글은 반대로 한 박자 늦게 나타난다.
+ */
+function invalidateCaches() {
+  clearCalendarCache();
+  clearJournalCache();
+}
 
 
 export default function WritePreviewScreen() {
@@ -94,6 +107,7 @@ export default function WritePreviewScreen() {
           if (isNewBlog && blogId) {
             try {
               await deleteBlog(blogId);
+              invalidateCaches();
             } catch {
               Alert.alert(
                 '오류',
@@ -110,6 +124,25 @@ export default function WritePreviewScreen() {
   );
 };
 
+/**
+ * 안드로이드 뒤로가기를 Cancel과 같은 경로로 — 그냥 두면 생성한 글이
+ * 서버에 남은 채 화면만 사라진다. iOS는 제스처를 꺼서 막았다.
+ */
+const backActionRef = useRef<() => void>(() => {});
+backActionRef.current = () => {
+  if (isSaving) return;
+  handleCancelPress();
+};
+
+useEffect(() => {
+  const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+    backActionRef.current();
+    return true; // 기본 뒤로가기 차단 — 이동은 확인 후 handleCancelPress가 한다
+  });
+
+  return () => subscription.remove();
+}, []);
+
 const handleDeletePress = () => {
   if (!blogId) return;
 
@@ -124,6 +157,7 @@ const handleDeletePress = () => {
         onPress: async () => {
           try {
             await deleteBlog(blogId);
+            invalidateCaches();
             router.replace('/(main)/(tabs)/journal-list');
           } catch {
             Alert.alert('오류', '글을 삭제하지 못했습니다.');
@@ -151,6 +185,8 @@ const handleDeletePress = () => {
         title: journalTitle.trim(),
         content: journalContent.trim(),
       });
+
+      invalidateCaches();
 
       Alert.alert('완료', '글이 저장되었습니다.', [
         {

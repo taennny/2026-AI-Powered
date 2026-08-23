@@ -28,15 +28,10 @@ export type TimelineData = {
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
   /**
-   * 그 날짜의 daily_record id — **백엔드가 아직 안 내려줍니다(undefined).**
+   * 고른 날짜의 daily_record id. 글쓰기가 이 값을 쓴다 —
+   * analyze 응답으로 받으면 항상 '오늘'이라 어제 카드에서 쓴 글이 오늘로 갔다.
    *
-   * 지금 `dailyRecordId`는 analyze 응답에서만 오는데, 그건 analyze가 돌린 날짜(오늘)라
-   * 사용자가 캘린더에서 고른 날짜와 어긋납니다. 어제 카드를 보며 글쓰기를 누르면
-   * 오늘 기록으로 글이 생성됩니다.
-   *
-   * 이 필드가 오기 시작하면 화면에 그려지는 타임라인과 **같은 응답·같은 날짜**에서
-   * 오므로 어긋날 수가 없습니다. 미리 읽어두면 백엔드 배포만으로 켜집니다
-   * (GPS `timezone` 전송과 같은 방식).
+   * 옵셔널로 둔 건 구버전 서버 대응일 뿐이다(현재 서버는 항상 내려준다).
    */
   daily_record_id?: string | null;
 };

@@ -29,7 +29,7 @@ function formatMonthDay(iso: string): string {
 }
 
 export default function SubscriptionScreen() {
-  // 갱신 시점은 useSubscriptionSync가 관리한다 — 여기서는 결제·해지 직후만 부른다
+  // 갱신 시점은 useSubscriptionSync가 관리한다
   const subscription = useSubscriptionStore();
   const loading = !subscription.hasLoaded;
   const isPremium = subscription.isPremium();
@@ -37,8 +37,7 @@ export default function SubscriptionScreen() {
   const [options, setOptions] = useState<PurchaseOption[]>([]);
   const [isPurchasing, setIsPurchasing] = useState(false);
 
-  // 스토어 가격은 지역·환율에 따라 다르다. 못 받아오면 FreeView가
-  // constants/pricing.ts의 국내 기준 값으로 그린다
+  // 못 받아오면 FreeView가 국내 기준 기본값으로 그린다
   useEffect(() => {
     if (isPremium) return;
     void getPurchaseOptions().then(setOptions);
@@ -81,11 +80,9 @@ export default function SubscriptionScreen() {
 
     setIsPurchasing(true);
     try {
-      // 결제는 SDK가 Apple과 처리한다. 우리 서버에는 RevenueCat이 웹훅으로 알린다 —
-      // 앱이 plan을 직접 바꾸면 검증 실패 시 유료 기능이 잠깐 열린다
       const result = await purchase(option.package);
 
-      // 사용자가 시스템 다이얼로그를 닫은 것 — 오류가 아니다
+      // 다이얼로그를 닫은 것 — 오류가 아니다
       if (result === 'cancelled') return;
 
       if (result === 'failed') {
@@ -99,7 +96,7 @@ export default function SubscriptionScreen() {
     }
   };
 
-  /** 기기 변경·재설치 때 구독을 되찾는 경로 — Apple 심사 필수 */
+  /** 심사 필수 — 기기 변경·재설치 때 구독을 되찾는 경로 */
   const handleRestore = async () => {
     if (isPurchasing) return;
 
@@ -126,10 +123,7 @@ export default function SubscriptionScreen() {
     }
   };
 
-  /**
-   * 해지는 우리 서버가 아니라 앱스토어에서 한다.
-   * 구독의 실체가 Apple에 있어서, 우리 DB만 바꾸면 결제는 계속된다.
-   */
+  /** 해지는 앱스토어에서 — 우리 DB만 바꾸면 결제가 계속된다 */
   const handleCancel = () => {
     Alert.alert(
       '구독 해지',
@@ -146,10 +140,7 @@ export default function SubscriptionScreen() {
     );
   };
 
-  /**
-   * 해지를 예약해도 만료일까지는 프리미엄이다. 그때도 "다음 결제일"이라고 하면
-   * 해지가 안 된 줄 알고 또 해지하러 간다 — 갱신 여부를 문구로 구분한다.
-   */
+  /** 해지 예약 후에도 "다음 결제일"이라고 하면 또 해지하러 간다 */
   const subtitle = !isPremium
     ? '베이직 플랜을 이용 중'
     : !subscription.expiresAt

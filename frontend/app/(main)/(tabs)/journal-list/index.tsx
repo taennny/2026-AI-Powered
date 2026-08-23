@@ -20,8 +20,17 @@ const BAR_COLLAPSED = 40;
 const BAR_EXPANDED = SCREEN_WIDTH - 32;
 
 export default function JournalListScreen() {
-  const {query, setQuery, journals, isLoading, isLoadingMore, loadMore} =
-    useJournalList();
+  const {
+    query,
+    setQuery,
+    appliedQuery,
+    search,
+    clearSearch,
+    journals,
+    isLoading,
+    isLoadingMore,
+    loadMore,
+  } = useJournalList();
   const [isFocused, setIsFocused] = useState(false);
   const widthAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
@@ -38,7 +47,7 @@ export default function JournalListScreen() {
   };
 
   const collapse = () => {
-    setQuery('');
+    clearSearch();
     inputRef.current?.blur();
     Animated.spring(widthAnim, {
       toValue: 0,
@@ -68,7 +77,7 @@ export default function JournalListScreen() {
           }}
         >
           <TouchableOpacity
-            onPress={isFocused ? undefined : expand}
+            onPress={isFocused ? search : expand}
             style={{
               width: 40,
               height: 40,
@@ -85,6 +94,8 @@ export default function JournalListScreen() {
             onChangeText={setQuery}
             placeholder="Search"
             placeholderTextColor={tc.tertiary}
+            returnKeyType="search"
+            onSubmitEditing={search}
             style={{
               flex: 1,
               fontSize: 14,
@@ -118,7 +129,10 @@ export default function JournalListScreen() {
         <FlatList
           data={journals}
           keyExtractor={journal => journal.id}
-          renderItem={({item}) => <JournalCard data={item} query={query} />}
+          renderItem={({item}) => (
+            // 입력 중인 query가 아니라 이 목록을 만들어낸 검색어로 칠한다
+            <JournalCard data={item} query={appliedQuery} />
+          )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{paddingHorizontal: 16, paddingBottom: 32}}
           onEndReached={loadMore}
@@ -126,7 +140,7 @@ export default function JournalListScreen() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <Text className="text-center text-sm text-secondary mt-10">
-              {query ? '검색 결과가 없어요.' : '아직 작성한 글이 없어요.'}
+              {appliedQuery ? '검색 결과가 없어요.' : '아직 작성한 글이 없어요.'}
             </Text>
           }
           ListFooterComponent={
