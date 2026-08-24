@@ -32,6 +32,17 @@ def test_detect_stays_uses_centroid():
     assert stays[0]["lng"] == pytest.approx((127.0000 + 127.0002 + 127.0001) / 3)
 
 
+def test_detect_stays_mixed_timestamp_precision():
+    """마이크로초 있는/없는 ISO8601 시각이 섞여도 파싱 실패하지 않는다 (prod 500 재현)."""
+    logs = [
+        {"time": "2026-08-24T06:24:57.123456Z", "lat": 37.5, "lng": 127.0},
+        {"time": "2026-08-24T06:26:57Z", "lat": 37.5, "lng": 127.0},  # 마이크로초 없음
+        {"time": "2026-08-24T06:28:57Z", "lat": 37.5, "lng": 127.0},
+    ]
+    stays = gps.detect_stays(logs)  # 예전엔 여기서 ValueError → 500
+    assert len(stays) == 1
+
+
 def test_detect_stays_skips_short_stays():
     """MIN_STAY_MINUTES 미만은 체류로 보지 않는다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
