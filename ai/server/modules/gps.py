@@ -37,6 +37,22 @@ MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
 # 정상 GPS 수집 간격은 30초. 그보다 큰 끊김이라도 이 값 이하이고 같은 자리면
 # (앱이 잠깐 종료돼 GPS가 끊긴 경우 등) 하나의 체류로 이어붙인다. 초과 시엔 경계.
 GAP_BRIDGE_MINUTES = 3
+ACCURACY_MAX_M = 100  # accuracy(오차 반경 m)가 이보다 크면 노이즈로 보고 제외
+
+
+def _filter_by_accuracy(gps_logs: list) -> list:
+    """정확도가 나쁜(accuracy 값이 큰) GPS 점을 제외한다.
+
+    accuracy 는 오차 반경(m)이라 값이 클수록 부정확. 프론트가 '값 없음'을 0으로
+    보내므로(accuracy ?? 0) 0/None 은 '모름'으로 보고 유지하고, 큰 값만 버린다.
+    필터 후 2점 미만이면(그날 GPS가 전반적으로 나쁨) 원본을 그대로 쓴다.
+    """
+    filtered = [
+        log
+        for log in gps_logs
+        if not log.get("accuracy") or log["accuracy"] <= ACCURACY_MAX_M
+    ]
+    return filtered if len(filtered) >= 2 else gps_logs
 
 
 def detect_stays(gps_logs: list) -> list:
@@ -49,6 +65,8 @@ def detect_stays(gps_logs: list) -> list:
     """
     if len(gps_logs) < 2:
         return []
+
+    gps_logs = _filter_by_accuracy(gps_logs)
 
     df = pd.DataFrame(gps_logs)
     df["time"] = pd.to_datetime(df["time"])

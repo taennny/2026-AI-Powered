@@ -8,8 +8,11 @@ from config import settings
 from modules import gps
 
 
-def _log(t: datetime, lat: float, lng: float) -> dict:
-    return {"time": t.isoformat(), "lat": lat, "lng": lng}
+def _log(t: datetime, lat: float, lng: float, accuracy: float | None = None) -> dict:
+    log = {"time": t.isoformat(), "lat": lat, "lng": lng}
+    if accuracy is not None:
+        log["accuracy"] = accuracy
+    return log
 
 
 # ──────────────────────────────────────────
@@ -97,6 +100,53 @@ def test_moved_within_3min_not_merged():
     )
     stays = gps.detect_stays(logs)
     assert len(stays) == 2
+
+
+# ──────────────────────────────────────────
+# accuracy 노이즈 필터
+# ──────────────────────────────────────────
+def test_filter_by_accuracy_drops_bad_keeps_unknown():
+    """accuracy가 큰(나쁜) 점만 제외하고, 0/None(값 없음)은 유지한다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0, accuracy=10),  # 양호 → 유지
+        _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=0),  # 값없음 → 유지
+        _log(base + timedelta(minutes=2), 37.5, 127.0),  # 미지정 → 유지
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=200),  # 나쁨 → 제외
+    ]
+    filtered = gps._filter_by_accuracy(logs)
+    assert len(filtered) == 3
+    assert all(
+        (not log.get("accuracy")) or log["accuracy"] <= gps.ACCURACY_MAX_M
+        for log in filtered
+    )
+
+
+def test_bad_accuracy_point_excluded_from_stay():
+    """반경 안이라도 accuracy 나쁜 점은 체류 중심점 계산에서 빠진다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=2), 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=10),
+        # ~33m 이내라 반경엔 들지만 accuracy 200 → 제외되어 중심점 안 흔듦
+        _log(base + timedelta(minutes=4), 37.5003, 127.0, accuracy=200),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    assert stays[0]["lat"] == pytest.approx(37.5)  # 37.5003 섞였으면 어긋남
+
+
+def test_all_bad_accuracy_falls_back_to_unfiltered():
+    """그날 GPS가 전반적으로 나쁘면(모두 임계 초과) 다 날리지 않고 원본으로 감지."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=200)
+        for m in range(0, 5)
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
 
 
 # ──────────────────────────────────────────
