@@ -10,6 +10,8 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_REGEX =
   /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
 
+const NICKNAME_REGEX = /^[가-힣A-Za-z0-9]{2,10}$/;
+
 export default function SignupScreen() {
   const router = useRouter();
 
@@ -28,11 +30,14 @@ export default function SignupScreen() {
   const [passwordGuideMessage, setPasswordGuideMessage] = useState('');
   const [passwordGuideColor, setPasswordGuideColor] = useState('#CCCCCC');
 
+  const [nicknameGuideMessage, setNicknameGuideMessage] = useState('');
+  const [nicknameGuideColor, setNicknameGuideColor] = useState('#CCCCCC');
+
   const isSignupButtonEnabled = useMemo(() => {
     return (
       EMAIL_REGEX.test(email.trim()) &&
       PASSWORD_REGEX.test(password) &&
-      nickname.trim().length > 0 &&
+      NICKNAME_REGEX.test(nickname.trim()) &&
       isServiceTermsChecked &&
       isPrivacyPolicyChecked &&
       isAgeConfirmed
@@ -75,6 +80,27 @@ export default function SignupScreen() {
     setPasswordGuideMessage('비밀번호 형식이 아닙니다.');
     setPasswordGuideColor('#FF0000');
   };
+  
+  const handleNicknameChange = (text: string) => {
+  setNickname(text);
+
+  const trimmed = text.trim();
+
+  if (!trimmed) {
+    setNicknameGuideMessage('');
+    setNicknameGuideColor('#CCCCCC');
+    return;
+  }
+
+  if (NICKNAME_REGEX.test(trimmed)) {
+    setNicknameGuideMessage('사용 가능한 닉네임입니다.');
+    setNicknameGuideColor('#4EF5F9');
+    return;
+  }
+
+  setNicknameGuideMessage('2~10자의 한글, 영문, 숫자만 가능합니다.');
+  setNicknameGuideColor('#FF3B30');
+};
 
   const handleSignupPress = async () => {
     if (!isSignupButtonEnabled || isLoading) return;
@@ -83,8 +109,9 @@ export default function SignupScreen() {
       setIsLoading(true);
       setEmailGuideMessage('');
       setPasswordGuideMessage('');
+      setNicknameGuideMessage('');
 
-      await signup({email, password, nickname: nickname.trim()});
+      await signup({email: email.trim(),password,nickname: nickname.trim(),});
 
       router.replace('/(auth)/login');
     } catch (error: any) {
@@ -159,10 +186,16 @@ export default function SignupScreen() {
       <View className="mb-[10px]">
         <View className="flex-row items-center justify-between mb-[6px]">
           <Text className="text-[12px] leading-[12px] text-[#3C3C43]">닉네임</Text>
-        </View>
+        <Text
+    style={{color: nicknameGuideColor}}
+    className="text-[10px] leading-[10px]"
+  >
+    {nicknameGuideMessage}
+  </Text>
+</View>
         <TextInput
           value={nickname}
-          onChangeText={setNickname}
+          onChangeText={handleNicknameChange}
           placeholder="닉네임을 입력해주세요."
           placeholderTextColor="#CCCCCC"
           autoCapitalize="none"
