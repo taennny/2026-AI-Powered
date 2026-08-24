@@ -69,7 +69,9 @@ def detect_stays(gps_logs: list) -> list:
     gps_logs = _filter_by_accuracy(gps_logs)
 
     df = pd.DataFrame(gps_logs)
-    df["time"] = pd.to_datetime(df["time"])
+    # ISO8601 유연 파싱: 마이크로초 유무·Z/오프셋 혼합 허용, 모두 UTC로 정규화
+    # (기본 추론은 첫 값 포맷을 전체에 적용해 정밀도가 섞이면 실패함)
+    df["time"] = pd.to_datetime(df["time"], format="ISO8601", utc=True)
     df = df.sort_values("time").reset_index(drop=True)
 
     # 1) 앵커 기반 원시 군집화 (gap ≤ 3분 + 같은 자리 → 이어붙임)
