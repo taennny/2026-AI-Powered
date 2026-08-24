@@ -6,6 +6,9 @@ import {signup} from '@/services/authApi';
 import BackButton from '@/components/common/BackButton';
 
 export default function SignupScreen() {
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const PASSWORD_REGEX =
+  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -25,8 +28,8 @@ export default function SignupScreen() {
 
   const isSignupButtonEnabled = useMemo(() => {
     return (
-      email.includes('@') &&
-      password.length >= 8 &&
+      EMAIL_REGEX.test(email.trim()) &&
+      PASSWORD_REGEX.test(password) &&
       nickname.trim().length > 0 &&
       isServiceTermsChecked &&
       isPrivacyPolicyChecked &&
@@ -34,21 +37,26 @@ export default function SignupScreen() {
     );
   }, [email, password, nickname, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
 
-  const handleEmailChange = (text: string) => {
-    setEmail(text);
-    if (!text) {
-      setEmailGuideMessage('');
-      setEmailGuideColor('#CCCCCC');
-      return;
-    }
-    if (text.includes('@')) {
-      setEmailGuideMessage('사용 가능한 이메일입니다.');
-      setEmailGuideColor('#4EF5F9');
-      return;
-    }
+ const handleEmailChange = (text: string) => {
+  setEmail(text);
+
+  const trimmedEmail = text.trim();
+
+  if (!trimmedEmail) {
     setEmailGuideMessage('');
     setEmailGuideColor('#CCCCCC');
-  };
+    return;
+  }
+
+  if (EMAIL_REGEX.test(trimmedEmail)) {
+    setEmailGuideMessage('사용 가능한 이메일 형식입니다.');
+    setEmailGuideColor('#4EF5F9');
+    return;
+  }
+
+  setEmailGuideMessage('이메일 형식을 확인해주세요.');
+  setEmailGuideColor('#FF3B30');
+};
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
@@ -57,7 +65,7 @@ export default function SignupScreen() {
       setPasswordGuideColor('#CCCCCC');
       return;
     }
-    if (text.length >= 8) {
+    if (PASSWORD_REGEX.test(text)) {
       setPasswordGuideMessage('사용 가능한 비밀번호입니다.');
       setPasswordGuideColor('#4EF5F9');
       return;
@@ -142,7 +150,7 @@ export default function SignupScreen() {
           className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
         <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
-          8자 이상, 특수문자 포함
+          8자 이상, 영문·숫자·특수문자를 모두 포함해주세요.
         </Text>
       </View>
 
