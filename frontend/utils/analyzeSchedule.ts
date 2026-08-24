@@ -110,6 +110,16 @@ export async function analyzeOnForeground(now = Date.now()): Promise<boolean> {
   return false;
 }
 
+/** 계정이 바뀌면 비운다 — 가드가 기기 단위라 새 계정의 분석이 막힌다 */
+export async function resetAnalyzeSchedule(): Promise<void> {
+  lastAnalyzedAt = 0;
+  try {
+    await AsyncStorage.removeItem(LAST_ANALYZED_DATE_KEY);
+  } catch {
+    // 무시
+  }
+}
+
 /** 테스트 전용 — 모듈 상태 초기화 */
 export function __resetAnalyzeSchedule(): void {
   lastAnalyzedAt = 0;
