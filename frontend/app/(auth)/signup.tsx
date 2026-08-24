@@ -5,10 +5,12 @@ import {useRouter} from 'expo-router';
 import {signup} from '@/services/authApi';
 import BackButton from '@/components/common/BackButton';
 
-export default function SignupScreen() {
-  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const PASSWORD_REGEX =
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const PASSWORD_REGEX =
   /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+
+export default function SignupScreen() {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -37,7 +39,7 @@ export default function SignupScreen() {
     );
   }, [email, password, nickname, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
 
- const handleEmailChange = (text: string) => {
+  const handleEmailChange = (text: string) => {
   setEmail(text);
 
   const trimmedEmail = text.trim();
