@@ -44,6 +44,7 @@ async def analyze_and_save(
             GpsLog.recorded_at,
             func.ST_Y(GpsLog.location).label("lat"),
             func.ST_X(GpsLog.location).label("lng"),
+            GpsLog.accuracy,
         )
         .where(GpsLog.user_id == user_id)
         .where(GpsLog.recorded_at >= start_dt)
@@ -68,7 +69,10 @@ async def analyze_and_save(
 
     # 3. AI 서버 호출
     gps_items = [
-        AIGpsLogItem(time=row.recorded_at, lat=row.lat, lng=row.lng) for row in log_rows
+        AIGpsLogItem(
+            time=row.recorded_at, lat=row.lat, lng=row.lng, accuracy=row.accuracy
+        )
+        for row in log_rows
     ]
     request_body = AIAnalyzeRequest(user_id=str(user_id), gps_logs=gps_items)
 
