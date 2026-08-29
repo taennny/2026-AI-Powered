@@ -1,11 +1,5 @@
-/**
- * @file utils/api.ts
- * @description axios 인스턴스 — 모든 API 요청은 이 인스턴스를 사용
- * - 요청 인터셉터: Authorization 헤더에 액세스 토큰 자동 첨부
- * - 응답 인터셉터: 401 시 리프레시 토큰으로 재발급 후 재시도
- */
-
 import axios from 'axios';
+
 import {
   getAccessToken,
   getRefreshToken,
@@ -14,11 +8,13 @@ import {
 } from '@/utils/tokenStorage';
 import {useAuthStore} from '@/store/authStore';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-console.log("BASE_URL =", BASE_URL);
+const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000';
+
+const DEFAULT_TIMEOUT_MS = 15000;
+
 export const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 10000,
+  timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -41,12 +37,16 @@ let failedQueue: Array<{
   reject: (error: unknown) => void;
 }> = [];
 
+/**
+ * 큐의 요청은 반드시 resolve나 reject 중 하나로 끝나야 한다 — 그냥 지나가면
+ * 호출부에 매달린 채 영원히 안 끝난다(axios 타임아웃은 이미 응답을 받아 안 걸린다).
+ */
 function processQueue(error: unknown, token: string | null = null) {
-  failedQueue.forEach(promise => {
-    if (error) {
-      promise.reject(error);
-    } else if (token) {
-      promise.resolve(token);
+  failedQueue.forEach(({resolve, reject}) => {
+    if (token) {
+      resolve(token);
+    } else {
+      reject(error ?? new Error('TOKEN_REFRESH_FAILED'));
     }
   });
   failedQueue = [];
@@ -81,8 +81,11 @@ api.interceptors.response.use(
         const refreshToken = await getRefreshToken();
 
         if (!refreshToken) {
+          // 큐를 안 끊으면 매달릴 뿐 아니라, 다음 로그인 때 이전 세션 요청이
+          // 새 사용자 토큰으로 재전송된다
+          processQueue(error, null);
           await removeTokens();
-          useAuthStore.getState().clearToken();
+          useAuthStore.getState().clearAuth();
           return Promise.reject(error);
         }
 
@@ -101,7 +104,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError, null);
         await removeTokens();
-        useAuthStore.getState().clearToken();
+        useAuthStore.getState().clearAuth();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

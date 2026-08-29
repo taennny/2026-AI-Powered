@@ -1,13 +1,34 @@
-/**
- * @file utils/formatDate.ts
- * @description 날짜 포맷 유틸 함수
- */
+/** 하루의 경계(기기 로컬). 자정이 아니라 새벽 4시 — 회의 결정 */
+export const DAY_BOUNDARY_HOUR = 4;
 
-/** Date → 'YYYY-MM-DD' (데이터 날짜 키) */
+/**
+ * 달력 날짜 → 'YYYY-MM-DD'. **이미 "며칠"이 정해진 값에 쓴다.**
+ * 경계 보정을 하지 않는다 — 5일을 골랐으면 그냥 5일이다.
+ */
 export function toDateKey(date: Date): string {
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
   return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+/** ISO 8601 → 'YY.MM.DD(day)' */
+export function formatDateFromISO(iso: string): string {
+  return formatDate(new Date(iso));
+}
+
+/**
+ * 순간 → 그 순간이 속한 논리적 하루. **실제 시각에 쓴다**(GPS timestamp 등).
+ * 새벽 4시 이전은 전날: 8/6 02:00 → '2026-08-05'.
+ */
+export function toLogicalDateKey(date: Date): string {
+  const shifted = new Date(date.getTime() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
+  return toDateKey(shifted);
+}
+
+/** 논리적 하루의 로컬 자정 — 새벽 2시에 앱을 열면 전날이 선택된다 */
+export function logicalToday(): Date {
+  const shifted = new Date(Date.now() - DAY_BOUNDARY_HOUR * 60 * 60 * 1000);
+  return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
 }
 
 /** Date → 'YY.MM.DD(day)' */

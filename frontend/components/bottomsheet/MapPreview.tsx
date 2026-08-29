@@ -1,11 +1,3 @@
-/**
- * @file components/bottomsheet/MapPreview.tsx
- * @description 바텀시트 expanded 상태에서 표시되는 정적 지도 이미지
- * - Google Static Maps API 사용
- * - 모든 마커가 한 시야에 들어오도록 zoom & center 자동 계산
- * - 꾹 누르면 3:4 비율 미리보기 모달 → 공유
- */
-
 import {useState} from 'react';
 import {
   Alert,
@@ -16,12 +8,19 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-//import RNFetchBlob from 'react-native-blob-util';
+import {File, Paths} from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 import {type TimelinePlace} from '@/services/calendarApi';
+import {buildStaticMapUrl} from '@/utils/staticMapUrl';
 
-const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY ?? '';
+/**
+ * 공유는 `expo-file-system` + `expo-sharing`으로 한다.
+ * 예전에 쓰던 `RNFetchBlob`은 네이티브 전용이라 Expo 웹 번들을 깨뜨렸는데,
+ * Expo 모듈은 웹에서도 import가 되므로 `Platform.OS` 가드가 필요 없다.
+ * 대신 실제 지원 여부는 `Sharing.isAvailableAsync()`로 확인한다.
+ */
+const SHARE_FILE_NAME = 'map_share.png';
 
 type Props = {
   places: TimelinePlace[];
@@ -32,102 +31,38 @@ const PREVIEW_H = 200;
 const SAVE_W = 360;
 const SAVE_H = 640;
 
-function calcZoom(
-  minLat: number,
-  maxLat: number,
-  minLng: number,
-  maxLng: number,
-  w: number,
-  h: number,
-): number {
-  const WORLD_PX = 256;
-
-  const latRad = (lat: number) => {
-    const sin = Math.sin((lat * Math.PI) / 180);
-    const rad = Math.log((1 + sin) / (1 - sin)) / 2;
-    return Math.max(Math.min(rad, Math.PI), -Math.PI) / 2;
-  };
-
-  const latFraction = (latRad(maxLat) - latRad(minLat)) / Math.PI;
-  const lngFraction = (maxLng - minLng + (maxLng < minLng ? 360 : 0)) / 360;
-
-  const latZoom = Math.floor(Math.log(h / WORLD_PX / latFraction) / Math.LN2);
-  const lngZoom = Math.floor(Math.log(w / WORLD_PX / lngFraction) / Math.LN2);
-
-  return Math.min(latZoom, lngZoom, 16) - 1;
-}
-
-function buildUrl(
-  places: TimelinePlace[],
-  w: number,
-  h: number,
-  scale = 1,
-): string | null {
-  if (!GOOGLE_MAPS_KEY) return null;
-
-  if (places.length === 0) {
-    return (
-      `https://maps.googleapis.com/maps/api/staticmap` +
-      `?center=37.5665,126.9780&zoom=12` +
-      `&size=${w}x${h}` +
-      `&scale=${scale}` +
-      `&key=${GOOGLE_MAPS_KEY}`
-    );
-  }
-
-  const lats = places.map(p => p.lat);
-  const lngs = places.map(p => p.lng);
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
-  const centerLat = (minLat + maxLat) / 2;
-  const centerLng = (minLng + maxLng) / 2;
-  const zoom =
-    places.length === 1 ? 15 : calcZoom(minLat, maxLat, minLng, maxLng, w, h);
-
-  const markers = places
-    .map(p => `color:red|${p.lat},${p.lng}`)
-    .join('&markers=');
-
-  return (
-    `https://maps.googleapis.com/maps/api/staticmap` +
-    `?center=${centerLat},${centerLng}` +
-    `&zoom=${zoom}` +
-    `&size=${w}x${h}` +
-    `&scale=${scale}` +
-    `&markers=${markers}` +
-    `&key=${GOOGLE_MAPS_KEY}`
-  );
-}
-
 export default function MapPreview({places}: Props) {
-  const previewUrl = buildUrl(places, PREVIEW_W, PREVIEW_H);
-  const saveUrl = buildUrl(places, SAVE_W, SAVE_H, 2);
+  const previewUrl = buildStaticMapUrl(places, PREVIEW_W, PREVIEW_H);
+  const saveUrl = buildStaticMapUrl(places, SAVE_W, SAVE_H, 2);
   const [loadFailed, setLoadFailed] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
   const [sharing, setSharing] = useState(false);
 
-  /*const handleShare = async () => {
+  const handleShare = async () => {
     if (!saveUrl || sharing) return;
     setSharing(true);
     try {
-      const res = await RNFetchBlob.config({
-        fileCache: true,
-        appendExt: 'png',
-        path: RNFetchBlob.fs.dirs.CacheDir + '/map_share.png', // 추가
-      }).fetch('GET', saveUrl);
-      await Sharing.shareAsync(`file://${res.path()}`, {
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('공유할 수 없어요', '이 기기에서는 공유가 지원되지 않아요.');
+        return;
+      }
+
+      // 캐시에 같은 이름이 남아 있으면 다운로드가 실패한다 — 매번 새로 받는다
+      const target = new File(Paths.cache, SHARE_FILE_NAME);
+      if (target.exists) target.delete();
+
+      const file = await File.downloadFileAsync(saveUrl, target);
+      await Sharing.shareAsync(file.uri, {
         mimeType: 'image/png',
         UTI: 'public.png',
       });
-      await res.flush();
     } catch {
       Alert.alert('공유 실패', '다시 시도해주세요.');
     } finally {
       setSharing(false);
     }
-  };*/
+  };
 
   if (!previewUrl || loadFailed) {
     return (
@@ -135,9 +70,7 @@ export default function MapPreview({places}: Props) {
         <Text className="text-sm text-secondary mb-1">
           지도를 불러올 수 없어요
         </Text>
-        <Text className="text-[11px] text-tertiary">
-          .env › EXPO_PUBLIC_GOOGLE_MAPS_KEY
-        </Text>
+        <Text className="text-[11px] text-tertiary">잠시 후 다시 열어주세요</Text>
       </View>
     );
   }
@@ -145,7 +78,7 @@ export default function MapPreview({places}: Props) {
   return (
     <>
       <TouchableOpacity
-        activeOpacity={0.9}
+        activeOpacity={0.7}
         onLongPress={() => setShowModal(true)}
         delayLongPress={500}
         className="mx-8 mb-4 rounded-[14px] overflow-hidden h-[180px]"
@@ -181,11 +114,13 @@ export default function MapPreview({places}: Props) {
                     <Text className="text-secondary">닫기</Text>
                   </TouchableOpacity>
                   <View className="w-px bg-line" />
-                  {/*<TouchableOpacity
+                  <TouchableOpacity
                     className="flex-1 items-center py-4"
                     onPress={handleShare}
                     disabled={sharing}
                   >
+                    {/* 진행 중이라고 글자를 바꾸지 말 것 — 길이가 변하면
+                        버튼 높이가 밀려 모달 아래쪽이 들썩인다. 색만 바꾼다 */}
                     <Text
                       className={
                         sharing ? 'text-muted' : 'font-medium text-primary'
@@ -193,7 +128,7 @@ export default function MapPreview({places}: Props) {
                     >
                       공유
                     </Text>
-                  </TouchableOpacity>*/}
+                  </TouchableOpacity>
                 </View>
               </View>
             </TouchableWithoutFeedback>

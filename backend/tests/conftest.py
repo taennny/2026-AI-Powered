@@ -1,3 +1,9 @@
+import os
+
+# app.config는 import 시점에 기본 시크릿을 거부한다(운영 사고 방지).
+# 테스트는 실제 시크릿이 필요 없으므로 임의값을 미리 넣어 둔다.
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-used-in-production")
+
 import uuid
 from datetime import date
 from unittest.mock import patch
@@ -22,6 +28,22 @@ TestingSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 TEST_USER_ID = uuid.uuid4()
 
 
+_PG_DAY_ABBR = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _to_char(value, fmt):
+    """SQLite용 Postgres to_char 대역 — 저널 날짜 검색에서 쓰는 포맷만 지원."""
+    if value is None:
+        return None
+    d = date.fromisoformat(str(value)[:10])
+    return (
+        fmt.replace("YY", f"{d.year % 100:02d}")
+        .replace("MM", f"{d.month:02d}")
+        .replace("DD", f"{d.day:02d}")
+        .replace("dy", _PG_DAY_ABBR[d.weekday()])
+    )
+
+
 def _register_spatialite_stubs(dbapi_conn, connection_record):
     """SQLite에서 GeoAlchemy2가 호출하는 SpatiaLite 함수들의 dummy 등록."""
     dbapi_conn.create_function("RecoverGeometryColumn", -1, lambda *args: 1)
@@ -29,6 +51,10 @@ def _register_spatialite_stubs(dbapi_conn, connection_record):
     dbapi_conn.create_function("CreateSpatialIndex", -1, lambda *args: 1)
     dbapi_conn.create_function("DisableSpatialIndex", -1, lambda *args: 1)
     dbapi_conn.create_function("CheckSpatialIndex", -1, lambda *args: 1)
+    # 장소 INSERT에 쓰인다. 블로그 생성은 좌표를 읽지 않으므로 원문을 그대로 저장한다.
+    dbapi_conn.create_function("GeomFromEWKT", 1, lambda wkt: wkt)
+    # Postgres 전용 함수라 SQLite엔 없다 (저널 날짜 검색에서 사용)
+    dbapi_conn.create_function("to_char", 2, _to_char)
 
 
 event.listen(engine.sync_engine, "connect", _register_spatialite_stubs)

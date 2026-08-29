@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -14,7 +14,7 @@ from app.models.gps_log import GpsLog
 from app.models.photos import Photo
 from app.models.place import Place
 from app.schemas.ai import AIAnalyzeRequest, AIAnalyzeResponse, AIGpsLogItem
-from app.utils.timezone import KST
+from app.utils.timezone import day_bounds
 
 logger = logging.getLogger(__name__)
 
@@ -36,25 +36,8 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 async def analyze_and_save(
     db: AsyncSession, user_id: uuid.UUID, target_date: date
 ) -> tuple[uuid.UUID | None, int]:
-    # 1. 해당 날짜 GPS 로그 조회
-    start_dt = datetime(
-        target_date.year,
-        target_date.month,
-        target_date.day,
-        0,
-        0,
-        0,
-        tzinfo=KST,
-    ).astimezone(timezone.utc)
-    end_dt = datetime(
-        target_date.year,
-        target_date.month,
-        target_date.day,
-        23,
-        59,
-        59,
-        tzinfo=KST,
-    ).astimezone(timezone.utc)
+    # 1. 해당 날짜 GPS 로그 조회 (하루 경계: 04:00 KST 기준)
+    start_dt, end_dt = day_bounds(target_date)
 
     result = await db.execute(
         select(
@@ -64,7 +47,7 @@ async def analyze_and_save(
         )
         .where(GpsLog.user_id == user_id)
         .where(GpsLog.recorded_at >= start_dt)
-        .where(GpsLog.recorded_at <= end_dt)
+        .where(GpsLog.recorded_at < end_dt)
         .order_by(GpsLog.recorded_at)
     )
     log_rows = result.all()
@@ -104,11 +87,12 @@ async def analyze_and_save(
         )
         raise
 
-    # 4. daily_record upsert
+    # 4. daily_record upsert (사진도 같은 04:00 경계 기준으로 집계)
     photo_result = await db.execute(
         select(func.count(Photo.id))
         .where(Photo.user_id == user_id)
-        .where(func.date(func.timezone("Asia/Seoul", Photo.taken_at)) == target_date)
+        .where(Photo.taken_at >= start_dt)
+        .where(Photo.taken_at < end_dt)
     )
     photo_count = photo_result.scalar() or 0
 
@@ -136,15 +120,20 @@ async def analyze_and_save(
         daily_record.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
-    # 5. 해당 날짜 사진들 daily_record에 연결
+    # 5. 해당 날짜 사진들 daily_record에 연결 (같은 04:00 경계 기준)
     await db.execute(
         update(Photo)
         .where(Photo.user_id == user_id)
-        .where(func.date(func.timezone("Asia/Seoul", Photo.taken_at)) == target_date)
+        .where(Photo.taken_at >= start_dt)
+        .where(Photo.taken_at < end_dt)
         .values(daily_record_id=daily_record.id)
     )
 
-    # 6. places 저장
+    # 6. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
+    # 지우지 않으면 analyze를 부를 때마다 같은 체류가 통째로 다시 insert되어
+    # 타임라인에 같은 카드가 계속 쌓인다.
+    await db.execute(delete(Place).where(Place.daily_record_id == daily_record.id))
+
     for stay in stays:
         place = Place(
             user_id=user_id,

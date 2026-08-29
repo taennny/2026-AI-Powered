@@ -1,8 +1,3 @@
-/**
- * @file services/calendarApi.ts
- * @description 캘린더 관련 API 호출 및 타입 정의
- */
-
 import {api} from '@/utils/api';
 
 export type CalendarDay = {
@@ -32,6 +27,13 @@ export type TimelineData = {
   date: string;          // 'YYYY-MM-DD'
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
+  /**
+   * 고른 날짜의 daily_record id. 글쓰기가 이 값을 쓴다 —
+   * analyze 응답으로 받으면 항상 '오늘'이라 어제 카드에서 쓴 글이 오늘로 갔다.
+   *
+   * 옵셔널로 둔 건 구버전 서버 대응일 뿐이다(현재 서버는 항상 내려준다).
+   */
+  daily_record_id?: string | null;
 };
 
 /** GET /api/v1/calendar/{year}/{month} */

@@ -27,6 +27,10 @@ class Subscription(Base):
     billing_cycle: Mapped[str] = mapped_column(
         String(10), server_default="monthly", nullable=False
     )
+    # 다음 결제일에 갱신 예정인지. 해지 예약 시 false — 만료일까지는 이용 가능
+    will_renew: Mapped[bool] = mapped_column(
+        Boolean, server_default="true", nullable=False
+    )
     premium_started_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

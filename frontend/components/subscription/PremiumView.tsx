@@ -1,23 +1,18 @@
-/**
- * @file components/subscription/PremiumView.tsx — 구독 화면 프리미엄 사용자 뷰
- *
- * ## 다음 연결 작업
- * - [ ] 결제 수단 변경 → 결제 플로우 연결
- * - [ ] 구독 해지 → 해지 확인 모달 연결
- * - [ ] API에서 월/연 플랜 구분 필드 추가 시 currentBilling 동적 처리
- */
+import {Linking, View, Text, TouchableOpacity} from 'react-native';
 
-import {View, Text, TouchableOpacity} from 'react-native';
-
-import {type SubscriptionStatus} from '@/services/subscriptionApi';
+import {APP_STORE_SUBSCRIPTIONS_URL} from '@/constants/store';
+import {ANNUAL_LABEL, MONTHLY_LABEL} from '@/constants/pricing';
+import {
+  type BillingCycle,
+  type SubscriptionStatus,
+} from '@/services/subscriptionApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
-type BillingCycle = 'monthly' | 'annual';
 
 const PLANS: {id: BillingCycle; label: string}[] = [
-  {id: 'monthly', label: '월 ₩7,500'},
-  {id: 'annual', label: '연 ₩39,000 (33% 할인! 💡)'},
+  {id: 'monthly', label: MONTHLY_LABEL},
+  {id: 'annual', label: ANNUAL_LABEL},
 ];
 
 function getDaysCount(startedAt: string): number {
@@ -27,8 +22,7 @@ function getDaysCount(startedAt: string): number {
 
 export default function PremiumView({subscription, onCancel}: Props) {
   const tc = useThemeColors();
-  // TODO: API에서 월/연 구분 필드 추가 시 동적으로 변경
-  const currentBilling: BillingCycle = 'monthly';
+  const currentBilling = subscription.billing_cycle;
 
   const daysCount = subscription.started_at
     ? getDaysCount(subscription.started_at)
@@ -40,7 +34,6 @@ export default function PremiumView({subscription, onCancel}: Props) {
         프리미엄 플랜
       </Text>
 
-      {/* 플랜 선택 (현재 플랜 표시) */}
       <View className="gap-y-[14px] mb-7">
         {PLANS.map(plan => {
           const isCurrent = plan.id === currentBilling;
@@ -68,7 +61,6 @@ export default function PremiumView({subscription, onCancel}: Props) {
         })}
       </View>
 
-      {/* D-day 박스 */}
       <View className="bg-teal-bg rounded-2xl py-[22px] px-5 items-center mb-10">
         <Text className="text-[15px] text-primary mb-[6px]">
           로미와 함께 한 지 <Text className="font-bold">{daysCount}일</Text> 💗
@@ -76,14 +68,21 @@ export default function PremiumView({subscription, onCancel}: Props) {
         <Text className="text-sm text-secondary">우리 오래봐요!</Text>
       </View>
 
-      {/* 하단 버튼 */}
       <View className="gap-y-2 mt-auto pb-20">
-        <TouchableOpacity>
+        {/* 결제 수단도 우리가 못 바꾼다 — 앱스토어 구독 관리로 보낸다 */}
+        <TouchableOpacity
+          onPress={() => {
+            void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+          }}
+        >
           <Text className="text-[15px] text-primary">결제 수단 변경</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onCancel}>
-          <Text className="text-[15px] text-tertiary">구독 해지</Text>
-        </TouchableOpacity>
+        {/* 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다 */}
+        {subscription.will_renew && (
+          <TouchableOpacity onPress={onCancel}>
+            <Text className="text-[15px] text-tertiary">구독 해지</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

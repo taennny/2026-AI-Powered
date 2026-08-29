@@ -9,14 +9,23 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 
+import {APP_STORE_SUBSCRIPTIONS_URL} from '@/constants/store';
+import {KAKAO_LINK_APP_REDIRECT} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
-import {fetchMe, deleteAccount, type UserMe} from '@/services/authApi';
+import {
+  fetchMe,
+  deleteAccount,
+  fetchKakaoLinkUrl,
+  type UserMe,
+} from '@/services/authApi';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
   const [user, setUser] = useState<UserMe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     fetchMe()
@@ -31,14 +40,24 @@ export default function AccountScreen() {
   };
 
   const handleDeleteAccount = () => {
+    // 탈퇴해도 앱스토어 구독은 살아 있어 계속 청구된다.
+    // 구독 여부를 따지지 않고 항상 알린다 — 조회 실패 시 free로 강등되므로
+    // 오프라인이면 진짜 구독자가 경고를 놓친다
     Alert.alert(
       '회원탈퇴',
-      '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.',
+      '정말 탈퇴하시겠습니까?\n탈퇴 시 모든 데이터가 삭제됩니다.\n\n' +
+        '구독 중이라면 자동으로 해지되지 않아요. App Store > 구독에서 직접 해지해야 결제가 멈춥니다.',
       [
-        {text: '취소', style: 'cancel'},
+        {
+          text: '구독 관리 열기',
+          onPress: () => {
+            void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+          },
+        },
+        {text: '취소', style: 'cancel' as const},
         {
           text: '탈퇴',
-          style: 'destructive',
+          style: 'destructive' as const,
           onPress: async () => {
             try {
               await deleteAccount();
@@ -57,41 +76,68 @@ export default function AccountScreen() {
   };
 
   const handleKakaoLink = async () => {
+    if (linking) return;
+    setLinking(true);
     try {
-      await WebBrowser.openAuthSessionAsync(
-        'https://api.roame.com/auth/kakao/link?source=account-link',
-        'roameapp://kakao-login',
+      // 서버가 state 토큰을 심은 카카오 URL을 만들어 준다. 브라우저로 직접
+      // 열면 Authorization 헤더가 안 실려 401이라, axios로 받아서 넘긴다.
+      const authorizeUrl = await fetchKakaoLinkUrl();
+
+      const result = await WebBrowser.openAuthSessionAsync(
+        authorizeUrl,
+        KAKAO_LINK_APP_REDIRECT,
       );
+
+      // 사용자가 브라우저를 닫으면 dismiss/cancel — 조용히 넘어간다
+      if (result.type !== 'success' || !result.url) return;
+
+      const {queryParams} = Linking.parse(result.url);
+      if (queryParams?.success !== 'true') {
+        const reason = queryParams?.reason;
+        // 백엔드는 실패 사유를 그대로 내려준다. 대부분 그대로 보여줄 수 있는
+        // 한글 문구지만 invalid_state만 코드라 우리가 문장으로 바꾼다.
+        // (state는 5분 만료라 카카오 로그인이 길어지면 실제로 난다)
+        Alert.alert(
+          '연동 실패',
+          reason === 'invalid_state'
+            ? '연동 요청이 만료됐어요. 다시 시도해주세요.'
+            : typeof reason === 'string' && reason
+              ? reason
+              : '카카오 연동에 실패했어요. 다시 시도해주세요.',
+        );
+        return;
+      }
+
+      // 연동 여부는 서버가 판정한다 — 낙관적으로 켜지 않고 다시 물어본다
+      setUser(await fetchMe());
+      Alert.alert('연동 완료', '카카오 계정이 연동됐어요.');
     } catch (error) {
       console.log('kakao link error', error);
+      Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setLinking(false);
     }
   };
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-      {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Text className="text-2xl font-normal text-muted">{'<'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 타이틀 */}
       <View className="px-6 pb-4">
         <Text className="text-[36px] font-extrabold text-primary">계정</Text>
       </View>
 
-      {/* 콘텐츠 */}
       <View className="flex-1">
-        {/* 세로 장식선 */}
         <View
           className="absolute top-10 bottom-[50px] w-[0.7px] bg-primary"
           style={{left: '70%'}}
         />
 
-        {/* 상단 콘텐츠 */}
         <View className="px-6 pt-7 gap-y-8">
-          {/* 이메일 + 비밀번호 재설정 */}
           <View className="gap-y-3">
             {loading ? (
               <ActivityIndicator size="small" />
@@ -108,7 +154,6 @@ export default function AccountScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* SNS 연동 상태 */}
           <View className="gap-y-[14px]">
             <Text className="text-[13px] text-tertiary">SNS 연동 상태</Text>
             {loading ? (
@@ -125,19 +170,19 @@ export default function AccountScreen() {
             ) : (
               <TouchableOpacity
                 onPress={handleKakaoLink}
+                disabled={linking}
                 activeOpacity={0.8}
                 className="flex-row items-center gap-x-[10px] bg-[#FEE500] py-[10px] px-4 rounded-xl self-start"
               >
                 <Text className="text-sm font-bold text-[#3C1E1E]">K</Text>
                 <Text className="text-sm font-semibold text-[#3C1E1E]">
-                  카카오 연동하기
+                  {linking ? '연동 중…' : '카카오 연동하기'}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        {/* 하단 버튼 */}
         <View className="absolute bottom-20 left-6 gap-y-2">
           <TouchableOpacity onPress={handleLogout} activeOpacity={0.6}>
             <Text className="text-[15px] text-primary">로그아웃</Text>

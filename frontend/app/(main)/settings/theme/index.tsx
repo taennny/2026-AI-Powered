@@ -1,21 +1,13 @@
-/**
- * @file app/(main)/settings/theme/index.tsx — 테마 선택 화면
- *
- * ## 다음 연결 작업
- * - [ ] 각 테마 미리보기 실제 스크린샷으로 교체
- * - [ ] 구독하기 버튼 → 결제 플로우 연결
- */
-
 import {useRef} from 'react';
 import {View, Text, TouchableOpacity, FlatList, Dimensions} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import {useState} from 'react';
 
-import {fetchSubscription} from '@/services/subscriptionApi';
 import SubscriptionModal from '@/components/subscription/SubscriptionModal';
+import {useSubscriptionStore} from '@/store/subscriptionStore';
 import {useThemeStore} from '@/store/themeStore';
-import {type ThemeId} from '@/constants/themes';
+import {PREMIUM_THEMES, type ThemeId} from '@/constants/themes';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -26,8 +18,6 @@ const THEMES = [
   {id: 'aqua' as ThemeId, label: '아쿠아', bg: '#E0F4FF'},
 ];
 
-const PREMIUM_THEMES: ThemeId[] = ['strawberry', 'aqua'];
-
 export default function ThemeScreen() {
   const {themeId, setTheme} = useThemeStore();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -37,41 +27,32 @@ export default function ThemeScreen() {
   const PREVIEW_H = SCREEN_WIDTH * 1.1;
   const LIST_H = PREVIEW_H + 60;
 
-  const handleSelect = async (id: ThemeId) => {
-    if (!PREMIUM_THEMES.includes(id)) {
-      setTheme(id);
+  // 구독 조회는 useSubscriptionSync가 미리 해둔다 — 탭할 때마다 왕복하지 않는다.
+  // 조회에 실패했으면 store가 free로 떨어져 있어 잠금이 유지된다.
+  const isPremium = useSubscriptionStore(s => s.isPremium());
+
+  const handleSelect = (id: ThemeId) => {
+    if (PREMIUM_THEMES.includes(id) && !isPremium) {
+      setShowModal(true);
       return;
     }
-    try {
-      const sub = await fetchSubscription();
-      if (sub.plan === 'premium' && sub.is_active) {
-        setTheme(id);
-      } else {
-        setShowModal(true);
-      }
-    } catch {
-      setShowModal(true);
-    }
+    setTheme(id);
   };
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
-      {/* 헤더 */}
       <View className="flex-row items-center px-5 py-3">
         <TouchableOpacity onPress={() => router.back()} className="p-1">
           <Text className="text-2xl font-normal text-muted">{'<'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 타이틀 */}
       <Text className="text-[36px] font-extrabold text-primary px-6 pb-4">
         테마
       </Text>
 
-      {/* 구분선 */}
       <View className="h-px bg-line" />
 
-      {/* 캐러셀 */}
       <FlatList
         ref={flatListRef}
         data={THEMES}
@@ -100,8 +81,11 @@ export default function ThemeScreen() {
               <Text className="text-[15px] text-primary">{item.label}</Text>
             </TouchableOpacity>
 
-            {/* 미리보기 (추후 스크린샷으로 교체) */}
-            <View
+            {/* 예시 영역도 선택에 쓴다 — 미리보기를 보다가 바로 고르는 게 자연스럽다.
+                가로 스와이프는 TouchableOpacity가 탭만 잡으므로 그대로 동작한다 */}
+            <TouchableOpacity
+              onPress={() => handleSelect(item.id)}
+              activeOpacity={0.7}
               style={{
                 height: PREVIEW_H,
                 borderRadius: 24,
@@ -112,7 +96,6 @@ export default function ThemeScreen() {
         )}
       />
 
-      {/* 페이지네이션 닷 */}
       <View className="flex-row justify-center gap-x-[6px] py-3">
         {THEMES.map((_, i) => (
           <View

@@ -22,7 +22,10 @@ class Blog(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     style: Mapped[str] = mapped_column(String(20), nullable=False)
+    # 여러 날을 한 편으로 묶은 글(모아쓰기)이면 target_date가 시작일이 된다.
     target_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    # 모아쓰기 종료일. 하루짜리 글은 NULL.
+    period_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     generation_status: Mapped[str] = mapped_column(
         String(20), server_default="pending", nullable=False
     )
@@ -40,4 +43,9 @@ class Blog(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+    # 소프트 삭제 시각. NULL이면 살아있는 글.
+    # 하드 삭제하지 않는 이유는 주간 생성 횟수를 유지하기 위해서다(services/blog.py 참고).
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
     )
