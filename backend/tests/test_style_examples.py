@@ -72,3 +72,20 @@ async def test_premium_excludes_current_blog_and_truncates():
         assert "지금 생성 중" not in examples
         assert max(len(e) for e in examples) <= STYLE_EXAMPLE_MAX_CHARS
         assert examples[0][:10] == long_blog.content[:10]
+
+
+async def test_deleted_blog_is_not_used_as_example():
+    """소프트 삭제한 글은 문체 예시에서 빠진다.
+
+    사용자가 지운 글이 AI 프롬프트로 되살아나면 안 된다.
+    """
+    async with TestingSessionLocal() as db:
+        await update_user_subscription(db, TEST_USER_ID, "premium")
+        deleted = await _make_blog(db, "지운 글")
+        deleted.deleted_at = datetime(2026, 8, 2, tzinfo=timezone.utc)
+        await db.commit()
+        await _make_blog(db, "남긴 글")
+
+        examples = await _get_style_examples(db, TEST_USER_ID, uuid.uuid4())
+
+        assert examples == ["남긴 글"]

@@ -221,6 +221,8 @@ async def _get_style_examples(
             Blog.is_published.is_(True),
             Blog.id != exclude_blog_id,
             Blog.content != "",
+            # 삭제한 글을 문체 예시로 되살려 쓰면 안 된다
+            Blog.deleted_at.is_(None),
         )
         .order_by(Blog.created_at.desc())
         .limit(STYLE_EXAMPLE_COUNT)
