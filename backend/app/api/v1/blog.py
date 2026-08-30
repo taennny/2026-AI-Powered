@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,6 +52,7 @@ async def list_blogs(
             id=b.id,
             date=b.target_date,
             period_end=b.period_end,
+            dates=b.target_dates,
             title=b.title,
             summary=build_summary(b.content, q),
             thumbnail_url=None,
@@ -79,11 +80,16 @@ async def generate_blog(
                 db, current_user.id, request.daily_record_id, request.style
             )
         else:
+            # 구간으로 왔든 날짜 목록으로 왔든 내부에서는 날짜 목록 하나로 통일한다
+            if request.dates is not None:
+                dates = request.dates
+            else:
+                span = (request.end_date - request.start_date).days + 1
+                dates = [request.start_date + timedelta(days=i) for i in range(span)]
             blog = await create_period_blog_generation(
                 db,
                 current_user.id,
-                request.start_date,
-                request.end_date,
+                dates,
                 request.style,
             )
     except QuotaExceededError as e:
