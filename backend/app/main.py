@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.blog import router as blog_router
 from app.api.v1.gps import router as gps_router
@@ -22,6 +23,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작 시 MinIO 버킷 확인/생성. MinIO가 안 떠 있어도 앱은 정상 기동해야 하므로 fail-soft."""
+    if settings.BETA_ALL_PREMIUM:
+        # 끄는 걸 잊은 채 정식 출시되면 아무도 결제하지 않아도 되므로 기동마다 남긴다
+        logger.warning(
+            "BETA_ALL_PREMIUM이 켜져 있습니다 — 모든 사용자가 결제 없이 프리미엄 기능을 사용합니다"
+        )
+
     try:
         await ensure_bucket_exists()
     except Exception:
