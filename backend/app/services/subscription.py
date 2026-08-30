@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.subscription import Subscription
 
 # 결제주기별 구독 기간(일)
@@ -15,6 +16,17 @@ def _is_expired(expires_at: datetime) -> bool:
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
     return expires_at <= datetime.now(timezone.utc)
+
+
+def is_premium(subscription: Subscription) -> bool:
+    """프리미엄 혜택을 줄지 판단.
+
+    베타 기간에는 결제 여부와 무관하게 전원 프리미엄으로 본다(BETA_ALL_PREMIUM).
+    DB의 plan_type은 그대로 두므로, 플래그를 끄면 실제 구독 상태로 즉시 돌아온다.
+    """
+    if settings.BETA_ALL_PREMIUM:
+        return True
+    return subscription.plan_type == "premium"
 
 
 async def get_user_subscription(db: AsyncSession, user_id: uuid.UUID) -> Subscription:

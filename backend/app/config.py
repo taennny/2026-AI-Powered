@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    # 베타 기간 전원 프리미엄. 켜면 결제 없이 모든 사용자가 프리미엄 기능을 쓴다.
+    # DB는 건드리지 않고 읽는 쪽에서만 적용하므로, 끄면 즉시 원래 상태로 돌아온다.
+    BETA_ALL_PREMIUM: bool = False
+
     # RevenueCat
     # 대시보드 Webhooks의 Authorization 값과 동일하게. 빈 값이면 웹훅 엔드포인트가 503 반환
     REVENUECAT_WEBHOOK_SECRET: str = ""

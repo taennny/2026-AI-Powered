@@ -14,7 +14,7 @@ from app.models.enums import GenerationStatus
 from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
-from app.services.subscription import get_user_subscription
+from app.services.subscription import get_user_subscription, is_premium
 from app.services.timeline_serializer import (
     build_multi_day_timeline_data,
     build_timeline_data,
@@ -143,7 +143,7 @@ async def _check_quota(db: AsyncSession, user_id: uuid.UUID) -> None:
     모아쓰기도 며칠을 묶든 생성 1회로 센다 — AI 호출이 한 번이기 때문.
     """
     subscription = await get_user_subscription(db, user_id)
-    if subscription.plan_type != "premium":
+    if not is_premium(subscription):
         used, reset_at = await get_weekly_usage(db, user_id)
         if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
             raise QuotaExceededError(
@@ -211,7 +211,7 @@ async def _get_style_examples(
     무료 사용자는 빈 배열 (개인화 문체는 구독 혜택).
     """
     subscription = await get_user_subscription(db, user_id)
-    if subscription.plan_type != "premium":
+    if not is_premium(subscription):
         return []
 
     result = await db.execute(
