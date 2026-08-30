@@ -6,3 +6,5 @@ pytest-asyncio==0.26.0
 aiosqlite==0.21.0
 ruff==0.11.2
 black==25.1.0
+# 테스트 픽스처(JPEG) 생성용 — 운영 코드는 EXIF를 piexif로 읽는다
+Pillow==11.2.1
