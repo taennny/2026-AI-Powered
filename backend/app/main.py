@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
 from app.api.v1.auth import router as auth_router
 from app.api.v1.blog import router as blog_router
 from app.api.v1.gps import router as gps_router
@@ -12,6 +11,7 @@ from app.api.v1.photos import router as photos_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.calendar import router as calendar_router
 from app.api.v1.webhooks import router as webhooks_router
+from app.config import settings
 from app.services.storage import ensure_bucket_exists
 
 logger = logging.getLogger(__name__)
@@ -39,13 +39,10 @@ async def lifespan(app: FastAPI):
 
 
 # CORS 허용 오리진 (allowlist)
-# 네이티브 앱은 CORS 대상이 아니며, 아래는 브라우저(Expo 웹) 개발용이다.
-# TODO(출시 전): 로컬 개발용 오리진 제거 + 프론트 배포 도메인으로 교체
-ALLOWED_ORIGINS = [
-    "http://localhost:8081",  # Expo 웹 기본 포트
-    "http://localhost:19006",  # Expo 웹 (구버전 포트)
-    "http://localhost:3000",  # 웹 개발 서버 예비
-]
+# 네이티브 앱은 CORS 대상이 아니라 브라우저에서 오는 요청만 해당된다.
+# 웹으로 배포하는 화면이 없다고 프론트에서 확인받아 전부 닫았다.
+# 웹 화면이 생기면 그 배포 도메인만 여기에 추가한다.
+ALLOWED_ORIGINS: list[str] = []
 
 app = FastAPI(
     title="Roame API",
