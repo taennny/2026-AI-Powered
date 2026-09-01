@@ -1,18 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
-from app.schemas.subscription import (
-    PaymentVerifyRequest,
-    PaymentVerifyResponse,
-    SubscriptionResponse,
-    SubscriptionUpdateRequest,
-)
-from app.services.payment import process_receipt
-from app.services.payment_verifier import ReceiptVerificationError
-from app.services.subscription import get_user_subscription, update_user_subscription
+from app.schemas.subscription import SubscriptionResponse
+from app.services.subscription import get_user_subscription
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(tags=["subscription"])
@@ -42,41 +35,7 @@ async def get_subscription(
     return _as_response(subscription)
 
 
-@router.put("/api/v1/subscriptions/me", response_model=SubscriptionResponse)
-async def change_subscription(
-    request: SubscriptionUpdateRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """구독 플랜 변경"""
-    try:
-        subscription = await update_user_subscription(
-            db, current_user.id, request.plan_type, request.billing_cycle
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return subscription
-
-
-@router.post("/api/v1/subscriptions/verify", response_model=PaymentVerifyResponse)
-async def verify_payment(
-    request: PaymentVerifyRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """영수증 검증 후 구독 반영 (같은 영수증 재전송은 멱등 처리)"""
-    try:
-        payment, created = await process_receipt(
-            db, current_user.id, request.provider, request.receipt
-        )
-    except (ValueError, ReceiptVerificationError) as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return PaymentVerifyResponse(
-        transaction_id=payment.transaction_id,
-        plan=payment.plan_type,
-        billing_cycle=payment.billing_cycle,
-        already_processed=not created,
-        message="결제가 반영되었습니다" if created else "이미 처리된 결제입니다",
-    )
+# PUT /subscriptions/me 와 POST /subscriptions/verify 는 제거했다.
+# 둘 다 로그인만 하면 결제 없이 프리미엄이 될 수 있었다. PUT은 plan_type을
+# 그대로 받았고, verify의 검증기는 "mock:<id>:<cycle>" 형식이면 통과하는
+# 개발용이었다. 실제 결제 반영은 RevenueCat 웹훅(/webhooks/revenuecat)이 한다.

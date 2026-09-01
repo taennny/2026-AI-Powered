@@ -56,8 +56,6 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_USER}
       MINIO_SECRET_KEY: ${MINIO_PASSWORD}
-    ports:
-      - "8000:8000"  # 전환기 직접 접근용. 프론트가 https로 옮기면 제거 + SG 8000 닫기
     depends_on:
       db:
         condition: service_healthy
