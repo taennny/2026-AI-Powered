@@ -26,6 +26,12 @@ export type AnalyzeResponse = {
 };
 
 /**
+ * 기본 15초로는 모자란다 — 서버가 AI 호출에만 30초를 쓴다(`services/ai.py`).
+ * 짧게 끊으면 서버는 저장했는데 앱은 실패로 알아 화면 갱신을 태우지 않는다.
+ */
+const ANALYZE_TIMEOUT_MS = 40000;
+
+/**
  * POST /api/v1/gps/logs/{date}/analyze — 쌓인 로그를 체류 장소로 분석·저장.
  * tz는 하루 경계 계산에 필요하다 (모르는 쿼리는 FastAPI가 무시한다).
  */
@@ -33,7 +39,7 @@ export async function analyzeGpsLogs(date: string): Promise<AnalyzeResponse> {
   const {data} = await api.post<AnalyzeResponse>(
     `/api/v1/gps/logs/${date}/analyze`,
     undefined,
-    {params: {timezone: getDeviceTimeZone()}},
+    {params: {timezone: getDeviceTimeZone()}, timeout: ANALYZE_TIMEOUT_MS},
   );
   return data;
 }
