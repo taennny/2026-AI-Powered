@@ -110,6 +110,26 @@ export async function analyzeOnForeground(now = Date.now()): Promise<boolean> {
   return false;
 }
 
+/**
+ * 새로고침 버튼용 — 가드를 무시하고 지금 분석한다.
+ * 사용자가 직접 누른 것이라 "아직 주기가 안 됐다"로 무시하면 안 된다.
+ */
+export async function analyzeNow(now = Date.now()): Promise<boolean> {
+  lastAnalyzedAt = now;
+
+  const today = toLogicalDateKey(new Date(now));
+
+  await analyzeRolledOverDate(today);
+
+  if (await analyzeDate(today)) {
+    await writeLastAnalyzedDate(today);
+    return true;
+  }
+
+  lastAnalyzedAt = 0;
+  return false;
+}
+
 /** 계정이 바뀌면 비운다 — 가드가 기기 단위라 새 계정의 분석이 막힌다 */
 export async function resetAnalyzeSchedule(): Promise<void> {
   lastAnalyzedAt = 0;

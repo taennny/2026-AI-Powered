@@ -3,6 +3,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
 import {useSettingsStore} from '@/store/settingsStore';
+import RefreshButton from '@/components/home/RefreshButton';
 
 /**
  * 위치 기록이 꺼져 있으면 헤더 왼쪽에 계속 띄운다.
@@ -44,6 +45,8 @@ export default function HomeHeader() {
       <View className="flex-row items-center justify-between px-5 py-3 bg-surface">
         <TrackingOffNotice />
         <View className="flex-1" />
+
+        <RefreshButton />
 
         <TouchableOpacity onPress={() => router.push('/(main)/settings')} className="p-1 gap-y-[5px]">
           <View className="w-[22px] h-[1.5px] bg-muted" />
