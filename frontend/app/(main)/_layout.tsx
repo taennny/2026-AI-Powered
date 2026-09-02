@@ -12,7 +12,6 @@ import {clearJournalCache} from '@/hooks/useJournalList';
 import {useDateSelectionStore} from '@/store/dateSelectionStore';
 import {clearPhotoSyncState} from '@/utils/photoSync';
 import {resetAnalyzeSchedule} from '@/utils/analyzeSchedule';
-import {clearCurrentUserId, syncCurrentUserId} from '@/utils/currentUser';
 import {stopGpsTracking} from '@/hooks/useGpsTracking';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
 import {identifyUser, resetIdentifiedUser} from '@/services/purchases';
@@ -35,8 +34,6 @@ export default function MainLayout() {
       // 로그인 화면이 세 갈래(이메일·카카오 버튼·카카오 딥링크)라
       // 각각에 넣는 대신 인증 상태가 켜지는 한 곳에서 처리한다.
       void identifyUser();
-      // GPS 큐가 좌표의 주인을 표시하는 데 쓴다
-      void syncCurrentUserId();
       return;
     }
 
@@ -50,8 +47,7 @@ export default function MainLayout() {
     useDateSelectionStore.getState().clear();
     void clearPhotoSyncState();
     void resetAnalyzeSchedule();
-    // 큐는 비우지 않는다 — 아직 못 올린 좌표는 그 계정으로 다시 로그인할 때 올라간다
-    void clearCurrentUserId();
+    // GPS 큐는 비우지 않는다 — 아직 못 올린 좌표는 그 계정으로 다시 로그인할 때 올라간다
     // 로그아웃·회원탈퇴·토큰 만료가 모두 여기를 지난다.
     // 백그라운드 태스크는 화면이 사라져도 살아남으므로 명시적으로 꺼야 한다 —
     // 안 그러면 로그아웃한 사용자의 위치를 계속 수집한다.

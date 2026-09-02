@@ -6,6 +6,20 @@ import {GPS_TASK_NAME} from '@/tasks/gpsTask';
 const INTERVAL_MS = 30_000;
 
 /**
+ * iOS는 `timeInterval`을 무시하고 거리로만 좌표를 준다 — Balanced(≈100m)로는
+ * 연속한 두 점이 늘 STAY_RADIUS_M(50m)을 넘어 체류가 하나도 안 잡혔다.
+ * 안드로이드는 `distanceInterval: 0` + 시간 기준이라 그대로 둔다.
+ */
+const TRACKING_OPTIONS =
+  Platform.OS === 'ios'
+    ? {accuracy: Location.Accuracy.High, distanceInterval: 10}
+    : {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: INTERVAL_MS,
+        distanceInterval: 0,
+      };
+
+/**
  * 시작·정지를 순서대로 실행한다 — 계정을 바꾸면 로그아웃의 정지와 로그인의 시작이
  * 겹쳐, 시작이 "이미 켜져 있음"으로 건너뛴 뒤 정지가 끝나면서 추적이 꺼진 채 남는다.
  */
@@ -43,9 +57,7 @@ async function runStart() {
   if (isRunning) return;
 
   await Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: INTERVAL_MS,
-    distanceInterval: 0,
+    ...TRACKING_OPTIONS,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: 'Roame',

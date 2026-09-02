@@ -21,7 +21,7 @@ TaskManager.defineTask(
       timestamp: new Date(loc.timestamp).toISOString(),
     }));
 
-    // 주인을 모르면 어느 계정 것인지 정할 수 없다. 다음 배치에서 다시 들어온다
+    // 토큰이 없다는 뜻이라 어차피 올릴 수 없다 (로그아웃 상태)
     const ownerId = await getCurrentUserId();
     if (!ownerId) return;
 
