@@ -8,8 +8,11 @@ from config import settings
 from modules import gps
 
 
-def _log(t: datetime, lat: float, lng: float) -> dict:
-    return {"time": t.isoformat(), "lat": lat, "lng": lng}
+def _log(t: datetime, lat: float, lng: float, accuracy: float | None = None) -> dict:
+    log = {"time": t.isoformat(), "lat": lat, "lng": lng}
+    if accuracy is not None:
+        log["accuracy"] = accuracy
+    return log
 
 
 # ──────────────────────────────────────────
@@ -20,13 +23,24 @@ def test_detect_stays_uses_centroid():
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
         _log(base, 37.5000, 127.0000),
-        _log(base + timedelta(minutes=5), 37.5002, 127.0002),
-        _log(base + timedelta(minutes=10), 37.5001, 127.0001),
+        _log(base + timedelta(minutes=2), 37.5002, 127.0002),
+        _log(base + timedelta(minutes=4), 37.5001, 127.0001),
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
     assert stays[0]["lat"] == pytest.approx((37.5000 + 37.5002 + 37.5001) / 3)
     assert stays[0]["lng"] == pytest.approx((127.0000 + 127.0002 + 127.0001) / 3)
+
+
+def test_detect_stays_mixed_timestamp_precision():
+    """마이크로초 있는/없는 ISO8601 시각이 섞여도 파싱 실패하지 않는다 (prod 500 재현)."""
+    logs = [
+        {"time": "2026-08-24T06:24:57.123456Z", "lat": 37.5, "lng": 127.0},
+        {"time": "2026-08-24T06:26:57Z", "lat": 37.5, "lng": 127.0},  # 마이크로초 없음
+        {"time": "2026-08-24T06:28:57Z", "lat": 37.5, "lng": 127.0},
+    ]
+    stays = gps.detect_stays(logs)  # 예전엔 여기서 ValueError → 500
+    assert len(stays) == 1
 
 
 def test_detect_stays_skips_short_stays():
@@ -37,6 +51,113 @@ def test_detect_stays_skips_short_stays():
         _log(base + timedelta(minutes=1), 37.5, 127.0),  # 1분뿐
     ]
     assert gps.detect_stays(logs) == []
+
+
+def _stay_run(base, start_min, end_min, lat=37.5, lng=127.0, step=1):
+    """[start_min, end_min] 구간을 step분 간격으로 같은 좌표 로그 생성."""
+    return [
+        _log(base + timedelta(minutes=m), lat, lng)
+        for m in range(start_min, end_min + 1, step)
+    ]
+
+
+def test_bridges_short_gap_same_location():
+    """앱이 잠깐 죽어 GPS가 ≤3분 끊겨도, 같은 자리면 한 체류로 이어붙인다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0),
+        _log(base + timedelta(minutes=1), 37.5, 127.0),
+        _log(base + timedelta(minutes=2), 37.5, 127.0),
+        # 여기서 3분 끊김(앱 종료) — base+2 → base+5
+        _log(base + timedelta(minutes=5), 37.5, 127.0),
+        _log(base + timedelta(minutes=6), 37.5, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    dur = (stays[0]["end_time"] - stays[0]["start_time"]).total_seconds() / 60
+    assert dur == pytest.approx(6)  # 끊긴 구간까지 포함해 하나로
+
+
+def test_long_gap_splits():
+    """3분 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = _stay_run(base, 0, 4) + _stay_run(base, 10, 14)  # 사이 6분 공백
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 2
+
+
+def test_jitter_outlier_does_not_split():
+    """한두 점 튐(반경 밖)이 있어도 같은 자리 체류는 쪼개지지 않는다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0),
+        _log(base + timedelta(minutes=1), 37.5, 127.0),
+        _log(base + timedelta(minutes=2), 37.5, 127.0),
+        _log(base + timedelta(minutes=3), 37.5006, 127.0),  # ~66m 튐(단일)
+        _log(base + timedelta(minutes=4), 37.5, 127.0),
+        _log(base + timedelta(minutes=5), 37.5, 127.0),
+        _log(base + timedelta(minutes=6), 37.5, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+
+
+def test_moved_within_3min_not_merged():
+    """3분 안에라도 다른 곳으로 이동했으면 합치지 않는다 (별도 체류)."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 카페(0~4분) → 1분 뒤 ~180m 떨어진 식당(5~9분)
+    logs = _stay_run(base, 0, 4, lat=37.5, lng=127.0) + _stay_run(
+        base, 5, 9, lat=37.5, lng=127.0020
+    )
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 2
+
+
+# ──────────────────────────────────────────
+# accuracy 노이즈 필터
+# ──────────────────────────────────────────
+def test_filter_by_accuracy_drops_bad_keeps_unknown():
+    """accuracy가 큰(나쁜) 점만 제외하고, 0/None(값 없음)은 유지한다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0, accuracy=10),  # 양호 → 유지
+        _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=0),  # 값없음 → 유지
+        _log(base + timedelta(minutes=2), 37.5, 127.0),  # 미지정 → 유지
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=200),  # 나쁨 → 제외
+    ]
+    filtered = gps._filter_by_accuracy(logs)
+    assert len(filtered) == 3
+    assert all(
+        (not log.get("accuracy")) or log["accuracy"] <= gps.ACCURACY_MAX_M
+        for log in filtered
+    )
+
+
+def test_bad_accuracy_point_excluded_from_stay():
+    """반경 안이라도 accuracy 나쁜 점은 체류 중심점 계산에서 빠진다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=2), 37.5, 127.0, accuracy=10),
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=10),
+        # ~33m 이내라 반경엔 들지만 accuracy 200 → 제외되어 중심점 안 흔듦
+        _log(base + timedelta(minutes=4), 37.5003, 127.0, accuracy=200),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    assert stays[0]["lat"] == pytest.approx(37.5)  # 37.5003 섞였으면 어긋남
+
+
+def test_all_bad_accuracy_falls_back_to_unfiltered():
+    """그날 GPS가 전반적으로 나쁘면(모두 임계 초과) 다 날리지 않고 원본으로 감지."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=200)
+        for m in range(0, 5)
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
 
 
 # ──────────────────────────────────────────
@@ -113,7 +234,34 @@ def test_transit_not_chosen_when_stay_place_exists(monkeypatch):
     assert info["place_name"] == "카페"
 
 
-def test_unknown_when_nothing_found(monkeypatch):
+def test_reverse_geocode_fallback_when_no_poi(monkeypatch):
+    """POI가 하나도 없으면 좌표→동네로 폴백한다 ('알 수 없음' 대신)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if "coord2address" in url:
+            return _FakeResp(
+                [
+                    {
+                        "address": {
+                            "region_1depth_name": "서울",
+                            "region_2depth_name": "성동구",
+                            "region_3depth_name": "성수동2가",
+                        }
+                    }
+                ]
+            )
+        return _FakeResp([])  # 모든 POI 카테고리 없음
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+
+    info = gps.get_place_info(37.5, 127.0)
+    assert info["place_name"] == "성수동2가 인근"
+    assert info["category"] == "위치"
+
+
+def test_unknown_when_everything_fails(monkeypatch):
+    """POI도 역지오코딩도 다 비면 그제야 '알 수 없음'."""
     monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
     monkeypatch.setattr(gps.requests, "get", lambda *a, **k: _FakeResp([]))
     assert gps.get_place_info(37.5, 127.0)["place_name"] == "알 수 없음"
