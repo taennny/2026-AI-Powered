@@ -23,7 +23,7 @@ jobs:
           python-version: "3.13"
 
       - name: 의존성 설치
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Ruff 린트 검사
         run: ruff check .
@@ -35,3 +35,5 @@ jobs:
         run: pytest
         env:
           DATABASE_URL: sqlite+aiosqlite:///./test.db
+          # 기본 시크릿은 기동이 막히므로 테스트용 임의값을 준다
+          JWT_SECRET_KEY: ci-test-secret-not-used-in-production

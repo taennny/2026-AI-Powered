@@ -86,7 +86,7 @@ export default function ResetPasswordScreen() {
           className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
         />
         <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
-          8자 이상, 특수문자 포함
+          8자 이상, 영문·숫자·특수문자를 모두 포함해주세요.
         </Text>
       </View>
 

@@ -42,9 +42,11 @@ app/
     │   ├── home/index.tsx           # Calendar + BottomSheet
     │   └── journal-list/index.tsx   # 검색 + FlatList (무한 스크롤)
     ├── kakao-link.tsx               # 카카오 연동 딥링크 폴백 (아래 "카카오 연동" 참고)
-    ├── write/index.tsx              # 프롬프트 입력 → AI 생성
+    ├── write/index.tsx              # 프롬프트 입력 → AI 생성 (모아쓰기는 dates 파라미터)
     ├── write-preview/index.tsx      # 미리보기/저장 (리스트에서 진입 시 상세 조회)
-    └── settings/                    # index, account, subscription, theme, records
+    └── settings/
+        ├── _layout.tsx              # 설정 전용 스택 (아래 "뒤로가기" 참고)
+        └── index, account, subscription, theme, records
 ```
 
 ### 인증 플로우
@@ -111,7 +113,7 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`page`·`size` 사용) |
 | `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` (body에 `timezone` 동봉) |
 | `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` (`?timezone=`) |
-| `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` |
+| `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` (하루는 `daily_record_id`, 모아쓰기는 `start_date`+`end_date`) |
 | `GET /api/v1/blogs/{id}/status` | `fetchBlogGenerationStatus` | `waitForBlogGeneration` 폴링 |
 | `GET /api/v1/blog/{id}` | `fetchBlogDetail` | `write-preview/index.tsx` |
 | `PUT /api/v1/blog/{id}` | `updateBlog` | `write-preview/index.tsx` |
@@ -203,6 +205,43 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
 갱신해 실패한 날짜가 다음 주기에 자동 재시도됩니다.
 
+### 모아쓰기
+
+캘린더에서 날짜를 **롱프레스**하면 선택 모드가 됩니다. 선택된 칸은 회색 네모(`rounded-md`),
+평소 단일 선택은 하늘색 동그라미입니다.
+
+| 규칙 | 이유 |
+|---|---|
+| 선택 모드 플래그를 두지 않는다 | 고른 게 있으면 선택 모드입니다. 플래그를 따로 두면 "0개인데 선택 모드"가 생깁니다. **마지막 하나를 해제하면 저절로 끝납니다** |
+| `has_timeline`을 선택과 함께 저장한다 | 달을 넘겨도 선택이 유지되는데 `eventDays`는 보고 있는 달 것만이라 나중에 물어볼 수 없습니다 |
+| 드래그로 선택하지 않는다 | 캘린더가 가로 드래그를 달 넘기기에 이미 씁니다(`onMoveShouldSetPanResponder`). 탭만 씁니다 |
+| 선택 모드에서 단일 선택 강조를 숨긴다 | 동그라미와 네모가 같이 뜨면 어느 쪽이 글쓰기 대상인지 헷갈립니다 |
+| 타임라인은 바뀌지 않는다 | 시트에는 원래 `selectedDate`의 기록이 그대로 보입니다 |
+| 연속이면 범위, 불연속이면 목록으로 보낸다 | `buildDateTarget()`. **범위로 뭉뚱그리면 안 고른 날의 기록이 글에 들어갑니다** |
+
+글쓰기 버튼은 고른 날 중 `has_timeline`이 하나라도 있어야 열립니다 — 전부 빈 날이면
+서버가 "해당 기간에 기록이 없습니다"로 거절합니다. 개수와 "선택 해제"는 `HomeFooter`
+왼쪽에 있습니다(시트가 캘린더를 가려도 보이는 유일한 자리).
+
+### 뒤로가기
+
+`(main)`은 **iOS 스와이프 뒤로가기를 끕니다**(`gestureEnabled: false`). 글쓰기·미리보기에서
+스와이프로 빠져나가면 취소 처리를 건너뛰어 생성한 글이 서버에 남습니다.
+
+설정만 예외입니다. 두 군데에서 켭니다 — `(main)/_layout`의 `<Stack.Screen name="settings">`가
+설정에서 홈으로 나가는 것을, `settings/_layout.tsx`가 설정 안쪽 이동을 담당합니다.
+제스처 설정은 네비게이터 단위라 바깥을 끈 채 안쪽만 켤 수 있습니다.
+
+안드로이드 하드웨어 뒤로가기는 별개라 `write-preview`가 `BackHandler`로 직접 막고
+Cancel과 같은 확인 경로로 보냅니다.
+
+### 토큰 저장
+
+`utils/tokenStorage.ts`가 **`expo-secure-store`**(iOS Keychain / Android Keystore)를 씁니다.
+AsyncStorage는 암호화되지 않아 iOS 백업에 평문으로 실립니다.
+예전 AsyncStorage 값은 읽을 때 자동으로 옮기고 평문 사본을 지웁니다 — 이게 없으면
+업데이트 시 기존 로그인이 전부 풀립니다. **네이티브 모듈이라 `npx expo run:ios` 재빌드가 필요합니다.**
+
 ### 구독 상태
 
 서버가 단일 출처입니다. `subscriptionStore`가 들고 있고, **프리미엄 기능 개방 판정은
@@ -269,6 +308,7 @@ false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로 동작�
 | 결제 취소는 오류가 아니다 | 사용자가 시스템 다이얼로그를 닫은 것입니다. `purchase()`가 `'cancelled'`를 따로 돌려주고, 화면은 아무것도 띄우지 않습니다 |
 | 해지·결제수단 변경은 **앱스토어로 보낸다** | 구독의 실체가 Apple에 있어 우리 DB만 바꾸면 결제가 계속됩니다. `constants/store.ts`의 `APP_STORE_SUBSCRIPTIONS_URL` |
 | **구매 복원이 있어야 한다** | 기기 변경·재설치 때 되찾을 경로가 없으면 **Apple 심사에서 리젝됩니다.** `FreeView` 하단의 "구매 복원" |
+| **자동 갱신 고지와 약관 링크를 지우지 않는다** | 심사 지침 3.1.2가 결제 화면 안에 요구합니다 — 갱신 주기·해지 시한·청구 시점·관리 경로, 그리고 이용약관·개인정보처리방침 링크(`constants/legal.ts`). `FreeView`의 `AUTO_RENEW_NOTICE`와 하단 링크가 그것입니다 |
 
 `subscriptionApi.ts`의 `subscribePremium`·`cancelSubscription`은 **화면에서 부르지
 않습니다**(`@deprecated`). 앱이 그 API로 plan을 바꾸면 Apple과 우리 DB가 어긋나
@@ -316,6 +356,9 @@ store/subscriptionStore.ts  plan, billingCycle, isActive, expiresAt, willRenew,
                         hasLoaded, justExpired
                         / isPremium(), refresh, refreshUntilChanged,
                           acknowledgeExpiry, reset
+store/dateSelectionStore.ts  selected('YYYY-MM-DD' → has_timeline) / toggle, clear
+                        모아쓰기 날짜 선택. 선택 모드 플래그는 두지 않습니다 —
+                        고른 게 있으면 선택 모드입니다
 store/settingsStore.ts  isTrackingEnabled, hasLoaded / initialize, setTrackingEnabled
                         위치 기록 토글. 기본 켬, AsyncStorage 저장.
                         끄면 stopGpsTracking(), 켜면 startGpsTracking()
@@ -330,7 +373,9 @@ hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀) + 만료 안내
-hooks/useJournalList.ts   저널 목록 — 서버 검색(디바운스) + 페이지네이션
+hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 페이지네이션
+                          query(입력 중)와 appliedQuery(지금 목록의 검색어)를 나눠 둡니다.
+                          하이라이트·빈 목록 문구는 appliedQuery를 씁니다
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
 hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
 utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
@@ -338,6 +383,8 @@ utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
+constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리방침 URL
+                          처리방침은 아직 목 주소입니다
 services/purchases.ts     결제 SDK — 초기화·사용자 식별·가격 조회·결제·복원
 utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 reset_at까지 읽음)
 ```
@@ -381,8 +428,10 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
 | `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도, 결제 주기 반영, 만료 안내(앱 재시작 후에도 감지·조회 실패는 만료 아님·로그아웃 시 기록 삭제) |
+| `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
+| `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
-| `__tests__/useJournalList.test.ts` | `useJournalList` | 디바운스, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
+| `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
 `jest.setup.js`가 두 가지를 합니다:
 
@@ -444,10 +493,15 @@ npx jest gpsTask      # 파일 하나
 **오프셋 숫자가 아닌 IANA 문자열**(`Asia/Seoul`)을 씁니다 — 오프셋은 서머타임 지역에서
 계절마다 달라져 과거 기록의 경계를 다시 계산할 수 없습니다.
 
-> 백엔드도 `daily_records.timezone` 컬럼과 tz 기반 시각 변환을 반영했습니다.
-> 다만 **그 컬럼에 값을 채우는 것(analyze 경로)은 아직입니다.** 값이 비어 있으면
-> `Asia/Seoul`로 폴백하고, 하루 경계도 여전히 KST 자정이라
-> **새벽 0~4시에 찍힌 GPS는 어느 날짜에도 들어가지 않습니다.**
+> **하루 경계 4시는 백엔드에도 반영됐습니다** — `config.DAY_BOUNDARY_HOUR=4`,
+> `utils/timezone.py`의 `day_bounds()`·`week_bounds()`. 새벽 0~4시 GPS 유실은 해소됐습니다.
+>
+> 남은 것은 두 가지입니다. **①`daily_records.timezone`에 값을 넣는 코드가 없습니다**
+> (`ai.py`의 `DailyRecord(...)` 생성부에 `timezone=` 인자 없음) — 컬럼도 있고
+> `timeline_serializer`가 읽기도 하는데 항상 NULL이라 `Asia/Seoul`로 폴백합니다.
+> **②`day_bounds()`가 KST를 하드코딩**해 그 값을 채워도 경계는 전 세계 KST입니다.
+> GPS 업로드 body의 `timezone`과 analyze의 `?timezone=`도 아직 안 받습니다
+> (스키마·시그니처에 필드 없음). 프론트는 이미 둘 다 보내고 있습니다.
 
 ### 남은 미결
 
@@ -465,11 +519,10 @@ npx jest gpsTask      # 파일 하나
 | **비밀번호 재설정이 껍데기** | `backend/app/api/v1/auth.py:78-89` | 두 엔드포인트가 아무 일도 안 하고 성공 응답만 반환합니다. 이메일도 안 나가고 비밀번호도 안 바뀌는데 앱에는 성공으로 보여, 비밀번호를 잊으면 계정 복구가 불가능합니다 | 백엔드 |
 | **연동 URL을 리다이렉트로 준다** | `backend/app/api/v1/auth.py` `kakao_link_start` | `RedirectResponse` 대신 `{"authorize_url": ...}` JSON이어야 합니다. 이 엔드포인트는 `Authorization` 헤더가 필요한데 앱은 브라우저로 여는 구조라 지금은 401입니다. 프론트는 JSON을 가정해 배선을 끝냈습니다 | 백엔드 |
 | 카카오 로그인 시 이메일 중복 | `services/auth.py:76` | `social_id`로만 찾고 없으면 새로 만드는데 `users.email`이 unique라, 같은 이메일로 가입한 사람이 카카오로 로그인하면 IntegrityError가 납니다 | 백엔드 |
-| `daily_records.timezone` 값이 안 채워짐 | analyze 경로 | 컬럼은 생겼지만 비어 있어 `Asia/Seoul` 폴백으로 동작합니다. 하루 경계도 KST 자정이라 **새벽 0~4시 GPS가 유실**됩니다 | 백엔드(analyze 담당) |
+| `daily_records.timezone` 값이 안 채워짐 | `services/ai.py` `DailyRecord(...)` | 컬럼도 있고 읽는 쪽도 있는데 넣는 코드가 없어 항상 `Asia/Seoul` 폴백입니다. 하루 경계(4시)는 반영됐으나 `day_bounds()`가 KST 고정이라 해외에서는 여전히 어긋납니다 | 백엔드(analyze 담당) |
 | 검색어가 미리보기 밖에 있으면 안 보임 | `backend/app/api/v1/blog.py:50` | `summary`가 `content[:100]` 고정이라, 본문 200자 지점이 검색돼도 카드에서 확인할 수 없습니다 | 백엔드 |
 | AI 장소 매칭이 카테고리 순서에 의존 | `ai/server/modules/gps.py` | 거리 비교 없이 먼저 조회한 카테고리가 이깁니다. 카페에 있어도 300m 안 음식점으로 기록됩니다. 조회 카테고리도 4종뿐이라 병원·학교·마트 등은 "알 수 없음" | AI(강태윤) |
-| AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts:78` | 실제로는 성공했는데 "생성 실패"로 표시 | 프론트(글쓰기) |
-| 글 생성 후 캔슬·뒤로가기해도 저장됨 | `write-preview` | 사용자가 버린 글이 쌓입니다 | 프론트(글쓰기) |
+| AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시. 상한을 늘리려면 `__tests__/blogApi.test.ts`도 같이 고쳐야 합니다 | 프론트(글쓰기) |
 | 날짜 비교가 인덱스를 못 탐 | `calendar.py`, `ai.py` | `func.date(func.timezone(...))`로 컬럼을 감쌌습니다 | 백엔드 |
 
 ## 미구현 / TODO
@@ -477,11 +530,12 @@ npx jest gpsTask      # 파일 하나
 | 항목 | 위치 | 비고 |
 |---|---|---|
 | **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
-| **모아쓰기(여러 날 묶어쓰기)** | 캘린더 + `write` | 캘린더 다중 선택 → "N일 선택됨 · 글쓰기". **요청 형식이 백엔드·AI와 협의 중**이라 대기 중입니다 (배열/범위, 개수 제한, 빈 날짜 처리, 횟수 차감 규칙) |
+| **모아쓰기 — 불연속 선택** | 백엔드 `BlogGenerateRequest` | 프론트는 끝났습니다(아래 "모아쓰기" 참고). 백엔드가 `start_date`/`end_date`만 받아 **띄엄띄엄 고른 날짜를 표현할 수 없습니다.** `dates: list[date]` 추가 요청 중이고, 들어오면 프론트 재배포 없이 켜집니다 |
 | 리포트 | — | 와이어프레임 대기 |
 | 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
 | 사진 모아보기 | `settings/records` | 다른 담당자 구현 중. 설정 > 기록 화면에 붙일 자리를 만들어 뒀습니다 |
-| 개인정보처리방침 | `settings/index.tsx` | 링크가 비어 있습니다. **앱스토어 심사 필수** — 문서를 쓰고 공개 URL(Notion 게시 등)을 만들어야 합니다. 위치 상시 수집·사진 업로드가 있어 수집 항목을 꼼꼼히 적어야 합니다 |
+| **개인정보처리방침 문서** | `constants/legal.ts` | 링크 배선은 끝났고(설정 화면 + 구독 화면) **URL이 `example.com` 목입니다.** 문서를 쓰고 공개 URL을 만들어 `PRIVACY_POLICY_URL`만 바꾸면 됩니다. **앱스토어 심사 필수** — 위치 상시 수집·사진 업로드를 꼼꼼히 적어야 합니다. 이용약관은 Apple 표준 EULA로 해결됐습니다 |
+| 크래시 리포팅 | — | Sentry 등이 없어 출시 후 사용자 크래시를 알 방법이 없습니다. **RN의 JS 에러는 App Store Connect 크래시 리포트에 안 잡힙니다** |
 | 남은 생성 횟수 표시 | 글쓰기 | 지금은 429가 떠야만 `used/limit`을 알 수 있습니다. `GET /subscriptions/me`에 넣어주면 "이번 주 1/3" 안내가 가능합니다 |
 | 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:107` | 백엔드는 카카오 `properties.nickname`을 받아 쓰고 **못 받을 때만** `카카오유저1234`로 폴백합니다(`services/auth.py:88`) — 고정이 아닙니다. 먼저 볼 것은 **카카오 콘솔의 프로필 정보 동의항목**. 화면을 만들려면 닉네임 수정 API(`PATCH /me` 부재)가 전제이고, 지금은 닉네임이 앱 어디에도 안 보여 우선순위가 낮습니다 |
 | PostCard 탭 동작 미정 | `PostCard.tsx` | `TimelinePlace`에 `blogId`가 없어 저널로 못 보냅니다. 사진 뷰어 / 장소 상세 / 장소명 수정 중 결정 필요 |
@@ -496,9 +550,13 @@ npx jest gpsTask      # 파일 하나
 `/auth/kakao/link`(state 기반)는 이미 들어왔지만 **로그인 경로의 이메일 중복은 그대로**라,
 사용자가 설정 > 계정에서 연동을 거쳐야만 계정이 합쳐집니다.
 
-**2. 모아쓰기 요청 형식** — 배열인지 범위인지, 개수 제한, 기록 없는 날 처리,
-생성 횟수 차감 규칙(1회), 무료 사용자 허용 여부. 정해지면 프론트가 다중 선택 UI를 붙입니다.
+**2. 모아쓰기 요청 형식** — 대부분 확정됐습니다. `daily_record_id`(하루) /
+`start_date`+`end_date`(기간) 배타, 최대 31일(`MAX_BLOG_PERIOD_DAYS`), 기록 없는 날은
+백엔드가 알아서 제외, 횟수는 1회 차감, 같은 기간 생성 **진행 중**일 때만 409(완료된 뒤에는
+몇 번이든 다시 쓸 수 있습니다). AI 서버 payload도 `days` 배열로 합의됐습니다.
+**남은 건 불연속 선택(`dates: list[date]`) 하나입니다.**
 
-**3. 타임존 값 채우기** — 컬럼은 있으나 analyze가 값을 넣지 않습니다.
-프론트는 GPS 업로드 body와 analyze 쿼리로 이미 보내고 있어, 받아서 저장하고
-하루 경계를 그 tz의 새벽 4시로 바꾸면 켜집니다.
+**3. 타임존 값 채우기** — 하루 경계 4시는 반영됐습니다(`DAY_BOUNDARY_HOUR`).
+남은 건 ①GPS 업로드 body의 `timezone`과 analyze `?timezone=`을 받아
+`daily_records.timezone`에 저장하는 것, ②`day_bounds()`의 KST 하드코딩을
+그 값으로 바꾸는 것입니다. 프론트는 이미 둘 다 보내고 있어 받기만 하면 켜집니다.

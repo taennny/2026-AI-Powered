@@ -34,8 +34,7 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   return response.data;
 }
 
-// 토큰 재발급은 utils/api.ts의 응답 인터셉터가 401을 받아 알아서 처리한다.
-// 여기에 같은 로직을 또 두면 재발급 경로가 둘로 갈라진다.
+// 토큰 재발급은 utils/api.ts의 인터셉터가 처리한다 — 여기 두면 경로가 갈라진다
 
 export async function sendResetEmail(email: string) {
   const response = await api.post('/api/v1/auth/password-reset/request', {email});
@@ -52,10 +51,7 @@ export async function resetPassword(token: string, newPassword: string) {
 
 export interface UserMe {
   email: string;
-  /**
-   * 우리 서비스의 사용자 id. 결제 SDK(RevenueCat)에 이 값을 넘겨야
-   * 결제 웹훅이 어느 계정 것인지 매칭된다.
-   */
+  /** 결제 SDK에 넘겨야 웹훅이 어느 계정 것인지 매칭된다 */
   user_id?: string;
   /** 백엔드가 `social_id != null`로 판정해 내려준다 */
   is_kakao_linked?: boolean;
@@ -71,12 +67,8 @@ export async function deleteAccount(): Promise<void> {
 }
 
 /**
- * 카카오 연동 시작 URL을 받아온다.
- *
- * **브라우저로 직접 열면 안 되는 엔드포인트다.** 서버가 `Authorization` 헤더로
- * 누구의 연동인지 판단해 state 토큰(5분 만료)에 user_id를 심는데, 시스템
- * 브라우저는 앱이 들고 있는 토큰을 모르므로 401이 난다. 여기서 axios로 받아
- * (인터셉터가 토큰을 붙인다) 돌려받은 URL만 브라우저에 넘긴다.
+ * **브라우저로 직접 열면 안 된다.** 서버가 `Authorization`으로 누구의 연동인지
+ * 판단하는데 시스템 브라우저는 앱 토큰을 몰라 401이다 — URL만 받아서 넘긴다.
  */
 export async function fetchKakaoLinkUrl(): Promise<string> {
   const response = await api.get<{authorize_url: string}>(

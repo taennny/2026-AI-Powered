@@ -3,17 +3,11 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {fetchBlogs, type JournalData} from '@/services/blogApi';
 
 const PAGE_SIZE = 20;
-const SEARCH_DEBOUNCE_MS = 300;
 
 /**
- * 검색 없는 첫 페이지만 캐시한다.
- *
- * 탭 레이아웃이 `Slot`이라 홈↔저널을 오갈 때마다 이 화면이 언마운트돼서,
- * 돌아올 때마다 스피너를 보고 기다려야 했다. 캐시를 초기값으로 깔면 즉시 목록이
- * 뜨고 갱신은 뒤에서 돈다.
- *
- * 검색 결과는 캐시하지 않는다 — 검색어와 짝이 맞지 않으면 엉뚱한 목록이 보인다.
- * 로그아웃 시 `(main)/_layout`이 비운다 — 다음 계정이 물려받으면 안 된다.
+ * 검색 없는 첫 페이지만 캐시한다 — 탭 전환마다 언마운트돼서 스피너를 봐야 했다.
+ * 검색 결과는 캐시하지 않는다(검색어와 짝이 어긋난다).
+ * 로그아웃 시 `(main)/_layout`이 비운다.
  */
 let cachedFirstPage: {journals: JournalData[]; total: number} | null = null;
 
@@ -22,14 +16,21 @@ export function clearJournalCache(): void {
 }
 
 /**
- * 저널 목록 — 서버 검색 + 페이지네이션.
+ * 저널 목록 — 서버 검색(`q`) + 페이지네이션.
+ * 클라 검색은 받아온 페이지 안에서만 찾게 된다. 늦게 온 응답은 요청 번호로 거른다.
  *
- * 검색을 클라에서 걸면 이미 받아온 페이지 안에서만 찾게 되므로 백엔드 `q`를 쓴다.
- * 타이핑마다 요청하지 않도록 디바운스하고, 늦게 도착한 응답이 최신 결과를
- * 덮어쓰지 않도록 요청 번호로 거른다.
+ * 검색은 **제출식**이다 — 타이핑만으로는 조회하지 않고 `search()`를 불러야 나간다.
+ * 글자마다 조회하면 입력 중인 검색어와 화면의 목록이 계속 어긋난다. 그 상태로
+ * 하이라이트를 칠하면 "없는 검색어가 옛 글에 파랗게 칠해졌다가 뒤늦게 사라지는" 화면이 된다.
+ *
+ * 그래서 `query`(입력 중)와 `appliedQuery`(지금 목록을 만들어낸 검색어)를 나눠 둔다.
+ * **하이라이트와 빈 목록 문구는 반드시 `appliedQuery`를 쓴다** — 제출 후 응답까지의
+ * 짧은 구간에도 둘이 어긋나면 안 된다.
  */
 export function useJournalList() {
   const [query, setQuery] = useState('');
+  // 캐시로 되살린 목록은 검색 없는 첫 페이지뿐이라 빈 문자열이 맞다
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [journals, setJournals] = useState<JournalData[]>(
     () => cachedFirstPage?.journals ?? [],
   );
@@ -40,9 +41,11 @@ export function useJournalList() {
 
   const pageRef = useRef(1);
   const requestIdRef = useRef(0);
+  // 첫 페이지가 날아가는 중이면 '더 불러오기'를 막는다 — 그 사이 페이지 2를
+  // 요청하면 번호가 더 커져서, 뒤에 도착한 첫 페이지 응답이 버려진다
+  const isFirstPageLoadingRef = useRef(false);
 
-  // 스피너로 가릴지 판단하려면 현재 목록을 봐야 하는데, load는 의존성이 없는
-  // useCallback이라 state를 직접 못 읽는다
+  // load가 의존성 없는 useCallback이라 state를 직접 못 읽는다
   const journalsRef = useRef(journals);
   journalsRef.current = journals;
 
@@ -50,7 +53,8 @@ export function useJournalList() {
     const requestId = ++requestIdRef.current;
 
     if (page === 1) {
-      // 이미 보여줄 목록이 있으면(캐시·이전 결과) 스피너로 덮지 않는다
+      isFirstPageLoadingRef.current = true;
+      // 보여줄 목록이 있으면 스피너로 덮지 않는다
       if (journalsRef.current.length === 0) setIsLoading(true);
     } else {
       setIsLoadingMore(true);
@@ -63,14 +67,14 @@ export function useJournalList() {
         size: PAGE_SIZE,
       });
 
-      // 그 사이 검색어가 바뀌었으면 이 응답은 버린다
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current) return; // 검색어가 바뀌었다
 
       setTotal(data.total);
       setJournals(prev => (page === 1 ? data.blogs : [...prev, ...data.blogs]));
+      // 목록과 같은 순간에 바꾼다 — 하이라이트가 짝을 잃지 않는다
+      setAppliedQuery(q);
       pageRef.current = page;
 
-      // 검색 없는 첫 페이지만 — 다음 진입에서 바로 보여줄 용도
       if (page === 1 && !q.trim()) {
         cachedFirstPage = {journals: data.blogs, total: data.total};
       }
@@ -79,39 +83,53 @@ export function useJournalList() {
 
       // 첫 페이지 실패는 빈 목록, 더 불러오기 실패는 기존 목록 유지
       if (page === 1) {
-        // 실패한 결과를 캐시에 남기면 다음 진입에서 옛 목록이 되살아난다
         if (!q.trim()) cachedFirstPage = null;
         setJournals([]);
         setTotal(0);
+        // 실패해도 빈 목록은 이 검색어의 결과다 — '검색 결과가 없어요'가 옛 검색어를 가리키면 안 된다
+        setAppliedQuery(q);
       }
     } finally {
       if (requestId === requestIdRef.current) {
         setIsLoading(false);
         setIsLoadingMore(false);
+        if (page === 1) isFirstPageLoadingRef.current = false;
       }
     }
   }, []);
 
+  // 첫 진입에 한 번. 이후 조회는 search()/clearSearch()/loadMore()가 시작한다
   useEffect(() => {
-    // 첫 진입은 기다릴 이유가 없다 — 디바운스는 타이핑에만 건다
-    const delay = query ? SEARCH_DEBOUNCE_MS : 0;
-    const timer = setTimeout(() => {
-      void load(query, 1);
-    }, delay);
+    void load('', 1);
+  }, [load]);
 
-    return () => clearTimeout(timer);
-  }, [query, load]);
+  /** 검색 버튼·키보드 Search 키 */
+  const search = useCallback(() => {
+    void load(query, 1);
+  }, [load, query]);
+
+  /** 검색창을 닫을 때 — 검색어를 지우고 전체 목록으로 돌아온다 */
+  const clearSearch = useCallback(() => {
+    setQuery('');
+    void load('', 1);
+  }, [load]);
 
   const hasMore = journals.length < total;
 
   const loadMore = useCallback(() => {
-    if (isLoading || isLoadingMore || !hasMore) return;
-    void load(query, pageRef.current + 1);
-  }, [hasMore, isLoading, isLoadingMore, load, query]);
+    if (isLoading || isLoadingMore || isFirstPageLoadingRef.current || !hasMore) {
+      return;
+    }
+    // 입력 중인 `query`가 아니라 이 목록을 만들어낸 검색어로 이어받는다
+    void load(appliedQuery, pageRef.current + 1);
+  }, [appliedQuery, hasMore, isLoading, isLoadingMore, load]);
 
   return {
     query,
     setQuery,
+    appliedQuery,
+    search,
+    clearSearch,
     journals,
     isLoading,
     isLoadingMore,

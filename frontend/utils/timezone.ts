@@ -1,18 +1,16 @@
 /**
  * 기기 타임존 — 서버로 보내는 값.
  *
- * 오프셋 숫자가 아니라 IANA 문자열(`Asia/Seoul`)을 쓴다. 오프셋은 서머타임이 있는
- * 지역에서 계절마다 달라져, 과거 기록의 날짜 경계를 나중에 다시 계산할 수 없다.
- *
- * `Intl`은 Hermes 빌드에 따라 timeZone을 `UTC`로 뱉는 경우가 있어
- * expo-localization을 먼저 본다.
+ * 오프셋이 아니라 IANA 문자열을 쓴다 — 오프셋은 서머타임 지역에서 계절마다 달라져
+ * 과거 기록의 경계를 다시 계산할 수 없다.
+ * `Intl`이 Hermes 빌드에 따라 `UTC`를 뱉어서 expo-localization을 먼저 본다.
  */
 
 import * as Localization from 'expo-localization';
 
 const FALLBACK_TIME_ZONE = 'Asia/Seoul';
 
-/** 'UTC'는 진짜 UTC 기기와 구분이 안 되지만, 한국 사용자 기준으로는 오류일 확률이 높다 */
+/** 진짜 UTC 기기와 구분은 안 되지만, 국내 기준으로는 오류일 확률이 높다 */
 function isSuspicious(timeZone: string | null | undefined): boolean {
   return !timeZone || timeZone === 'UTC';
 }

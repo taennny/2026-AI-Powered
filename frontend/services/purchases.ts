@@ -1,17 +1,9 @@
 /**
- * 결제 SDK(RevenueCat) 연결 지점.
+ * 결제 SDK(RevenueCat). 앱은 영수증을 서버로 보내지 않는다 —
+ * SDK가 Apple과 결제하고, RevenueCat이 검증해 백엔드로 웹훅을 보낸다.
  *
- * 결제 자체는 SDK가 Apple과 처리하고, 검증 결과는 RevenueCat이 백엔드로
- * 웹훅을 보낸다. 앱은 영수증을 서버로 보내지 않는다.
- *
- *   로그인 → identifyUser(user_id)
- *   결제   → purchase() → SDK가 Apple에 청구 → RevenueCat이 검증 → 백엔드 웹훅
- *   앱     → GET /subscriptions/me 재조회 (웹훅이 몇 초 늦으므로 재시도)
- *
- * **앱은 SDK가 주는 구독 상태를 판정에 쓰지 않는다.** 프리미엄 개방은 언제나
- * 서버(`subscriptionStore.isPremium()`)만 본다 — SDK 캐시와 서버가 어긋날 때
- * 둘 중 하나를 골라야 하는데, 웹훅을 받아 정산하는 쪽이 서버이기 때문이다.
- * 그래서 여기서는 Entitlement를 들여다보지 않는다.
+ * **SDK의 구독 상태는 판정에 쓰지 않는다.** 개방은 언제나 서버만 본다
+ * (어긋날 때 웹훅으로 정산하는 쪽이 맞다) — 그래서 Entitlement를 보지 않는다.
  */
 
 import {Platform} from 'react-native';
@@ -25,9 +17,8 @@ import {fetchMe} from '@/services/authApi';
 import {type BillingCycle} from '@/services/subscriptionApi';
 
 /**
- * 플랫폼별 공개 API 키. RevenueCat 대시보드 > API keys의 **public** 키다
- * (secret 키는 앱에 넣지 않는다). 키가 없으면 결제 기능만 조용히 꺼진다 —
- * 앱 자체는 그대로 동작해야 하므로 여기서 던지지 않는다.
+ * RevenueCat 대시보드의 **public** 키 (secret은 앱에 넣지 않는다).
+ * 없으면 결제 기능만 조용히 꺼진다 — 앱은 그대로 동작해야 하므로 던지지 않는다.
  */
 const API_KEY =
   Platform.select({
@@ -36,9 +27,8 @@ const API_KEY =
   }) ?? '';
 
 /**
- * App Store Connect에 등록한 상품 ID. 백엔드
- * `revenuecat_webhook.py`의 `PRODUCT_PLAN_MAP`과 **글자 단위로 같아야 한다** —
- * 다르면 결제는 되는데 웹훅이 어떤 플랜인지 몰라 구독이 안 열린다.
+ * 백엔드 `revenuecat_webhook.py`의 `PRODUCT_PLAN_MAP`과 **글자 단위로 같아야 한다** —
+ * 다르면 결제는 되는데 웹훅이 플랜을 몰라 구독이 안 열린다.
  */
 export const PRODUCT_IDS: Record<BillingCycle, string> = {
   monthly: 'com.picknavi.roame.premium.monthly',
@@ -52,12 +42,7 @@ export function isPurchaseAvailable(): boolean {
 
 let configured = false;
 
-/**
- * SDK 초기화. 어떤 결제 호출보다 먼저 한 번만 실행된다.
- *
- * 사용자 식별 없이 먼저 초기화한다 — 로그인 전에도 가격을 보여줄 수 있어야 하고,
- * 식별은 `identifyUser()`가 `logIn`으로 뒤이어 붙인다.
- */
+/** 사용자 식별 없이 먼저 초기화한다 — 로그인 전에도 가격을 보여줘야 한다 */
 function ensureConfigured(): boolean {
   if (!isPurchaseAvailable()) return false;
   if (configured) return true;
@@ -72,11 +57,7 @@ function ensureConfigured(): boolean {
 let identifiedUserId: string | null = null;
 
 /**
- * 결제 SDK에 "지금 이 사람"을 알린다. 로그인 직후 한 번 부른다.
- *
- * 이 값이 없으면 결제 웹훅이 와도 백엔드가 누구 결제인지 매칭할 수 없다
- * (`revenuecat_webhook.py`가 `app_user_id`를 우리 `users.id`로 파싱한다).
- * user_id는 `GET /auth/me`가 준다.
+ * 로그인 직후 한 번. 이 값이 없으면 웹훅이 와도 백엔드가 누구 결제인지 모른다.
  */
 export async function identifyUser(): Promise<void> {
   try {
@@ -87,8 +68,7 @@ export async function identifyUser(): Promise<void> {
     await Purchases.logIn(me.user_id);
     identifiedUserId = me.user_id;
   } catch {
-    // 실패해도 앱 사용에는 지장이 없다. 다음 로그인·복귀 때 다시 시도된다.
-    // 결제를 시도하는 시점에 다시 부르므로 여기서 붙잡아둘 이유가 없다.
+    // 다음 로그인·복귀 때 다시 시도된다
   }
 }
 
@@ -97,7 +77,7 @@ export function resetIdentifiedUser(): void {
   identifiedUserId = null;
   if (!configured) return;
 
-  // 익명 사용자로 되돌린다. 실패해도 로그아웃 자체는 진행돼야 한다
+  // 실패해도 로그아웃 자체는 진행돼야 한다
   void Purchases.logOut().catch(() => {});
 }
 
@@ -109,11 +89,8 @@ export type PurchaseOption = {
 };
 
 /**
- * 실제 판매 가격을 가져온다.
- *
- * 하드코딩한 원화 가격은 한국에서만 맞다 — Apple이 나라마다 다른 가격표를
- * 쓰므로 표시용 문자열은 반드시 여기서 와야 한다. 실패하면 빈 배열을 주고,
- * 화면은 `constants/pricing.ts`의 기본값으로 그린다.
+ * 실제 판매 가격. Apple이 나라마다 다른 가격표를 써서 표시용 문자열은
+ * 반드시 여기서 와야 한다. 실패 시 빈 배열 — 화면이 기본값으로 그린다.
  */
 export async function getPurchaseOptions(): Promise<PurchaseOption[]> {
   if (!ensureConfigured()) return [];
@@ -140,13 +117,9 @@ export async function getPurchaseOptions(): Promise<PurchaseOption[]> {
 export type PurchaseResult = 'purchased' | 'cancelled' | 'failed';
 
 /**
- * 결제를 실행한다.
+ * @returns 'cancelled'는 실패가 아니다 — 다이얼로그를 닫은 것뿐이라 안내하지 않는다.
  *
- * @returns 'cancelled'는 실패가 아니다 — 사용자가 시스템 다이얼로그를 닫은
- *          것이므로 오류 안내를 띄우면 안 된다.
- *
- * 성공해도 **여기서 구독 상태를 바꾸지 않는다.** 호출부가
- * `refreshUntilChanged(false)`로 서버에 물어봐야 한다 — 웹훅이 몇 초 늦다.
+ * 성공해도 **여기서 구독 상태를 바꾸지 않는다** — 호출부가 서버에 다시 물어본다.
  */
 export async function purchase(pkg: PurchasesPackage): Promise<PurchaseResult> {
   if (!ensureConfigured()) return 'failed';
@@ -168,11 +141,8 @@ export async function purchase(pkg: PurchasesPackage): Promise<PurchaseResult> {
 }
 
 /**
- * 구매 복원 — **Apple 심사 필수 항목이다.** 기기를 바꾸거나 앱을 지웠다
- * 깔았을 때 이미 산 구독을 되찾는 경로가 없으면 리젝된다.
- *
- * 복원도 RevenueCat이 백엔드로 웹훅을 보내므로, 호출부는 결제와 똑같이
- * 서버를 재조회해야 한다.
+ * 구매 복원 — **심사 필수.** 되찾을 경로가 없으면 리젝된다.
+ * 복원도 웹훅을 거치므로 호출부는 결제와 똑같이 서버를 재조회한다.
  */
 export async function restorePurchases(): Promise<boolean> {
   if (!ensureConfigured()) return false;

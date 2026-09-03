@@ -2,7 +2,7 @@ import uuid
 import logging
 from datetime import date, datetime, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
@@ -14,7 +14,7 @@ from app.models.enums import GenerationStatus
 from app.models.place import Place
 from app.models.user import User
 from app.services.ai_client import request_blog_generation
-from app.services.subscription import get_user_subscription
+from app.services.subscription import get_user_subscription, is_premium
 from app.services.timeline_serializer import (
     build_multi_day_timeline_data,
     build_timeline_data,
@@ -88,15 +88,25 @@ async def _load_places(db: AsyncSession, daily_record_id: uuid.UUID) -> list[Pla
 
 
 async def _build_multi_day_timeline(db: AsyncSession, blog: Blog, user: User) -> dict:
-    """모아쓰기 블로그의 기간 내 기록들을 날짜순으로 모아 여러 날 payload 생성."""
+    """모아쓰기 블로그에 담긴 날짜들의 기록을 날짜순으로 모아 여러 날 payload 생성."""
+    if blog.target_dates:
+        # 저장된 날짜 목록이 기준 (띄엄띄엄 고른 날짜도 그대로 반영된다)
+        wanted = [date.fromisoformat(d) for d in blog.target_dates]
+        date_filter = DailyRecord.target_date.in_(wanted)
+    else:
+        # target_dates 도입 전에 만들어진 글은 기존대로 구간으로 해석한다
+        date_filter = and_(
+            DailyRecord.target_date >= blog.target_date,
+            DailyRecord.target_date <= blog.period_end,
+        )
+
     daily_records = list(
         (
             await db.execute(
                 select(DailyRecord)
                 .where(
                     DailyRecord.user_id == blog.user_id,
-                    DailyRecord.target_date >= blog.target_date,
-                    DailyRecord.target_date <= blog.period_end,
+                    date_filter,
                 )
                 .order_by(DailyRecord.target_date)
             )
@@ -143,7 +153,7 @@ async def _check_quota(db: AsyncSession, user_id: uuid.UUID) -> None:
     모아쓰기도 며칠을 묶든 생성 1회로 센다 — AI 호출이 한 번이기 때문.
     """
     subscription = await get_user_subscription(db, user_id)
-    if subscription.plan_type != "premium":
+    if not is_premium(subscription):
         used, reset_at = await get_weekly_usage(db, user_id)
         if used >= settings.FREE_WEEKLY_BLOG_LIMIT:
             raise QuotaExceededError(
@@ -199,49 +209,98 @@ async def create_blog_generation(
     return blog
 
 
+STYLE_EXAMPLE_COUNT = 3  # 프롬프트에 넣을 최근 발행 글 수
+STYLE_EXAMPLE_MAX_CHARS = 1500  # 글당 절단 길이 (프롬프트 비대 방지)
+
+
+async def _get_style_examples(
+    db: AsyncSession, user_id: uuid.UUID, exclude_blog_id: uuid.UUID
+) -> list[str]:
+    """유료 사용자의 최근 발행 글 본문 — AI가 문체를 따라 쓸 예시.
+
+    무료 사용자는 빈 배열 (개인화 문체는 구독 혜택).
+    """
+    subscription = await get_user_subscription(db, user_id)
+    if not is_premium(subscription):
+        return []
+
+    result = await db.execute(
+        select(Blog.content)
+        .where(
+            Blog.user_id == user_id,
+            Blog.is_published.is_(True),
+            Blog.id != exclude_blog_id,
+            Blog.content != "",
+            # 삭제한 글을 문체 예시로 되살려 쓰면 안 된다
+            Blog.deleted_at.is_(None),
+        )
+        .order_by(Blog.created_at.desc())
+        .limit(STYLE_EXAMPLE_COUNT)
+    )
+    return [content[:STYLE_EXAMPLE_MAX_CHARS] for content in result.scalars()]
+
+
 async def create_period_blog_generation(
     db: AsyncSession,
     user_id: uuid.UUID,
-    start_date: date,
-    end_date: date,
+    dates: list[date],
     style: str,
 ) -> Blog:
     """여러 날 모아쓰기 생성 요청 → pending 상태로 DB 저장.
 
-    target_date가 시작일, period_end가 종료일이며 daily_record_id는 비운다.
-    기간 유효성(역전·상한)은 요청 스키마에서 이미 검증된다.
+    dates는 요청 스키마에서 정규화된(중복 제거·오름차순) 날짜 목록이다.
+    연속 구간 요청도 라우터에서 날짜로 펼쳐 여기로 넘어온다.
+
+    실제 기록이 있는 날짜만 target_dates에 담고,
+    target_date/period_end에는 그 최소·최대값을 넣어 기존 표시(“8/5~8/8”)와 호환을 유지한다.
+    daily_record_id는 비운다.
     """
     await _check_quota(db, user_id)
 
-    # 같은 기간으로 생성이 진행 중이면 중복 요청 거절 (하루짜리와 같은 규칙)
-    in_progress = (
-        await db.execute(
-            select(Blog.id).where(
-                Blog.user_id == user_id,
-                Blog.target_date == start_date,
-                Blog.period_end == end_date,
-                Blog.deleted_at.is_(None),
-                Blog.generation_status.in_(
-                    [GenerationStatus.PENDING, GenerationStatus.GENERATING]
-                ),
+    # 요청한 날짜 중 실제 기록이 있는 날만 추린다
+    recorded = sorted(
+        set(
+            (
+                await db.execute(
+                    select(DailyRecord.target_date).where(
+                        DailyRecord.user_id == user_id,
+                        DailyRecord.target_date.in_(dates),
+                    )
+                )
             )
+            .scalars()
+            .all()
         )
-    ).first()
-    if in_progress:
-        raise BlogConflictError("이미 생성이 진행 중입니다")
-
-    # 기간 안에 기록이 하나도 없으면 쓸 내용이 없으므로 404
-    has_record = (
-        await db.execute(
-            select(DailyRecord.id).where(
-                DailyRecord.user_id == user_id,
-                DailyRecord.target_date >= start_date,
-                DailyRecord.target_date <= end_date,
-            )
-        )
-    ).first()
-    if not has_record:
+    )
+    # 하나도 없으면 쓸 내용이 없으므로 404
+    if not recorded:
         raise ValueError("해당 기간에 기록이 없습니다")
+
+    target_dates = [d.isoformat() for d in recorded]
+    start_date, end_date = recorded[0], recorded[-1]
+
+    # 같은 날짜 목록으로 생성이 진행 중이면 중복 요청 거절 (하루짜리와 같은 규칙).
+    # JSON 컬럼 비교는 방언마다 동작이 달라, 시작·종료일로 후보만 좁힌 뒤
+    # 파이썬에서 목록을 비교한다.
+    candidates = (
+        (
+            await db.execute(
+                select(Blog).where(
+                    Blog.user_id == user_id,
+                    Blog.target_date == start_date,
+                    Blog.period_end == end_date,
+                    Blog.deleted_at.is_(None),
+                    Blog.generation_status.in_(
+                        [GenerationStatus.PENDING, GenerationStatus.GENERATING]
+                    ),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if any(b.target_dates == target_dates for b in candidates):
+        raise BlogConflictError("이미 생성이 진행 중입니다")
 
     blog = Blog(
         user_id=user_id,
@@ -251,6 +310,7 @@ async def create_period_blog_generation(
         style=style,
         target_date=start_date,
         period_end=end_date,
+        target_dates=target_dates,
         generation_status=GenerationStatus.PENDING,
     )
     db.add(blog)
@@ -272,10 +332,12 @@ async def run_blog_generation(blog_id: uuid.UUID, user_note: str | None = None) 
 
         try:
             daily_record = await _build_timeline_for_blog(db, blog)
+            style_examples = await _get_style_examples(db, blog.user_id, blog.id)
             ai_result = await request_blog_generation(
                 daily_record=daily_record,
                 style=map_style(blog.style),
                 user_note=user_note,
+                style_examples=style_examples,
             )
 
             # AI 프롬프트는 25자 권장이지만 강제가 아님 — DB 컬럼(255) 초과 방지 절단

@@ -12,11 +12,8 @@ export type PhotoUploadResult = {
 const UPLOAD_TIMEOUT_MS = 60_000;
 
 /**
- * 확장자로 MIME 타입을 정한다.
- *
- * 실제 포맷과 다르게 보내면 안 된다 — 서버가 EXIF에서 촬영 시각을 읽는데,
- * 파서가 내용을 못 읽으면 업로드 시각으로 저장돼 사진이 엉뚱한 장소에 붙는다.
- * (아이폰 기본 촬영 포맷은 HEIC다)
+ * 실제 포맷과 다르게 보내면 서버의 EXIF 파서가 못 읽어 사진이 엉뚱한 장소에 붙는다.
+ * (아이폰 기본 촬영 포맷은 HEIC)
  */
 export function mimeTypeOf(fileName: string): string {
   const ext = fileName.toLowerCase().split('.').pop();
@@ -33,19 +30,15 @@ export function mimeTypeOf(fileName: string): string {
 }
 
 /**
- * POST /api/v1/photos/upload
- *
- * 촬영 시각을 함께 보낼 수 없다 — 서버가 파일의 EXIF로만 판단한다.
- * 그래서 EXIF가 없는 사진(스크린샷 등)은 업로드 시각으로 저장돼 엉뚱한 장소에
- * 붙는다. 호출부(`utils/photoSync.ts`)가 그런 사진을 걸러내는 이유다.
+ * POST /api/v1/photos/upload — 촬영 시각은 못 보낸다(서버가 EXIF로만 판단).
+ * 그래서 호출부가 EXIF 없는 사진을 미리 걸러낸다.
  */
 export async function uploadPhoto(
   uri: string,
   fileName: string,
 ): Promise<PhotoUploadResult> {
   const form = new FormData();
-  // 필드명은 'photo' — 서버가 `photo: UploadFile = File(...)`로 받는다.
-  // 다르면 FastAPI가 필수 필드 누락으로 422를 던진다.
+  // 필드명 'photo' 고정 — 다르면 FastAPI가 422를 던진다
   form.append('photo', {
     uri,
     name: fileName,

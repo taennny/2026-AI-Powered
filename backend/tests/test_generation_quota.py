@@ -8,6 +8,7 @@ from sqlalchemy import select, update
 from app.config import settings
 from app.models.blog import Blog
 from app.models.enums import GenerationStatus
+from app.services.subscription import update_user_subscription
 from app.utils.timezone import KST, week_bounds
 from tests.conftest import TEST_USER_ID, TestingSessionLocal
 
@@ -108,7 +109,9 @@ async def test_last_week_blogs_not_counted(client, daily_record_id):
 
 async def test_premium_user_unlimited(client, daily_record_id):
     """프리미엄은 한도를 넘겨도 계속 202"""
-    await client.put("/api/v1/subscriptions/me", json={"plan_type": "premium"})
+    # 구독 변경 API는 제거됐다(결제 없이 프리미엄이 됐던 구멍). 서비스로 직접 설정한다.
+    async with TestingSessionLocal() as db:
+        await update_user_subscription(db, TEST_USER_ID, "premium")
 
     for _ in range(settings.FREE_WEEKLY_BLOG_LIMIT + 2):
         res = await _generate(client, daily_record_id)

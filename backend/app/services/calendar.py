@@ -4,7 +4,7 @@ import calendar
 from datetime import date
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import and_, exists, select
+from sqlalchemy import and_, exists, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.daily_record import DailyRecord
@@ -48,8 +48,24 @@ async def get_monthly_calendar(
         has_timeline = has_timeline_result.scalar()
 
         if BLOG_MODEL_AVAILABLE:
+            # 하루짜리 글은 daily_record_id로, 모아쓰기 글은 target_dates(포함된
+            # 날짜 목록)로 판정한다. 모아쓰기는 daily_record_id가 비어 있어서
+            # 그 조건만 보면 캘린더에 아예 표시되지 않는다.
+            date_key = record.target_date.isoformat()
             has_journal_result = await db.execute(
-                select(exists().where(Blog.daily_record_id == record.id))
+                select(
+                    exists().where(
+                        and_(
+                            Blog.user_id == user_id,
+                            Blog.deleted_at.is_(None),
+                            or_(
+                                Blog.daily_record_id == record.id,
+                                Blog.target_dates.isnot(None)
+                                & Blog.target_dates.contains(date_key),
+                            ),
+                        )
+                    )
+                )
             )
             has_journal = has_journal_result.scalar()
         else:

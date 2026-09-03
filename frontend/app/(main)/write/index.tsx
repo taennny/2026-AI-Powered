@@ -15,20 +15,31 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
+  buildDateTarget,
   generateBlog,
   waitForBlogGeneration,
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {describeBlogGenerationError} from '@/utils/blogGenerationError';
+import {useDateSelectionStore} from '@/store/dateSelectionStore';
 
 export default function WriteScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {dailyRecordId} = useLocalSearchParams<{
+  const {dailyRecordId, dates} = useLocalSearchParams<{
     dailyRecordId?: string;
+    /** 모아쓰기 — 'YYYY-MM-DD' 오름차순 콤마 목록 */
+    dates?: string;
   }>();
+
+  const dateKeys = useMemo(
+    () => (dates ? dates.split(',').filter(Boolean) : []),
+    [dates],
+  );
+  const isMultiDay = dateKeys.length > 0;
+  const clearSelection = useDateSelectionStore(s => s.clear);
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [place, setPlace] = useState('');
@@ -46,11 +57,8 @@ useEffect(() => {
 
   return () => subscription.remove();
 }, [isLoading]);
-  const canSubmit =
-  place.trim().length > 0 &&
-  companion.trim().length > 0 &&
-  feeling.trim().length > 0 &&
-  !!dailyRecordId;
+  // 입력은 전부 선택이다 — 아무것도 안 적으면 타임라인만으로 생성한다
+  const canSubmit = isMultiDay || !!dailyRecordId;
 
   const dateStr = useMemo(() => {
     const today = new Date();
@@ -73,34 +81,36 @@ useEffect(() => {
   };
 
   const handleWritePress = async () => {
-    if (!dailyRecordId) {
+    if (!isMultiDay && !dailyRecordId) {
       Alert.alert('오류', '날짜 기록 정보가 없습니다.');
-      return;
-    }
-
-    if (!canSubmit) {
-      Alert.alert('알림', '내용을 입력해야 글을 생성할 수 있습니다.');
       return;
     }
 
     try {
       setIsLoading(true);
-      const userNote = [
-  `오늘 간 장소: ${place.trim()}`,
-  `함께한 사람: ${companion.trim()}`,
-  `오늘의 감정: ${feeling.trim()}`,
-  prompt.trim() ? `추가 요청: ${prompt.trim()}` : '',
-]
-  .filter(Boolean)
-  .join('\n');
+      // 빈 항목은 빼고 보낸다 — `오늘 간 장소: `처럼 레이블만 가면 AI가 그걸 내용으로 읽는다
+      const userNote =
+        [
+          place.trim() && `오늘 간 장소: ${place.trim()}`,
+          companion.trim() && `함께한 사람: ${companion.trim()}`,
+          feeling.trim() && `오늘의 감정: ${feeling.trim()}`,
+          prompt.trim() && `추가 요청: ${prompt.trim()}`,
+        ]
+          .filter(Boolean)
+          .join('\n') || undefined;
 
       const generateResult = await generateBlog({
-        daily_record_id: dailyRecordId,
+        ...(isMultiDay
+          ? buildDateTarget(dateKeys)
+          : {daily_record_id: dailyRecordId}),
         user_note: userNote,
         writing_style: writingStyle,
       });
 
       const blog = await waitForBlogGeneration(generateResult.blog_id);
+
+      // 글이 나왔으면 선택은 끝났다 — 안 비우면 홈에 돌아가도 선택 모드가 남는다
+      if (isMultiDay) clearSelection();
 
       router.push({
         pathname: '/(main)/write-preview',
@@ -162,7 +172,16 @@ useEffect(() => {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View className="px-[22px] pt-4 pb-[10px] flex-row justify-between">
-          <Text className="text-xl font-bold text-primary">{dateStr}</Text>
+          <View className="flex-row items-baseline gap-x-2">
+            <Text className="text-xl font-bold text-primary">{dateStr}</Text>
+
+            {/* 하루만 고른 경우는 모아쓰기라고 하지 않는다 */}
+            {dateKeys.length > 1 && (
+              <Text className="text-xs text-tertiary">
+                {dateKeys.length}일 모아쓰는 중
+              </Text>
+            )}
+          </View>
 
           <TouchableOpacity onPress={handleHomePress}>
             <Text className="text-xs text-muted mt-[6px]">Home</Text>

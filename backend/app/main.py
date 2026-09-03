@@ -11,6 +11,7 @@ from app.api.v1.photos import router as photos_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.calendar import router as calendar_router
 from app.api.v1.webhooks import router as webhooks_router
+from app.config import settings
 from app.services.storage import ensure_bucket_exists
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,12 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작 시 MinIO 버킷 확인/생성. MinIO가 안 떠 있어도 앱은 정상 기동해야 하므로 fail-soft."""
+    if settings.BETA_ALL_PREMIUM:
+        # 끄는 걸 잊은 채 정식 출시되면 아무도 결제하지 않아도 되므로 기동마다 남긴다
+        logger.warning(
+            "BETA_ALL_PREMIUM이 켜져 있습니다 — 모든 사용자가 결제 없이 프리미엄 기능을 사용합니다"
+        )
+
     try:
         await ensure_bucket_exists()
     except Exception:
@@ -32,13 +39,10 @@ async def lifespan(app: FastAPI):
 
 
 # CORS 허용 오리진 (allowlist)
-# 네이티브 앱은 CORS 대상이 아니며, 아래는 브라우저(Expo 웹) 개발용이다.
-# TODO(출시 전): 로컬 개발용 오리진 제거 + 프론트 배포 도메인으로 교체
-ALLOWED_ORIGINS = [
-    "http://localhost:8081",  # Expo 웹 기본 포트
-    "http://localhost:19006",  # Expo 웹 (구버전 포트)
-    "http://localhost:3000",  # 웹 개발 서버 예비
-]
+# 네이티브 앱은 CORS 대상이 아니라 브라우저에서 오는 요청만 해당된다.
+# 웹으로 배포하는 화면이 없다고 프론트에서 확인받아 전부 닫았다.
+# 웹 화면이 생기면 그 배포 도메인만 여기에 추가한다.
+ALLOWED_ORIGINS: list[str] = []
 
 app = FastAPI(
     title="Roame API",

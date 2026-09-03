@@ -70,7 +70,8 @@
           "savePhotosPermission": false,
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

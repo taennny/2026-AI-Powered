@@ -2,6 +2,8 @@ import {View, Text, TouchableOpacity, Alert, Linking} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
+import {PRIVACY_POLICY_URL} from '@/constants/legal';
+
 /** 문의 채널 — 카카오 오픈채팅 */
 const SUPPORT_CHAT_URL = 'https://open.kakao.com/o/sCvGYyHi';
 
@@ -29,6 +31,15 @@ export default function SettingsScreen() {
         },
       },
     ]);
+  };
+
+  /** 심사에서 직접 눌러보는 링크라 확인 다이얼로그를 두지 않는다 */
+  const handlePrivacyPolicy = async () => {
+    try {
+      await Linking.openURL(PRIVACY_POLICY_URL);
+    } catch {
+      Alert.alert('오류', '페이지를 열지 못했어요. 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -68,7 +79,7 @@ export default function SettingsScreen() {
             <Text className="text-sm text-primary">버전 정보</Text>
             <Text className="text-[13px] text-tertiary">1.0.0</Text>
           </View>
-          <TouchableOpacity activeOpacity={0.6}>
+          <TouchableOpacity activeOpacity={0.6} onPress={handlePrivacyPolicy}>
             <Text className="text-sm text-primary">개인정보처리방침</Text>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.6} onPress={handleSupport}>

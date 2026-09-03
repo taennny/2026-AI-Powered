@@ -19,16 +19,14 @@ TaskManager.defineTask(
       timestamp: new Date(loc.timestamp).toISOString(),
     }));
     try {
-      // 업로드는 매 배치(30초)마다. 저장만 하는 가벼운 호출이고,
-      // 자주 보내야 지도 궤적이 촘촘해진다.
+      // 매 배치(30초)마다 — 가벼운 호출이고 자주 보내야 궤적이 촘촘하다
       await uploadGpsLogs(logs);
     } catch {
       // 실패는 무시 — 다음 배치에서 재시도된다
       return;
     }
 
-    // 분석은 1시간에 한 번. 그 날짜 전체를 다시 계산하는 무거운 호출이라
-    // 배치마다 부를 이유가 없다 (자세한 이유는 analyzeSchedule.ts)
+    // 1시간에 한 번 — 그 날짜 전체를 다시 계산하는 무거운 호출이다
     await analyzePeriodically();
   },
 );
