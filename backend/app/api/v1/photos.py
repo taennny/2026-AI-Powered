@@ -24,12 +24,15 @@ async def upload_photo_api(
 
     file_bytes = await photo.read()
 
-    saved = await upload_photo(
-        file_bytes=file_bytes,
-        content_type=photo.content_type,
-        user_id=current_user.id,
-        db=db,
+    try: 
+     saved = await upload_photo(
+            file_bytes=file_bytes,
+            content_type=photo.content_type,
+            user_id=current_user.id,
+            db=db,
     )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     photo_url = await get_photo_url(saved.storage_key)
 

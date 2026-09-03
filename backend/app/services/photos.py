@@ -51,7 +51,9 @@ async def upload_photo(
 ) -> Photo:
     exif = _parse_exif(file_bytes)
 
-    taken_at = exif["taken_at"] or datetime.now(timezone.utc)
+    if exif["taken_at"] is None:
+        raise ValueError("촬영 시각 정보가 없는 사진입니다")
+    taken_at = exif["taken_at"]
 
     photo_id = uuid.uuid4()
     ext = "jpg" if "jpeg" in content_type else "png"
