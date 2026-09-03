@@ -117,20 +117,44 @@ def test_moved_within_3min_not_merged():
 # accuracy 노이즈 필터
 # ──────────────────────────────────────────
 def test_filter_by_accuracy_drops_bad_keeps_unknown():
-    """accuracy가 큰(나쁜) 점만 제외하고, 0/None(값 없음)은 유지한다."""
+    """accuracy가 임계 초과(나쁜) 점만 제외하고, 0/None(값 없음)은 유지한다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
         _log(base, 37.5, 127.0, accuracy=10),  # 양호 → 유지
         _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=0),  # 값없음 → 유지
         _log(base + timedelta(minutes=2), 37.5, 127.0),  # 미지정 → 유지
-        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=200),  # 나쁨 → 제외
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=250),  # 나쁨(>200) → 제외
     ]
     filtered = gps._filter_by_accuracy(logs)
-    assert len(filtered) == 3
+    assert len(filtered) == 3  # 1개만 걸러짐(25%<50%)이라 필터 적용
     assert all(
         (not log.get("accuracy")) or log["accuracy"] <= gps.ACCURACY_MAX_M
         for log in filtered
     )
+
+
+def test_indoor_accuracy_is_kept():
+    """실내 수준 정확도(~150m)는 보존한다 — 실내 체류가 사라지면 안 됨."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=150) for m in range(0, 5)
+    ]
+    assert len(gps._filter_by_accuracy(logs)) == 5  # 150 ≤ 200 → 전부 유지
+    assert len(gps.detect_stays(logs)) == 1  # 실내 체류 살아있음
+
+
+def test_keeps_original_when_filter_drops_too_many():
+    """필터가 절반 넘게 지우면(그날 GPS 전반 불량) 원본 유지 — 왜곡 방지."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0, accuracy=250),  # 나쁨
+        _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=250),  # 나쁨
+        _log(base + timedelta(minutes=2), 37.5, 127.0, accuracy=250),  # 나쁨
+        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=10),  # 양호
+        _log(base + timedelta(minutes=4), 37.5, 127.0, accuracy=10),  # 양호
+    ]
+    # 3/5(60%)가 걸러져 40%만 남음(<50%) → 필터 취소, 원본 5개 유지
+    assert len(gps._filter_by_accuracy(logs)) == 5
 
 
 def test_bad_accuracy_point_excluded_from_stay():
@@ -141,8 +165,8 @@ def test_bad_accuracy_point_excluded_from_stay():
         _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=10),
         _log(base + timedelta(minutes=2), 37.5, 127.0, accuracy=10),
         _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=10),
-        # ~33m 이내라 반경엔 들지만 accuracy 200 → 제외되어 중심점 안 흔듦
-        _log(base + timedelta(minutes=4), 37.5003, 127.0, accuracy=200),
+        # ~33m 이내라 반경엔 들지만 accuracy 250(>200) → 제외되어 중심점 안 흔듦
+        _log(base + timedelta(minutes=4), 37.5003, 127.0, accuracy=250),
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
@@ -150,10 +174,10 @@ def test_bad_accuracy_point_excluded_from_stay():
 
 
 def test_all_bad_accuracy_falls_back_to_unfiltered():
-    """그날 GPS가 전반적으로 나쁘면(모두 임계 초과) 다 날리지 않고 원본으로 감지."""
+    """모두 임계 초과면(2점 미만 남음) 다 날리지 않고 원본으로 감지."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
-        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=200)
+        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=250)
         for m in range(0, 5)
     ]
     stays = gps.detect_stays(logs)
