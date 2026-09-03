@@ -37,22 +37,30 @@ MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
 # 정상 GPS 수집 간격은 30초. 그보다 큰 끊김이라도 이 값 이하이고 같은 자리면
 # (앱이 잠깐 종료돼 GPS가 끊긴 경우 등) 하나의 체류로 이어붙인다. 초과 시엔 경계.
 GAP_BRIDGE_MINUTES = 3
-ACCURACY_MAX_M = 100  # accuracy(오차 반경 m)가 이보다 크면 노이즈로 보고 제외
+# 실내 GPS는 정확도가 나빠(오차 ~150m) 임계값을 넉넉히 둔다. 너무 낮으면
+# 카페·식당 같은 실내 체류의 점이 통째로 걸러져 체류가 사라진다.
+ACCURACY_MAX_M = 200  # 이보다 나쁜(값 큰) 점만 노이즈로 제외
+# 필터가 절반 넘게 지우면 그날 GPS가 전반적으로 나쁜 것 → 왜곡 방지 위해 원본 유지
+ACCURACY_MIN_KEEP_RATIO = 0.5
 
 
 def _filter_by_accuracy(gps_logs: list) -> list:
-    """정확도가 나쁜(accuracy 값이 큰) GPS 점을 제외한다.
+    """정확도가 매우 나쁜(accuracy 값이 큰) GPS 점만 제외한다.
 
     accuracy 는 오차 반경(m)이라 값이 클수록 부정확. 프론트가 '값 없음'을 0으로
-    보내므로(accuracy ?? 0) 0/None 은 '모름'으로 보고 유지하고, 큰 값만 버린다.
-    필터 후 2점 미만이면(그날 GPS가 전반적으로 나쁨) 원본을 그대로 쓴다.
+    보내므로(accuracy ?? 0) 0/None 은 '모름'으로 보고 유지한다.
+    한 장소의 점을 통째로 날려 체류가 사라지는 것을 막기 위해:
+      - 임계값을 넉넉히(200m) 두어 실내 GPS를 보존하고,
+      - 필터가 점을 절반 넘게 지우면(그날 GPS 전반 불량) 원본을 그대로 쓴다.
     """
     filtered = [
         log
         for log in gps_logs
         if not log.get("accuracy") or log["accuracy"] <= ACCURACY_MAX_M
     ]
-    return filtered if len(filtered) >= 2 else gps_logs
+    if len(filtered) < 2 or len(filtered) < len(gps_logs) * ACCURACY_MIN_KEEP_RATIO:
+        return gps_logs
+    return filtered
 
 
 def detect_stays(gps_logs: list) -> list:
@@ -66,7 +74,9 @@ def detect_stays(gps_logs: list) -> list:
     if len(gps_logs) < 2:
         return []
 
+    n_input = len(gps_logs)
     gps_logs = _filter_by_accuracy(gps_logs)
+    n_kept = len(gps_logs)
 
     df = pd.DataFrame(gps_logs)
     # ISO8601 유연 파싱: 마이크로초 유무·Z/오프셋 혼합 허용, 모두 UTC로 정규화
@@ -107,6 +117,13 @@ def detect_stays(gps_logs: list) -> list:
         seg["lat"] = sum(seg["lats"]) / len(seg["lats"])
         seg["lng"] = sum(seg["lngs"]) / len(seg["lngs"])
         stays.append(seg)
+
+    logger.info(
+        "detect_stays | 입력=%d 정확도필터후=%d 체류=%d",
+        n_input,
+        n_kept,
+        len(stays),
+    )
     return stays
 
 
@@ -346,7 +363,12 @@ class Analyze(Resource):
                     }
                 )
 
-            logger.info("분석 완료 | user_id=%s 체류=%d곳", user_id, len(stays))
+            logger.info(
+                "분석 완료 | user_id=%s 입력=%d 체류=%d곳",
+                user_id,
+                len(gps_logs),
+                len(stays),
+            )
             return {"stays": stays}, 200
 
         except Exception as e:

@@ -10,9 +10,19 @@
   GET  /swagger           Swagger UI
 """
 
+import logging
+
 from dotenv import load_dotenv
 
 load_dotenv()  # config / 모듈 import 전에 .env 로드
+
+# 성공 로그(INFO)까지 stdout(docker logs)으로. 미설정 시 root 기본이 WARNING이라
+# logger.info(분석 완료 등)가 억제되고 에러만 보인다. force=True 로 확실히 적용.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    force=True,
+)
 
 from flask import Flask, jsonify  # noqa: E402
 from flask_cors import CORS  # noqa: E402
