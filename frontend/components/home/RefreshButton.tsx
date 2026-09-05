@@ -18,6 +18,15 @@ import {
 export default function RefreshButton() {
   const [isRunning, setIsRunning] = useState(false);
   const spin = useRef(new Animated.Value(0)).current;
+  // 분석이 도는 동안 탭을 옮기면 헤더가 언마운트된다
+  const mounted = useRef(true);
+
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isRunning) {
@@ -55,7 +64,7 @@ export default function RefreshButton() {
     } catch (error) {
       failure = describeAnalyzeError(error);
     } finally {
-      setIsRunning(false);
+      if (mounted.current) setIsRunning(false);
     }
 
     // 실패해도 갱신한다 — 앱이 먼저 끊었을 뿐 서버는 저장했을 수 있다
