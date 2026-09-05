@@ -9,6 +9,7 @@ class AIGpsLogItem(BaseModel):
     time: datetime
     lat: float
     lng: float
+    accuracy: float | None = None
 
 
 class AIAnalyzeRequest(BaseModel):

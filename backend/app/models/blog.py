@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Boolean, DateTime, Text, ForeignKey, Date
+from sqlalchemy import JSON, String, Boolean, DateTime, Text, ForeignKey, Date
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -26,6 +26,12 @@ class Blog(Base):
     target_date: Mapped[date] = mapped_column(Date, index=True, nullable=False)
     # 모아쓰기 종료일. 하루짜리 글은 NULL.
     period_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    # 글에 실제로 포함된 날짜 목록(ISO 문자열 배열). 하루짜리 글은 NULL(daily_record_id로 판정).
+    # 구간으로 요청이 들어와도 "기록이 있는 날짜"만 담기므로,
+    # 캘린더의 "이 날 글이 있나"(has_journal) 판정은 이 배열을 기준으로 해야
+    # 고르지 않은 날에 글이 있다고 잘못 표시되지 않는다.
+    # JSONB가 아닌 JSON을 쓰는 이유: SQLite 테스트 DB 호환.
+    target_dates: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     generation_status: Mapped[str] = mapped_column(
         String(20), server_default="pending", nullable=False
     )

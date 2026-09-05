@@ -15,11 +15,15 @@ from app.config import settings
 
 # --- 블로그 생성 요청/응답 ---
 class BlogGenerateRequest(BaseModel):
-    # 하루 모드는 daily_record_id, 기간 모드(모아쓰기)는 start_date+end_date.
-    # 둘은 배타적이며 model_validator에서 검증한다.
+    # 세 가지 모드가 있고 서로 배타적이다 (model_validator에서 검증).
+    #   1) daily_record_id       — 하루
+    #   2) start_date + end_date — 연속 구간
+    #   3) dates                 — 띄엄띄엄 고른 날짜들
+    # 어느 쪽으로 들어오든 서비스에서는 "실제 날짜 목록"으로 통일해 저장한다.
     daily_record_id: Optional[uuid.UUID] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    dates: Optional[list[date]] = None
     # 프론트는 writing_style/writingStyle, 내부/구버전은 style — 모두 수용
     # 255/20은 DB 컬럼 한계(기술적 제한) — 정책 결정 시 조정
     style: str = Field(
@@ -39,18 +43,23 @@ class BlogGenerateRequest(BaseModel):
 
     @model_validator(mode="after")
     def _check_target(self) -> "BlogGenerateRequest":
-        """하루 모드와 기간 모드 중 정확히 하나만 지정됐는지 + 기간이 유효한지 검증."""
+        """세 모드 중 정확히 하나만 지정됐는지 + 기간/날짜 목록이 유효한지 검증."""
         has_single = self.daily_record_id is not None
-        has_period = self.start_date is not None and self.end_date is not None
-        # 한쪽만 온 start_date/end_date도 "지정한 것"으로 보고 섞임을 잡는다.
+        # 한쪽만 온 start_date/end_date도 "구간 모드를 고른 것"으로 보고 섞임을 잡는다.
         # (daily_record_id + start_date만 보낸 요청을 통과시키면 안 된다)
         touched_period = self.start_date is not None or self.end_date is not None
-        if has_single == has_period or (has_single and touched_period):
+        has_period = self.start_date is not None and self.end_date is not None
+        # 빈 배열도 "dates 모드를 고른 것"이다 (아래에서 개수 검증에 걸린다)
+        touched_dates = self.dates is not None
+
+        if sum([has_single, touched_period, touched_dates]) != 1:
             raise ValueError(
-                "daily_record_id 또는 start_date/end_date 중 하나만 지정하세요"
+                "daily_record_id, start_date/end_date, dates 중 하나만 지정하세요"
             )
 
-        if has_period:
+        if touched_period:
+            if not has_period:
+                raise ValueError("start_date와 end_date를 함께 지정하세요")
             if self.end_date < self.start_date:
                 raise ValueError("end_date는 start_date보다 빠를 수 없습니다")
             days = (self.end_date - self.start_date).days + 1  # 양끝 포함
@@ -58,6 +67,18 @@ class BlogGenerateRequest(BaseModel):
                 raise ValueError(
                     f"기간은 최대 {settings.MAX_BLOG_PERIOD_DAYS}일까지 지정할 수 있습니다"
                 )
+
+        if touched_dates:
+            if not self.dates:
+                raise ValueError("dates는 최소 한 날짜 이상이어야 합니다")
+            # 중복 제거 + 오름차순 정렬해 이후 로직이 정규화된 목록만 다루게 한다
+            normalized = sorted(set(self.dates))
+            # 상한은 구간 모드와 동일하게 적용한다
+            if len(normalized) > settings.MAX_BLOG_PERIOD_DAYS:
+                raise ValueError(
+                    f"날짜는 최대 {settings.MAX_BLOG_PERIOD_DAYS}일까지 지정할 수 있습니다"
+                )
+            self.dates = normalized
 
         return self
 
@@ -86,6 +107,11 @@ class BlogResponse(BaseModel):
     target_date: date
     # 모아쓰기 종료일 (하루짜리는 None). 프론트가 "8/5~8/8" 표기에 쓴다
     period_end: Optional[date] = None
+    # 글에 실제로 포함된 날짜 목록 (하루짜리는 None). ORM의 target_dates를 그대로 노출
+    dates: Optional[list[date]] = Field(
+        default=None,
+        validation_alias=AliasChoices("dates", "target_dates"),
+    )
     generation_status: str
     is_published: bool
     visibility: str
@@ -107,6 +133,8 @@ class BlogListItem(BaseModel):
     date: date
     # 모아쓰기 종료일 (하루짜리는 None). 프론트가 "8/5~8/8" 표기에 쓴다
     period_end: Optional[date] = None
+    # 글에 실제로 포함된 날짜 목록 (하루짜리는 None)
+    dates: Optional[list[date]] = None
     title: str
     summary: Optional[str] = None
     thumbnail_url: Optional[str] = None

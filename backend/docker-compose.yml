@@ -38,7 +38,6 @@ services:
       MINIO_SECRET_KEY: ${MINIO_PASSWORD:-minioadmin123}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-roame-photos}
       AI_SERVER_URL: ${AI_SERVER_URL:-}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-random-secret-key}
       SQL_ECHO: ${SQL_ECHO:-false}
       KAKAO_REST_API_KEY: ${KAKAO_REST_API_KEY:-}
       KAKAO_REDIRECT_URI: ${KAKAO_REDIRECT_URI:-}

@@ -1,3 +1,9 @@
+import os
+
+# app.config는 import 시점에 기본 시크릿을 거부한다(운영 사고 방지).
+# 테스트는 실제 시크릿이 필요 없으므로 임의값을 미리 넣어 둔다.
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-not-used-in-production")
+
 import uuid
 from datetime import date
 from unittest.mock import patch

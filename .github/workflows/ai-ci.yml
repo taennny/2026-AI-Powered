@@ -1,0 +1,33 @@
+name: AI CI
+
+# ai/server(AI 추론 서버) 전용 테스트. 백엔드 ci.yml 과 완전히 독립이며,
+# ai/server 가 바뀐 PR 에서만 실행된다. torch/CLIP 은 설치하지 않아 가볍다(~1분).
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'ai/server/**'
+      - '.github/workflows/ai-ci.yml'
+  workflow_dispatch: {}  # Actions 탭에서 수동 실행 허용
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai/server
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.13 세팅
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: 의존성 설치 (테스트용 경량 — torch 제외)
+        run: pip install -r requirements-test.txt
+
+      - name: Pytest 실행
+        run: python -m pytest tests/ -q

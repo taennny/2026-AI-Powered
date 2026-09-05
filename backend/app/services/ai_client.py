@@ -13,7 +13,10 @@ TIMEOUT_SECONDS = 60.0  # GPT-4o 블로그 생성 고려
 
 
 async def request_blog_generation(
-    daily_record: dict, style: str, user_note: str | None = None
+    daily_record: dict,
+    style: str,
+    user_note: str | None = None,
+    style_examples: list[str] | None = None,
 ) -> dict:
     """AI 서버에 블로그 생성 요청.
 
@@ -34,6 +37,8 @@ async def request_blog_generation(
                         "style": style,
                         "user_note": user_note,
                         "daily_record": daily_record,
+                        # 유료 전용 개인화 문체: 사용자의 최근 발행 글 (없으면 빈 배열)
+                        "style_examples": style_examples or [],
                     },
                 )
                 response.raise_for_status()
