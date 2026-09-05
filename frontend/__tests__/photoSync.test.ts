@@ -108,6 +108,21 @@ describe('photoSync', () => {
       await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
     });
 
+    // iOS는 CGImage 속성 딕셔너리를 그대로 넘겨 키가 '{Exif}'다.
+    // 이걸 못 읽으면 아이폰 사진이 한 장도 안 올라간다
+    it("iOS의 '{Exif}' 키도 읽는다", async () => {
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      mockInfo.mockImplementation(async (a: MediaLibrary.Asset) => ({
+        ...withoutExif(a),
+        exif: {
+          PixelWidth: 4032,
+          '{Exif}': {DateTimeOriginal: '2026:08:06 13:00:00'},
+        },
+      }));
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+    });
+
     // 기록해두지 않으면 회차마다 같은 사진의 EXIF를 다시 읽는다
     it('건너뛴 사진도 기록해 다시 검사하지 않는다', async () => {
       mockAssets.mockResolvedValue({assets: [asset('saved')]});

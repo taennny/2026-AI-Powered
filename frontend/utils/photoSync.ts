@@ -96,7 +96,12 @@ function hasCaptureTime(info: MediaLibraryTypes.AssetInfo): boolean {
   const exif = info.exif as Record<string, unknown> | undefined;
   if (!exif) return false;
 
-  const nested = exif.Exif as Record<string, unknown> | undefined;
+  // iOS는 CGImage 속성 딕셔너리를 그대로 넘겨 키가 '{Exif}'다(중괄호 포함).
+  // 안드로이드는 평탄한 구조. 둘 다 못 찾으면 사진이 통째로 안 올라간다
+  const nested = (exif['{Exif}'] ?? exif.Exif) as
+    | Record<string, unknown>
+    | undefined;
+
   return Boolean(exif.DateTimeOriginal ?? nested?.DateTimeOriginal);
 }
 
