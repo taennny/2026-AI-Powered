@@ -15,18 +15,42 @@
 
 import {getAccessToken} from '@/utils/tokenStorage';
 
-/** JWT payload는 base64url이라 표준 base64로 바꿔서 디코드한다 */
+const BASE64_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/**
+ * base64url을 직접 푼다. `atob`는 런타임(Hermes 버전)에 따라 없을 수 있는데,
+ * 없으면 주인을 못 정해 업로드가 통째로 막힌다 — 그 위험을 지운다.
+ * payload는 ASCII(JSON)라 바이트를 그대로 문자로 읽으면 된다.
+ */
+function decodeBase64Url(input: string): string {
+  const clean = input.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+  let bits = 0;
+  let acc = 0;
+  let out = '';
+
+  for (const char of clean) {
+    const value = BASE64_ALPHABET.indexOf(char);
+    if (value === -1) throw new Error('invalid base64');
+
+    acc = (acc << 6) | value;
+    bits += 6;
+
+    if (bits >= 8) {
+      bits -= 8;
+      out += String.fromCharCode((acc >> bits) & 0xff);
+    }
+  }
+
+  return out;
+}
+
 function decodeSub(token: string): string | null {
   const payload = token.split('.')[1];
   if (!payload) return null;
 
   try {
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(
-      base64.length + ((4 - (base64.length % 4)) % 4),
-      '=',
-    );
-    const {sub} = JSON.parse(global.atob(padded));
+    const {sub} = JSON.parse(decodeBase64Url(payload));
     return typeof sub === 'string' && sub ? sub : null;
   } catch {
     return null;
