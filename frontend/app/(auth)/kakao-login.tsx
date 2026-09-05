@@ -4,6 +4,7 @@ import {ActivityIndicator, Alert, View} from 'react-native';
 
 import {useAuthStore} from '@/store/authStore';
 import {saveTokens} from '@/utils/tokenStorage';
+import {logError} from '@/utils/logError';
 
 export default function KakaoLoginScreen() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function KakaoLoginScreen() {
 
         router.replace('/(main)/(tabs)/home');
       } catch (error) {
-        console.error('카카오 딥링크 처리 오류:', error);
+        logError('kakao deeplink', error);
 
         Alert.alert(
           '카카오 로그인 실패',

@@ -20,6 +20,7 @@ import {
   fetchKakaoLinkUrl,
   type UserMe,
 } from '@/services/authApi';
+import {logError} from '@/utils/logError';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
@@ -112,7 +113,7 @@ export default function AccountScreen() {
       setUser(await fetchMe());
       Alert.alert('연동 완료', '카카오 계정이 연동됐어요.');
     } catch (error) {
-      console.log('kakao link error', error);
+      logError('kakao link', error);
       Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
     } finally {
       setLinking(false);

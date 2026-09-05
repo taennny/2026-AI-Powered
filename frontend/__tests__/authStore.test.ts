@@ -92,13 +92,13 @@ describe('tokenStorage — 보안 저장소', () => {
   });
 
   // 기본값(WHEN_UNLOCKED)이면 잠긴 동안 못 읽어, 걷는 중 GPS 업로드가 통째로 실패한다
-  it('잠금 상태에서도 읽히는 접근성으로 저장한다', async () => {
+  it('잠금 중에도 읽히고 기기를 벗어나지 않는 접근성으로 저장한다', async () => {
     await saveTokens('access-1', 'refresh-1');
 
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'accessToken',
       'access-1',
-      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK},
+      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY},
     );
   });
 
@@ -112,7 +112,7 @@ describe('tokenStorage — 보안 저장소', () => {
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
       'accessToken',
       'old-access',
-      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK},
+      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY},
     );
   });
 
