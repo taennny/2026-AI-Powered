@@ -83,6 +83,7 @@ def detect_stays(gps_logs: list) -> list:
     # (기본 추론은 첫 값 포맷을 전체에 적용해 정밀도가 섞이면 실패함)
     df["time"] = pd.to_datetime(df["time"], format="ISO8601", utc=True)
     df = df.sort_values("time").reset_index(drop=True)
+    span_min = (df["time"].iloc[-1] - df["time"].iloc[0]).total_seconds() / 60
 
     # 1) 앵커 기반 원시 군집화 (gap ≤ 3분 + 같은 자리 → 이어붙임)
     segments = []
@@ -101,9 +102,11 @@ def detect_stays(gps_logs: list) -> list:
             current = _new_segment(t, lat, lng)
     if current is not None:
         segments.append(current)
+    n_raw = len(segments)
 
     # 2) 이동/이상치(단일 점) 제거 → GPS 튐으로 갈라진 인접 체류가 다시 붙도록
     segments = [s for s in segments if len(s["lats"]) >= 2]
+    n_multi = len(segments)
 
     # 3) 같은 자리 + 짧은 간격(≤3분)으로 나뉜 체류 병합 (튐·앱 종료 복원)
     segments = _merge_adjacent(segments)
@@ -119,9 +122,12 @@ def detect_stays(gps_logs: list) -> list:
         stays.append(seg)
 
     logger.info(
-        "detect_stays | 입력=%d 정확도필터후=%d 체류=%d",
+        "detect_stays | 입력=%d 필터후=%d 시간범위=%.1f분 원시구간=%d 유효구간=%d 체류=%d",
         n_input,
         n_kept,
+        span_min,
+        n_raw,
+        n_multi,
         len(stays),
     )
     return stays
