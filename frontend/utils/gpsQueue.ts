@@ -58,14 +58,35 @@ function prune(entries: QueueEntry[], now: number): QueueEntry[] {
 }
 
 /**
+ * 큐 접근을 한 줄로 세운다 — 읽기-수정-쓰기라, 겹쳐 실행되면 한쪽 결과가 덮여
+ * 좌표가 사라진다. 건너뛰지 않고 기다리게 하는 건 그 배치를 잃지 않기 위해서다.
+ */
+let chain: Promise<unknown> = Promise.resolve();
+
+function serialize<T>(task: () => Promise<T>): Promise<T> {
+  const next = chain.then(task, task);
+  chain = next.catch(() => {});
+  return next;
+}
+
+/**
  * 새 좌표를 큐에 넣고, 지금 계정 몫을 오래된 것부터 올린다.
  * @returns 실제로 올렸으면 true
  */
-export async function queueAndUploadGpsLogs(
+export function queueAndUploadGpsLogs(
   ownerId: string,
   logs: GpsLog[],
   upload: (logs: GpsLog[]) => Promise<void>,
   now = Date.now(),
+): Promise<boolean> {
+  return serialize(() => runQueueAndUpload(ownerId, logs, upload, now));
+}
+
+async function runQueueAndUpload(
+  ownerId: string,
+  logs: GpsLog[],
+  upload: (logs: GpsLog[]) => Promise<void>,
+  now: number,
 ): Promise<boolean> {
   const stored = await read();
   const entries = prune([...stored, ...logs.map(log => ({ownerId, log}))], now);
@@ -91,10 +112,13 @@ export async function queueAndUploadGpsLogs(
   return true;
 }
 
-export async function clearGpsQueue(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(QUEUE_KEY);
-  } catch {
-    // 무시
-  }
+/** 진행 중인 큐 작업이 끝난 뒤에 지운다 — 안 그러면 지운 직후 되살아난다 */
+export function clearGpsQueue(): Promise<void> {
+  return serialize(async () => {
+    try {
+      await AsyncStorage.removeItem(QUEUE_KEY);
+    } catch {
+      // 무시
+    }
+  });
 }

@@ -144,6 +144,22 @@ describe('gpsTask', () => {
     expect(mockUpload.mock.calls[0][0]).toHaveLength(102);
   });
 
+  // 읽기-수정-쓰기라 겹쳐 돌면 한쪽 결과가 덮인다. 건너뛰면 그 배치를 잃으므로
+  // 순서를 세워 둘 다 처리해야 한다
+  it('동시에 들어와도 좌표를 잃지 않는다', async () => {
+    mockUpload.mockRejectedValue(new Error('network'));
+
+    await Promise.all([
+      run([location('2026-08-05T04:00:00.000Z')]),
+      run([location('2026-08-05T04:00:30.000Z')]),
+    ]);
+
+    mockUpload.mockReset().mockResolvedValue(undefined);
+    await run([location('2026-08-05T04:01:00.000Z')]);
+
+    expect(mockUpload.mock.calls[0][0]).toHaveLength(3);
+  });
+
   it('주인을 모르면 올리지 않는다', async () => {
     mockOwner.mockResolvedValue(null);
 
