@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -212,68 +214,80 @@ export default function WritePreviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
-      <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
-        <TouchableOpacity onPress={handleCancelPress}>
-          <Text className="text-xs text-muted">Cancel</Text>
-        </TouchableOpacity>
-
-        {!isNewBlog && (
-          <TouchableOpacity onPress={handleDeletePress}>
-            <Text className="text-xs text-red-500">Delete</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          onPress={handleSavePress}
-          disabled={!canSave || isSaving}
-        >
-          <Text
-            className={`text-xs font-bold${
-              !canSave || isSaving ? ' text-muted' : ' text-primary'
-            }`}
-          >
-            {isSaving ? 'Saving...' : 'Save'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: 20,
-          paddingBottom: 40,
-          alignItems: 'center',
-        }}
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View className="w-[90%] mb-5">
-          <Text className="text-sm font-semibold text-primary">
-            위치 기록 날짜 {formatDate(journalTargetDate)}
-          </Text>
+        <View className="px-[18px] pt-[14px] pb-3 flex-row justify-between">
+          <TouchableOpacity onPress={handleCancelPress}>
+            <Text className="text-xs text-muted">Cancel</Text>
+          </TouchableOpacity>
 
-          <Text className="mt-1 text-xs text-muted">
-            작성일 {formatDate(journalCreatedAt)}
-          </Text>
+          {!isNewBlog && (
+            <TouchableOpacity onPress={handleDeletePress}>
+              <Text className="text-xs text-red-500">Delete</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={handleSavePress}
+            disabled={!canSave || isSaving}
+          >
+            <Text
+              className={`text-xs font-bold${
+                !canSave || isSaving ? ' text-muted' : ' text-primary'
+              }`}
+            >
+              {isSaving ? 'Saving...' : 'Save'}
+            </Text>
+          </TouchableOpacity>
         </View>
-        <TextInput
-          className="text-base font-bold text-primary mb-4"
-          style={{width: '90%', padding: 0, textAlign: 'center'}}
-          value={journalTitle}
-          onChangeText={setJournalTitle}
-          placeholder="제목"
-          placeholderTextColor={tc.tertiary}
-          textAlign="center"
-        />
 
-        <TextInput
-          className="text-sm text-primary leading-[22px]"
-          style={{width: '90%', minHeight: 160, textAlign: 'center'}}
-          value={journalContent}
-          onChangeText={setJournalContent}
-          multiline
-          placeholder="내용"
-          placeholderTextColor={tc.tertiary}
-          textAlign="center"
-        />
-      </ScrollView>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingBottom: 80,
+            alignItems: 'center',
+          }}
+        >
+          <View className="w-[90%] mb-5">
+            <Text className="text-sm font-semibold text-primary">
+              위치 기록 날짜 {formatDate(journalTargetDate)}
+            </Text>
+
+            <Text className="mt-1 text-xs text-muted">
+              작성일 {formatDate(journalCreatedAt)}
+            </Text>
+          </View>
+          <TextInput
+            className="text-base font-bold text-primary mb-4"
+            style={{width: '90%', padding: 0, textAlign: 'center'}}
+            value={journalTitle}
+            onChangeText={setJournalTitle}
+            placeholder="제목"
+            placeholderTextColor={tc.tertiary}
+            textAlign="center"
+          />
+
+          <TextInput
+            className="text-sm text-primary leading-[22px]"
+            style={{width: '90%', minHeight: 160, textAlign: 'center'}}
+            value={journalContent}
+            onChangeText={setJournalContent}
+            multiline
+            placeholder="내용"
+            placeholderTextColor={tc.tertiary}
+            textAlign="center"
+          />
+
+          <View className="w-[90%] mt-10 pt-4 border-t border-line">
+            <Text className="text-[11px] text-muted text-center">
+              이 글은 AI로 생성되었습니다.
+            </Text>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
