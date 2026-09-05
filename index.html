@@ -1,11 +1,174 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
-  </head>
-  <body>
-    <p>개인정보 처리방침 데모</p>
-  </body>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Roame 베타테스트 참가자 개인정보 수집·이용 동의서</title>
+  <style>
+    :root{ --ink:#1c1f26; --mut:#5b6270; --line:#e3e5ea; --accent:#2f6b4f; }
+    *{box-sizing:border-box}
+    body{margin:0;background:#f5f6f8;color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+      line-height:1.75;font-size:15px;padding:32px 16px}
+    main{max-width:760px;margin:0 auto;background:#fff;border:1px solid var(--line);
+      border-radius:12px;padding:44px 48px 52px}
+    h1{font-size:22px;line-height:1.4;margin:0 0 18px}
+    .meta{border:1px solid var(--line);border-radius:8px;background:#fafbfc;
+      padding:14px 16px;margin:0 0 22px;font-size:14px}
+    .meta p{margin:4px 0}
+    .lead{color:#2b2e35;margin:0 0 30px}
+    section{margin:0 0 26px;padding-top:8px}
+    h2{font-size:16px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+    h2 .req{font-size:12px;font-weight:700;color:#b3392a;margin-left:6px}
+    h3{font-size:14.5px;margin:16px 0 4px}
+    p{margin:0 0 10px}
+    ul{margin:6px 0 12px;padding-left:20px}
+    li{margin:3px 0}
+    .field{color:var(--mut)}
+    .keep{background:#fafbfc;border-left:3px solid var(--accent);padding:8px 14px;margin:8px 0 0}
+    .note{background:#fff8f0;border:1px solid #f0d9bd;border-radius:8px;padding:10px 14px;font-size:14px}
+    .agree{margin-top:34px;border-top:2px solid var(--ink);padding-top:22px}
+    .agree label{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;
+      border:1px solid var(--line);border-radius:8px;margin-bottom:9px;cursor:pointer}
+    .agree input{margin-top:4px;width:17px;height:17px;flex:none}
+    .agree .opt{color:var(--mut)}
+    .sign{display:flex;gap:20px;flex-wrap:wrap;margin-top:22px;font-size:14px;color:var(--mut)}
+    .sign span{border-bottom:1px solid var(--line);min-width:180px;padding-bottom:6px}
+    .ph{color:#b3392a}
+    @media(max-width:560px){ main{padding:28px 22px} body{padding:16px 8px} }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Roame 베타테스트 참가자 개인정보 수집·이용 동의서</h1>
+
+  <p class="lead">개인정보 보호법 제15조·제22조 및 「위치정보의 보호 및 이용 등에 관한 법률」 제18조·제19조에 따라 아래와 같이 동의를 받습니다.</p>
+
+  <div class="meta">
+    <p>■ <b>서비스명</b>: Roame (로미) — AI 기반 자동 하루 기록·블로그 생성 서비스</p>
+    <p>■ <b>운영 주체</b>: PicNavi</p>
+    <p>■ <b>개인정보 보호책임자</b>: <span class="ph">[강태윤 / tae_0416yoon@kyonggi.ac.kr]</span></p>
+    <p>■ <b>베타테스트 기간</b>: <span class="ph">[2026. 09. 01.] ~ [2026. 09. 27.]</span> (운영팀 사정에 따라 조기 종료 또는 연장될 수 있음)</p>
+  </div>
+
+  <p class="lead">Roame은 참가자가 권한 요청 팝업에서 위치 권한(“항상 허용”)과 사진 접근 권한을 허용한 경우에 한하여, 스마트폰 위치를 백그라운드에서 상시(약 30초 간격) 수집하여 방문 장소를 자동으로 감지하고, 기기 갤러리의 해당 일자 사진을 자동으로 서버에 업로드하며, 이를 바탕으로 AI가 일기/블로그 글을 생성하는 서비스입니다. 아래 내용을 충분히 읽고 동의해 주시기 바랍니다.</p>
+
+  <section>
+    <h2>제1조 (개인정보 수집·이용) <span class="req">[필수]</span></h2>
+
+    <h3>1. 계정 정보</h3>
+    <ul>
+      <li><span class="field">수집 항목:</span> 이메일 주소, 비밀번호(암호화 저장), 닉네임 / 카카오 로그인 시: 카카오 회원번호, 카카오 계정 이메일·닉네임</li>
+      <li><span class="field">수집 방법:</span> 회원 가입 시 직접 입력 또는 카카오로부터 수신 (카카오가 전달하는 프로필 정보 중 위 항목만 저장)</li>
+      <li><span class="field">이용 목적:</span> 회원 식별, 로그인, 비밀번호 재설정 메일 발송, 고객 문의 대응</li>
+    </ul>
+
+    <h3>2. 사진</h3>
+    <ul>
+      <li><span class="field">수집 항목:</span> 기기 갤러리 사진 원본 파일 및 촬영 시각(EXIF 메타데이터 포함)</li>
+      <li><span class="field">수집 방법:</span> 사진 접근 권한 허용 시, 앱이 자동 선별하여 서버 업로드 (Wi-Fi 연결 시)</li>
+      <li><span class="field">이용 목적:</span> 하루 기록 타임라인 구성, AI 글 생성 시 사진 수 반영</li>
+    </ul>
+
+    <h3>3. 이용자 입력 내용</h3>
+    <ul>
+      <li><span class="field">수집 항목:</span> 방문 장소·동행자·감정/기분 메모, AI 글 생성 요청사항, 생성된 글 본문 및 수정 내용</li>
+      <li><span class="field">수집 방법:</span> 글쓰기 화면에서 직접 입력</li>
+      <li><span class="field">이용 목적:</span> AI 일기/블로그 생성 및 저장</li>
+    </ul>
+
+    <h3>4. 이용 기록</h3>
+    <ul>
+      <li><span class="field">수집 항목:</span> 일자별 방문 장소 수·사진 수·총 이동거리, 서비스 접속 기록(IP 주소 등), 구독·결제 이력(결제 이벤트 내역 및 스토어 트랜잭션 ID — 카드번호 등 결제수단 정보는 수집하지 않음)</li>
+      <li><span class="field">수집 방법:</span> 서비스 이용 중 자동 생성</li>
+      <li><span class="field">이용 목적:</span> 타임라인 제공, 구독 관리, 서비스 품질 개선 및 오류 분석</li>
+    </ul>
+
+    <p class="keep">▶ <b>보유·이용 기간:</b> 회원 탈퇴 또는 베타테스트 종료 후 90일 이내 파기합니다. 다만 결제 관련 기록은 「전자상거래 등에서의 소비자보호에 관한 법률」에 따라 5년간 보존됩니다. 정식 서비스 전환 시 데이터 이전에 대해서는 별도 재동의를 받습니다.</p>
+  </section>
+
+  <section>
+    <h2>제2조 (개인위치정보 수집·이용) <span class="req">[필수]</span></h2>
+    <p>Roame의 핵심 기능은 개인위치정보를 기반으로 하며, 「위치정보의 보호 및 이용 등에 관한 법률」에 따라 별도 동의를 받습니다.</p>
+    <ul>
+      <li><span class="field">수집 항목:</span> 위도·경도 좌표, 위치 정확도, 이동 속도, 기록 시각</li>
+      <li><span class="field">수집 방식:</span> 앱 설치 후 위치 권한(“항상 허용”) 부여 시, 앱이 화면에 켜져 있지 않은 백그라운드 상태에서도 약 30초 간격으로 상시 수집되어 서버로 전송됩니다. 기기·OS 환경에 따라 이동 중에는 이보다 짧은 간격으로 수집될 수 있습니다.</li>
+      <li><span class="field">이용 목적:</span> 체류 장소 자동 감지, 방문 장소명·주소 매칭, 이동 경로 및 이동거리 산출, 일자별 타임라인·지도 이미지 생성, AI 글 생성 소재 활용</li>
+      <li><span class="field">보유 기간:</span> 제1조의 보유 기간과 동일</li>
+      <li><span class="field">수집 중지:</span> 앱 내 설정에서 위치 기록을 끄거나, 기기 설정에서 위치 권한을 회수하여 언제든 수집을 중단할 수 있습니다. 이 경우 장소 자동 기록 기능은 이용할 수 없습니다.</li>
+    </ul>
+    <p class="note">※ <b>유의:</b> 위치정보는 권한 요청 팝업에서 참가자가 직접 허용한 경우에만 수집됩니다. 다만 권한 허용 후에는 앱 내 “위치 기록” 설정이 별도 조작 없이 켜진 상태로 유지되므로, 수집을 원하지 않는 시간대에는 설정에서 직접 꺼 주시기 바랍니다.</p>
+  </section>
+
+  <section>
+    <h2>제3조 (개인정보의 처리위탁 및 국외 이전) <span class="req">[필수]</span></h2>
+    <p>서비스 제공에 필요한 업무를 아래와 같이 외부 사업자에게 위탁하여 처리하며, 일부 수탁자는 국외(미국) 소재 사업자로 이 과정에서 개인정보가 국외로 이전됩니다.</p>
+
+    <h3>1. OpenAI, L.L.C. (미국)</h3>
+    <ul>
+      <li><span class="field">처리 항목:</span> 닉네임, 날짜, 방문 장소명·카테고리, 체류 시각, 이용자가 입력한 메모(동행자·감정·요청사항)</li>
+      <li><span class="field">위탁 업무:</span> AI 일기/블로그 본문 생성 (GPT 모델 호출)</li>
+    </ul>
+
+    <h3>2. ㈜카카오 (한국)</h3>
+    <ul>
+      <li><span class="field">처리 항목:</span> (로그인) 카카오 계정 인증 정보 / (장소 매칭) 체류 지점의 위도·경도 좌표</li>
+      <li><span class="field">위탁 업무:</span> 소셜 로그인, 주변 장소 검색 및 주소 변환</li>
+    </ul>
+
+    <h3>3. Google LLC (미국)</h3>
+    <ul>
+      <li><span class="field">처리 항목:</span> 방문 장소들의 위도·경도 좌표 (지도 이미지를 앱에서 직접 불러오는 과정에서 이용자 단말의 IP 주소가 함께 전달될 수 있음)</li>
+      <li><span class="field">위탁 업무:</span> 타임라인 지도 이미지 생성 (Static Maps)</li>
+    </ul>
+
+    <h3>4. RevenueCat, Inc. / Apple Inc. (미국)</h3>
+    <ul>
+      <li><span class="field">처리 항목:</span> 서비스 내부 이용자 식별자(UUID), 구매·구독 이벤트, App Store 영수증</li>
+      <li><span class="field">위탁 업무:</span> 인앱 구독 결제 처리 및 검증</li>
+    </ul>
+
+    <h3>5. Amazon Web Services (AWS) (<span class="ph">[리전 기재]</span>)</h3>
+    <ul>
+      <li><span class="field">처리 항목:</span> 제1조·제2조의 전체 수집 데이터 (데이터베이스 및 사진 저장소 호스팅)</li>
+      <li><span class="field">위탁 업무:</span> 서버 인프라 운영 (처리위탁)</li>
+    </ul>
+
+    <p class="keep">▶ <b>보유·이용 기간:</b> 각 수탁자의 정책에 따르되, 위탁 업무 수행 목적 달성 시까지. OpenAI API로 전송된 데이터는 OpenAI의 API 데이터 정책에 따라 모델 학습에 사용되지 않습니다.<br>▶ 위 업무는 모두 서비스 제공에 필요한 범위에서 위탁되는 것이며, 운영팀은 수탁자가 위탁 목적 외로 개인정보를 이용하지 않도록 관리·감독합니다.</p>
+  </section>
+
+  <section>
+    <h2>제4조 (사진 자동 업로드에 관한 안내)</h2>
+    <ul>
+      <li>사진 접근 권한 부여 시, 이용자가 조회하는 날짜에 촬영된 갤러리 사진이 개별 선택 절차 없이 자동으로 서버에 업로드됩니다 (Wi-Fi 연결 시, 1회 최대 20장씩 여러 차례에 걸쳐 해당 일자의 사진이 모두 업로드될 수 있음).</li>
+      <li>업로드된 사진 원본에는 촬영 기기가 기록한 EXIF 메타데이터가 포함될 수 있습니다.</li>
+      <li>서버에 저장하고 싶지 않은 사진이 있는 날에는 사진 접근 권한을 제한(“선택한 사진만 허용”)하거나 권한을 회수해 주시기 바랍니다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>제5조 (베타테스트 특약)</h2>
+    <ul>
+      <li>본 서비스는 정식 출시 전 시험 버전으로, 기능 오류·데이터 유실·서비스 중단이 발생할 수 있으며, 운영팀은 사전 고지 후 서비스를 변경·종료할 수 있습니다.</li>
+      <li>참가자가 제출한 버그 제보·설문·피드백은 서비스 개선 목적으로 이용되며, 개인을 식별할 수 없는 형태로 통계 처리될 수 있습니다.</li>
+      <li>베타테스트 중 알게 된 미공개 기능·화면 등은 운영팀의 사전 동의 없이 외부에 공개하지 않습니다.</li>
+      <li>참가자는 언제든 참가를 중단할 수 있으며, 앱 내 회원 탈퇴 시 제1조의 보유 기간 정책에 따라 데이터가 파기됩니다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>제6조 (만 14세 미만 아동의 가입 제한)</h2>
+    <ul>
+      <li>본 서비스는 만 14세 이상만 가입·이용할 수 있으며, 만 14세 미만 아동은 가입할 수 없습니다.</li>
+      <li>「개인정보 보호법」 제22조의2 및 「위치정보의 보호 및 이용 등에 관한 법률」 제25조에 따라 만 14세 미만 아동의 개인정보·개인위치정보를 처리하려면 법정대리인의 동의가 필요하나, 본 베타테스트는 법정대리인 동의 절차를 두지 않으므로 만 14세 미만 아동의 참가를 받지 않습니다.</li>
+      <li>참가자는 동의 시 만 14세 이상임을 확인하는 것으로 보며, 만 14세 미만임이 확인되는 경우 운영팀은 해당 계정을 즉시 해지하고 수집된 개인정보를 지체 없이 파기합니다.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>제7조 (동의 거부의 권리 및 불이익)</h2>
+    <p>참가자는 위 각 항목의 동의를 거부할 권리가 있습니다. 다만 제1조~제3조는 서비스 제공에 필수적인 사항으로, 동의하지 않을 경우 베타테스트에 참가할 수 없습니다. 동의 후에도 개인정보 보호책임자에게 열람·정정·삭제·처리정지를 요구할 수 있습니다.</p>
+  </section>
+</main>
+</body>
 </html>
