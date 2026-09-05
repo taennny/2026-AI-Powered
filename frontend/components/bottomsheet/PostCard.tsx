@@ -20,7 +20,9 @@ export default function PostCard({data}: Props) {
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
       <View className="flex-1">
-        <Text className="text-sm font-semibold text-primary mb-1">{timeLabel}</Text>
+        <Text className="text-sm font-semibold text-primary mb-1">
+          {timeLabel}
+        </Text>
         <Text className="text-[13px] text-medium mb-0.5">{name}</Text>
         <Text className="text-xs text-tertiary">{category}</Text>
       </View>

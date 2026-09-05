@@ -48,7 +48,10 @@ export default function HomeHeader() {
 
         <RefreshButton />
 
-        <TouchableOpacity onPress={() => router.push('/(main)/settings')} className="p-1 gap-y-[5px]">
+        <TouchableOpacity
+          onPress={() => router.push('/(main)/settings')}
+          className="p-1 gap-y-[5px]"
+        >
           <View className="w-[22px] h-[1.5px] bg-muted" />
           <View className="w-[22px] h-[1.5px] bg-muted" />
           <View className="w-[22px] h-[1.5px] bg-muted" />

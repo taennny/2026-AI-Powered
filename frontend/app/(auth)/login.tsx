@@ -98,10 +98,7 @@ export default function LoginScreen() {
       const accessToken = queryParams?.accessToken;
       const refreshToken = queryParams?.refreshToken;
 
-      if (
-        typeof accessToken !== 'string' ||
-        typeof refreshToken !== 'string'
-      ) {
+      if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
         throw new Error('토큰을 받지 못했습니다.');
       }
 

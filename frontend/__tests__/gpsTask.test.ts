@@ -119,6 +119,31 @@ describe('gpsTask', () => {
     ]);
   });
 
+  // 밀린 것을 통째로 보내면 요청이 커져 타임아웃에 걸리고, 그러면 큐가 더 커져
+  // 다시 실패한다. 한 번에 보내는 개수를 제한해 그 악순환을 막는다
+  it('한 번에 보내는 개수를 제한하고, 남은 것은 다음 배치에서 올린다', async () => {
+    mockUpload.mockRejectedValueOnce(new Error('network'));
+    const many = Array.from({length: 600}, (_, i) =>
+      location(
+        new Date(
+          Date.parse('2026-08-05T04:00:00.000Z') + i * 1000,
+        ).toISOString(),
+      ),
+    );
+    await run(many);
+
+    mockUpload.mockClear();
+    await run([location('2026-08-05T04:20:00.000Z')]);
+
+    expect(mockUpload.mock.calls[0][0]).toHaveLength(500);
+
+    mockUpload.mockClear();
+    await run([location('2026-08-05T04:21:00.000Z')]);
+
+    // 남은 100개 + 그사이 들어온 2개
+    expect(mockUpload.mock.calls[0][0]).toHaveLength(102);
+  });
+
   it('주인을 모르면 올리지 않는다', async () => {
     mockOwner.mockResolvedValue(null);
 

@@ -26,15 +26,11 @@ export default function SectionTabs() {
   const requestRefresh = useTimelineStore(state => state.requestRefresh);
 
   const homeFlex = useRef(
-    new Animated.Value(
-      activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX,
-    ),
+    new Animated.Value(activeTab === 'home' ? ACTIVE_FLEX : INACTIVE_FLEX),
   ).current;
 
   const journalFlex = useRef(
-    new Animated.Value(
-      activeTab === 'journal' ? ACTIVE_FLEX : INACTIVE_FLEX,
-    ),
+    new Animated.Value(activeTab === 'journal' ? ACTIVE_FLEX : INACTIVE_FLEX),
   ).current;
 
   useEffect(() => {
@@ -86,24 +82,24 @@ export default function SectionTabs() {
           zIndex: activeTab === 'home' ? 1 : 0,
         }}
       >
-       <TouchableOpacity
-  onPress={() => handleTabPress('home')}
-  className="items-center bg-card rounded-tr-[10px] py-3"
-  style={{
-    boxShadow:
-      activeTab === 'home'
-        ? '4px -3px 9px -3px rgba(0,0,0,0.10)'
-        : '0 -2px 6px -3px rgba(0,0,0,0.06)',
-  }}
->
-  <Text
-  className={`text-[13px] tracking-[0.3px] ${
-    activeTab === 'home'
-      ? 'font-semibold text-primary'
-      : 'font-normal text-secondary'
-  }`}
-/>
-</TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleTabPress('home')}
+          className="items-center bg-card rounded-tr-[10px] py-3"
+          style={{
+            boxShadow:
+              activeTab === 'home'
+                ? '4px -3px 9px -3px rgba(0,0,0,0.10)'
+                : '0 -2px 6px -3px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Text
+            className={`text-[13px] tracking-[0.3px] ${
+              activeTab === 'home'
+                ? 'font-semibold text-primary'
+                : 'font-normal text-secondary'
+            }`}
+          />
+        </TouchableOpacity>
       </Animated.View>
 
       <Animated.View
@@ -112,24 +108,24 @@ export default function SectionTabs() {
           zIndex: activeTab === 'journal' ? 1 : 0,
         }}
       >
-       <TouchableOpacity
-  onPress={() => handleTabPress('journal')}
-  className="items-center bg-teal rounded-tl-[10px] py-3"
-  style={{
-    boxShadow:
-      activeTab === 'journal'
-        ? '-4px -3px 9px -3px rgba(0,0,0,0.10)'
-        : '0 -2px 6px -3px rgba(0,0,0,0.06)',
-  }}
->
-  <Text
-  className={`text-[13px] tracking-[0.3px] ${
-    activeTab === 'journal'
-      ? 'font-semibold text-primary'
-      : 'font-normal text-secondary'
-  }`}
-/>
-</TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => handleTabPress('journal')}
+          className="items-center bg-teal rounded-tl-[10px] py-3"
+          style={{
+            boxShadow:
+              activeTab === 'journal'
+                ? '-4px -3px 9px -3px rgba(0,0,0,0.10)'
+                : '0 -2px 6px -3px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Text
+            className={`text-[13px] tracking-[0.3px] ${
+              activeTab === 'journal'
+                ? 'font-semibold text-primary'
+                : 'font-normal text-secondary'
+            }`}
+          />
+        </TouchableOpacity>
       </Animated.View>
     </View>
   );

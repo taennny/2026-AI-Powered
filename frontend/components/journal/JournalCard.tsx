@@ -51,7 +51,9 @@ function HighlightText({
     >
       {parts.map((part, i) =>
         part.toLowerCase() === query.toLowerCase() ? (
-          <Text key={i} style={{color: highlightColor}}>{part}</Text>
+          <Text key={i} style={{color: highlightColor}}>
+            {part}
+          </Text>
         ) : (
           part
         ),
@@ -74,21 +76,21 @@ export default function JournalCard({data, query = ''}: Props) {
       className="bg-surface rounded-[14px] px-4 py-[14px] mb-[10px]"
       style={{boxShadow: '0 1px 4px rgba(0,0,0,0.06)'}}
     >
-<View className="mb-2">
-  <HighlightText
-    text={`위치 기록일 ${formatDateStr(data.date)}`}
-    query={query}
-    className="text-[13px] font-semibold text-primary"
-    highlightColor={tc.tealAccent}
-  />
+      <View className="mb-2">
+        <HighlightText
+          text={`위치 기록일 ${formatDateStr(data.date)}`}
+          query={query}
+          className="text-[13px] font-semibold text-primary"
+          highlightColor={tc.tealAccent}
+        />
 
-  <HighlightText
-    text={`작성일 ${formatDateFromISO(data.created_at)}`}
-    query={query}
-    className="text-[11px] text-tertiary mt-1"
-    highlightColor={tc.tealAccent}
-  />
-</View>
+        <HighlightText
+          text={`작성일 ${formatDateFromISO(data.created_at)}`}
+          query={query}
+          className="text-[11px] text-tertiary mt-1"
+          highlightColor={tc.tealAccent}
+        />
+      </View>
       <HighlightText
         text={data.title}
         query={query}

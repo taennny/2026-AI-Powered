@@ -91,7 +91,10 @@ describe('photoSync', () => {
       mockInfo.mockImplementation(async (a: MediaLibrary.Asset) =>
         a.id === 'saved'
           ? withoutExif(a)
-          : {...withoutExif(a), exif: {DateTimeOriginal: '2026:08:06 13:00:00'}},
+          : {
+              ...withoutExif(a),
+              exif: {DateTimeOriginal: '2026:08:06 13:00:00'},
+            },
       );
 
       await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
@@ -166,7 +169,9 @@ describe('photoSync', () => {
     mockUpload.mockClear();
 
     mockAssets.mockResolvedValue({assets: [asset('a'), asset('b')]});
-    await expect(syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS)).resolves.toBe(1);
+    await expect(
+      syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS),
+    ).resolves.toBe(1);
     expect(uploadedIds()).toEqual(['b.jpg']);
   });
 
@@ -250,7 +255,9 @@ describe('photoSync', () => {
       await syncPhotosForDate(TODAY, NOW);
       mockAssets.mockClear().mockResolvedValue({assets: [asset('b')]});
 
-      await expect(syncPhotosForDate('2026-07-01', NOW + 1000)).resolves.toBe(1);
+      await expect(syncPhotosForDate('2026-07-01', NOW + 1000)).resolves.toBe(
+        1,
+      );
     });
 
     it('고른 날짜의 범위로 조회한다', async () => {

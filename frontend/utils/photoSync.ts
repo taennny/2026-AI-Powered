@@ -68,7 +68,9 @@ async function writeUploadedIds(ids: Set<string>): Promise<void> {
 }
 
 /** 셀룰러로 수백 MB를 올리면 안 된다. 확인이 안 되면 올리지 않는다 */
-async function isOnWifi(Network: typeof import('expo-network')): Promise<boolean> {
+async function isOnWifi(
+  Network: typeof import('expo-network'),
+): Promise<boolean> {
   try {
     const state = await Network.getNetworkStateAsync();
     return state.type === Network.NetworkStateType.WIFI;

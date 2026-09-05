@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import {uploadGpsLogs} from '@/services/gpsApi';
 import {analyzePeriodically} from '@/utils/analyzeSchedule';
 import {getCurrentUserId} from '@/utils/currentUser';
-import {enqueueGpsLogs, flushGpsLogs} from '@/utils/gpsQueue';
+import {queueAndUploadGpsLogs} from '@/utils/gpsQueue';
 
 export const GPS_TASK_NAME = 'roame-gps-task';
 
@@ -25,10 +25,8 @@ TaskManager.defineTask(
     const ownerId = await getCurrentUserId();
     if (!ownerId) return;
 
-    await enqueueGpsLogs(ownerId, logs);
-
     // 밀린 것까지 같이 올라간다 — 실패하면 큐에 남아 다음 배치에서 재시도된다
-    if (!(await flushGpsLogs(ownerId, uploadGpsLogs))) return;
+    if (!(await queueAndUploadGpsLogs(ownerId, logs, uploadGpsLogs))) return;
 
     // 1시간에 한 번 — 그 날짜 전체를 다시 계산하는 무거운 호출이다
     await analyzePeriodically();

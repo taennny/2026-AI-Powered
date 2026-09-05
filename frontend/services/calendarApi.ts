@@ -1,7 +1,7 @@
 import {api} from '@/utils/api';
 
 export type CalendarDay = {
-  date: string;          // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
   has_journal: boolean;
   has_timeline: boolean;
 };
@@ -20,11 +20,11 @@ export type TimelinePlace = {
   left_at: string;
   lat: number;
   lng: number;
-  photos?: string[];     // 촬영된 사진 url 목록
+  photos?: string[]; // 촬영된 사진 url 목록
 };
 
 export type TimelineData = {
-  date: string;          // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
   /**

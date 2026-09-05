@@ -39,7 +39,9 @@ export function useCalendar() {
     cachedMonth?.key === monthKey(viewDate) ? cachedMonth.days : [],
   );
   const [places, setPlaces] = useState<TimelinePlace[]>(() =>
-    cachedTimeline?.key === toDateKey(selectedDate) ? cachedTimeline.places : [],
+    cachedTimeline?.key === toDateKey(selectedDate)
+      ? cachedTimeline.places
+      : [],
   );
   const setTimeline = useTimelineStore(s => s.setTimeline);
   const setDailyRecordId = useTimelineStore(s => s.setDailyRecordId);
@@ -90,10 +92,6 @@ export function useCalendar() {
     loadTimeline();
   }, [loadTimeline, refreshKey]);
 
-  /**
-   * 오늘만 올린다. 과거 날짜는 analyze를 다시 돌릴 경로가 없어 `daily_record_id`가
-   * 채워지지 않고, 카드에 붙지 못한 채 용량만 쓴다.
-   */
   useEffect(() => {
     const dateKey = toDateKey(selectedDate);
     if (dateKey !== toDateKey(logicalToday())) return;

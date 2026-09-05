@@ -1,18 +1,17 @@
 import {api} from '@/utils/api';
 
-
 export async function deleteBlog(blogId: string): Promise<void> {
   await api.delete(`/api/v1/blog/${blogId}`);
 }
 
 export type JournalData = {
   id: string;
-  date: string;              // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
   title: string;
-  summary: string | null;    // 카드 미리보기용 (본문 앞 100자, nullable)
+  summary: string | null; // 카드 미리보기용 (본문 앞 100자, nullable)
   thumbnail_url: string | null;
   is_published: boolean;
-  created_at: string;        // ISO 8601
+  created_at: string; // ISO 8601
 };
 
 export type BlogsResponse = {
@@ -24,12 +23,14 @@ export type BlogsResponse = {
 
 type FetchBlogsParams = {
   q?: string;
-  date?: string;   // 'YYYY-MM-DD'
+  date?: string; // 'YYYY-MM-DD'
   page?: number;
   size?: number;
 };
 
-export async function fetchBlogs(params: FetchBlogsParams = {}): Promise<BlogsResponse> {
+export async function fetchBlogs(
+  params: FetchBlogsParams = {},
+): Promise<BlogsResponse> {
   const {data} = await api.get<BlogsResponse>('/api/v1/blogs', {params});
   return data;
 }
@@ -84,7 +85,7 @@ export type BlogDetail = {
   target_date: string;
   created_at: string;
   photo_urls?: string[];
-}
+};
 export async function generateBlog(
   body: GenerateBlogRequest,
 ): Promise<GenerateBlogResponse> {
@@ -110,7 +111,9 @@ export async function fetchBlogDetail(blogId: string): Promise<BlogDetail> {
   return data;
 }
 
-export async function waitForBlogGeneration(blogId: string): Promise<BlogDetail> {
+export async function waitForBlogGeneration(
+  blogId: string,
+): Promise<BlogDetail> {
   const maxRetryCount = 15;
 
   for (let i = 0; i < maxRetryCount; i += 1) {
@@ -142,4 +145,3 @@ export async function updateBlog(
   const {data} = await api.put<BlogDetail>(`/api/v1/blog/${blogId}`, body);
   return data;
 }
-

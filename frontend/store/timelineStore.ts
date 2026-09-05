@@ -13,9 +13,9 @@ type TimelineStore = {
 
 export const useTimelineStore = create<TimelineStore>(set => ({
   placesCount: 0,
-  setTimeline: (count) => set({placesCount: count}),
+  setTimeline: count => set({placesCount: count}),
   dailyRecordId: null,
-  setDailyRecordId: (id) => set({dailyRecordId: id}),
+  setDailyRecordId: id => set({dailyRecordId: id}),
   refreshKey: 0,
   requestRefresh: () => set(s => ({refreshKey: s.refreshKey + 1})),
 }));

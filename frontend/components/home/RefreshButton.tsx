@@ -46,9 +46,11 @@ export default function RefreshButton() {
 
     try {
       // 사진을 먼저 올려야 analyze가 그 사진을 장소에 잇는다
-      await syncPhotosForDate(toDateKey(logicalToday()), Date.now(), true).catch(
-        () => 0,
-      );
+      await syncPhotosForDate(
+        toDateKey(logicalToday()),
+        Date.now(),
+        true,
+      ).catch(() => 0);
       await analyzeNow();
     } catch (error) {
       failure = describeAnalyzeError(error);

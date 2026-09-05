@@ -19,6 +19,12 @@ const QUEUE_KEY = 'gps:queue';
 const MAX_ENTRIES = 5000;
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * 한 요청에 실어 보내는 최대 개수. 밀린 것을 통째로 보내면 요청이 커져
+ * 타임아웃(15초)에 걸리고, 그러면 큐가 더 커져 다시 실패하는 악순환이 된다.
+ */
+const MAX_UPLOAD_PER_RUN = 500;
+
 type QueueEntry = {
   ownerId: string;
   log: GpsLog;
@@ -51,43 +57,37 @@ function prune(entries: QueueEntry[], now: number): QueueEntry[] {
   return alive.length > MAX_ENTRIES ? alive.slice(-MAX_ENTRIES) : alive;
 }
 
-export async function enqueueGpsLogs(
+/**
+ * 새 좌표를 큐에 넣고, 지금 계정 몫을 오래된 것부터 올린다.
+ * @returns 실제로 올렸으면 true
+ */
+export async function queueAndUploadGpsLogs(
   ownerId: string,
   logs: GpsLog[],
-  now = Date.now(),
-): Promise<void> {
-  if (logs.length === 0) return;
-
-  const entries = await read();
-  const added = logs.map(log => ({ownerId, log}));
-  await write(prune([...entries, ...added], now));
-}
-
-/**
- * 지금 계정 몫만 올린다. 성공하면 큐에서 지우고, 실패하면 그대로 둬 다음에 다시 시도한다.
- * 다른 계정 몫은 건드리지 않는다 — 그 계정으로 로그인하면 그때 올라간다.
- */
-export async function flushGpsLogs(
-  ownerId: string,
   upload: (logs: GpsLog[]) => Promise<void>,
   now = Date.now(),
 ): Promise<boolean> {
-  const entries = prune(await read(), now);
+  const stored = await read();
+  const entries = prune([...stored, ...logs.map(log => ({ownerId, log}))], now);
 
   const mine = entries.filter(e => e.ownerId === ownerId);
+
   if (mine.length === 0) {
-    await write(entries);
+    if (entries.length !== stored.length) await write(entries);
     return false;
   }
 
+  const batch = mine.slice(0, MAX_UPLOAD_PER_RUN);
+
   try {
-    await upload(mine.map(e => e.log));
+    await upload(batch.map(e => e.log));
   } catch {
     await write(entries);
     return false;
   }
 
-  await write(entries.filter(e => e.ownerId !== ownerId));
+  const sent = new Set(batch);
+  await write(entries.filter(e => !sent.has(e)));
   return true;
 }
 

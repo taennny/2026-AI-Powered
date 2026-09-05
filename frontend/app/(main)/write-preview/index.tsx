@@ -27,13 +27,11 @@ function invalidateCaches() {
   clearJournalCache();
 }
 
-
 export default function WritePreviewScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {blogId, title, content, targetData, createdAt} =
-  useLocalSearchParams<{
+  const {blogId, title, content, targetData, createdAt} = useLocalSearchParams<{
     blogId?: string;
     title?: string;
     content?: string;
@@ -81,92 +79,95 @@ export default function WritePreviewScreen() {
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
   const formatDate = (date?: string) => {
-  if (!date) return '-';
+    if (!date) return '-';
 
-  const parsedDate = new Date(date);
+    const parsedDate = new Date(date);
 
-  if (Number.isNaN(parsedDate.getTime())) {
-    return date;
-  }
+    if (Number.isNaN(parsedDate.getTime())) {
+      return date;
+    }
 
-  return parsedDate.toLocaleDateString('ko-KR');
-};
+    return parsedDate.toLocaleDateString('ko-KR');
+  };
 
- const handleCancelPress = () => {
-  Alert.alert(
-    isNewBlog ? '작성 취소' : '수정 취소',
-    isNewBlog
-      ? '생성한 글을 삭제하고 작성을 취소할까요?'
-      : '수정한 내용을 저장하지 않고 나갈까요?',
-    [
-      {text: '계속 작성', style: 'cancel'},
-      {
-        text: '취소',
-        style: 'destructive',
-        onPress: async () => {
-          if (isNewBlog && blogId) {
+  const handleCancelPress = () => {
+    Alert.alert(
+      isNewBlog ? '작성 취소' : '수정 취소',
+      isNewBlog
+        ? '생성한 글을 삭제하고 작성을 취소할까요?'
+        : '수정한 내용을 저장하지 않고 나갈까요?',
+      [
+        {text: '계속 작성', style: 'cancel'},
+        {
+          text: '취소',
+          style: 'destructive',
+          onPress: async () => {
+            if (isNewBlog && blogId) {
+              try {
+                await deleteBlog(blogId);
+                invalidateCaches();
+              } catch {
+                Alert.alert(
+                  '오류',
+                  '글을 삭제하지 못했습니다. 다시 시도해주세요.',
+                );
+                return;
+              }
+            }
+
+            router.replace('/(main)/(tabs)/journal-list');
+          },
+        },
+      ],
+    );
+  };
+
+  /**
+   * 안드로이드 뒤로가기를 Cancel과 같은 경로로 — 그냥 두면 생성한 글이
+   * 서버에 남은 채 화면만 사라진다. iOS는 제스처를 꺼서 막았다.
+   */
+  const backActionRef = useRef<() => void>(() => {});
+  backActionRef.current = () => {
+    if (isSaving) return;
+    handleCancelPress();
+  };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        backActionRef.current();
+        return true; // 기본 뒤로가기 차단 — 이동은 확인 후 handleCancelPress가 한다
+      },
+    );
+
+    return () => subscription.remove();
+  }, []);
+
+  const handleDeletePress = () => {
+    if (!blogId) return;
+
+    Alert.alert(
+      '글 삭제',
+      '정말 이 글을 삭제하시겠습니까?\n삭제해도 생성 횟수는 돌아오지 않습니다.',
+      [
+        {text: '취소', style: 'cancel'},
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
             try {
               await deleteBlog(blogId);
               invalidateCaches();
+              router.replace('/(main)/(tabs)/journal-list');
             } catch {
-              Alert.alert(
-                '오류',
-                '글을 삭제하지 못했습니다. 다시 시도해주세요.',
-              );
-              return;
+              Alert.alert('오류', '글을 삭제하지 못했습니다.');
             }
-          }
-
-          router.replace('/(main)/(tabs)/journal-list');
+          },
         },
-      },
-    ],
-  );
-};
-
-/**
- * 안드로이드 뒤로가기를 Cancel과 같은 경로로 — 그냥 두면 생성한 글이
- * 서버에 남은 채 화면만 사라진다. iOS는 제스처를 꺼서 막았다.
- */
-const backActionRef = useRef<() => void>(() => {});
-backActionRef.current = () => {
-  if (isSaving) return;
-  handleCancelPress();
-};
-
-useEffect(() => {
-  const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-    backActionRef.current();
-    return true; // 기본 뒤로가기 차단 — 이동은 확인 후 handleCancelPress가 한다
-  });
-
-  return () => subscription.remove();
-}, []);
-
-const handleDeletePress = () => {
-  if (!blogId) return;
-
-  Alert.alert(
-    '글 삭제',
-    '정말 이 글을 삭제하시겠습니까?\n삭제해도 생성 횟수는 돌아오지 않습니다.',
-    [
-      {text: '취소', style: 'cancel'},
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteBlog(blogId);
-            invalidateCaches();
-            router.replace('/(main)/(tabs)/journal-list');
-          } catch {
-            Alert.alert('오류', '글을 삭제하지 못했습니다.');
-          }
-        },
-      },
-    ],
-  );
-};
+      ],
+    );
+  };
   const handleSavePress = async () => {
     if (!canSave) {
       Alert.alert('알림', '제목과 내용을 입력해주세요.');
@@ -191,8 +192,7 @@ const handleDeletePress = () => {
       Alert.alert('완료', '글이 저장되었습니다.', [
         {
           text: '확인',
-          onPress: () =>
-            router.replace('/(main)/(tabs)/journal-list'),
+          onPress: () => router.replace('/(main)/(tabs)/journal-list'),
         },
       ]);
     } catch {
@@ -218,11 +218,10 @@ const handleDeletePress = () => {
         </TouchableOpacity>
 
         {!isNewBlog && (
-    <TouchableOpacity onPress={handleDeletePress}>
-      <Text className="text-xs text-red-500">Delete</Text>
-    </TouchableOpacity>
-  )}
-
+          <TouchableOpacity onPress={handleDeletePress}>
+            <Text className="text-xs text-red-500">Delete</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           onPress={handleSavePress}
@@ -246,14 +245,14 @@ const handleDeletePress = () => {
         }}
       >
         <View className="w-[90%] mb-5">
-  <Text className="text-sm font-semibold text-primary">
-  위치 기록 날짜 {formatDate(journalTargetDate)}
-</Text>
+          <Text className="text-sm font-semibold text-primary">
+            위치 기록 날짜 {formatDate(journalTargetDate)}
+          </Text>
 
-<Text className="mt-1 text-xs text-muted">
-  작성일 {formatDate(journalCreatedAt)}
-</Text>
-</View>
+          <Text className="mt-1 text-xs text-muted">
+            작성일 {formatDate(journalCreatedAt)}
+          </Text>
+        </View>
         <TextInput
           className="text-base font-bold text-primary mb-4"
           style={{width: '90%', padding: 0, textAlign: 'center'}}

@@ -1,5 +1,12 @@
 import {useMemo, useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback} from 'react-native';
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 import {useRouter} from 'expo-router';
 
 import {signup} from '@/services/authApi';
@@ -42,28 +49,35 @@ export default function SignupScreen() {
       isPrivacyPolicyChecked &&
       isAgeConfirmed
     );
-  }, [email, password, nickname, isServiceTermsChecked, isPrivacyPolicyChecked, isAgeConfirmed]);
+  }, [
+    email,
+    password,
+    nickname,
+    isServiceTermsChecked,
+    isPrivacyPolicyChecked,
+    isAgeConfirmed,
+  ]);
 
   const handleEmailChange = (text: string) => {
-  setEmail(text);
+    setEmail(text);
 
-  const trimmedEmail = text.trim();
+    const trimmedEmail = text.trim();
 
-  if (!trimmedEmail) {
-    setEmailGuideMessage('');
-    setEmailGuideColor('#CCCCCC');
-    return;
-  }
+    if (!trimmedEmail) {
+      setEmailGuideMessage('');
+      setEmailGuideColor('#CCCCCC');
+      return;
+    }
 
-  if (EMAIL_REGEX.test(trimmedEmail)) {
-    setEmailGuideMessage('사용 가능한 이메일 형식입니다.');
-    setEmailGuideColor('#4EF5F9');
-    return;
-  }
+    if (EMAIL_REGEX.test(trimmedEmail)) {
+      setEmailGuideMessage('사용 가능한 이메일 형식입니다.');
+      setEmailGuideColor('#4EF5F9');
+      return;
+    }
 
-  setEmailGuideMessage('이메일 형식을 확인해주세요.');
-  setEmailGuideColor('#FF3B30');
-};
+    setEmailGuideMessage('이메일 형식을 확인해주세요.');
+    setEmailGuideColor('#FF3B30');
+  };
 
   const handlePasswordChange = (text: string) => {
     setPassword(text);
@@ -80,27 +94,27 @@ export default function SignupScreen() {
     setPasswordGuideMessage('비밀번호 형식이 아닙니다.');
     setPasswordGuideColor('#FF0000');
   };
-  
+
   const handleNicknameChange = (text: string) => {
-  setNickname(text);
+    setNickname(text);
 
-  const trimmed = text.trim();
+    const trimmed = text.trim();
 
-  if (!trimmed) {
-    setNicknameGuideMessage('');
-    setNicknameGuideColor('#CCCCCC');
-    return;
-  }
+    if (!trimmed) {
+      setNicknameGuideMessage('');
+      setNicknameGuideColor('#CCCCCC');
+      return;
+    }
 
-  if (NICKNAME_REGEX.test(trimmed)) {
-    setNicknameGuideMessage('사용 가능한 닉네임입니다.');
-    setNicknameGuideColor('#4EF5F9');
-    return;
-  }
+    if (NICKNAME_REGEX.test(trimmed)) {
+      setNicknameGuideMessage('사용 가능한 닉네임입니다.');
+      setNicknameGuideColor('#4EF5F9');
+      return;
+    }
 
-  setNicknameGuideMessage('2~10자의 한글, 영문, 숫자만 가능합니다.');
-  setNicknameGuideColor('#FF3B30');
-};
+    setNicknameGuideMessage('2~10자의 한글, 영문, 숫자만 가능합니다.');
+    setNicknameGuideColor('#FF3B30');
+  };
 
   const handleSignupPress = async () => {
     if (!isSignupButtonEnabled || isLoading) return;
@@ -111,14 +125,16 @@ export default function SignupScreen() {
       setPasswordGuideMessage('');
       setNicknameGuideMessage('');
 
-      await signup({email: email.trim(),password,nickname: nickname.trim(),});
+      await signup({email: email.trim(), password, nickname: nickname.trim()});
 
       router.replace('/(auth)/login');
     } catch (error: any) {
       const status = error?.response?.status;
 
       if (status === 400 || status === 422) {
-        setPasswordGuideMessage('이메일 형식 또는 비밀번호 조건을 확인해주세요.');
+        setPasswordGuideMessage(
+          '이메일 형식 또는 비밀번호 조건을 확인해주세요.',
+        );
         setPasswordGuideColor('#FF3B30');
       } else if (status === 409) {
         setEmailGuideMessage('중복된 이메일입니다.');
@@ -138,128 +154,150 @@ export default function SignupScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
-      <BackButton />
-      <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
-        Roa{'\n'}me
-      </Text>
-
-      <View className="mb-[10px]">
-        <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">이메일</Text>
-          <Text style={{color: emailGuideColor}} className="text-[10px] leading-[10px]">
-            {emailGuideMessage}
-          </Text>
-        </View>
-        <TextInput
-          value={email}
-          onChangeText={handleEmailChange}
-          placeholder="이메일을 입력해주세요."
-          placeholderTextColor="#CCCCCC"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
-        />
-      </View>
-
-      <View className="mb-[6px]">
-        <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">비밀번호</Text>
-          <Text style={{color: passwordGuideColor}} className="text-[10px] leading-[10px]">
-            {passwordGuideMessage}
-          </Text>
-        </View>
-        <TextInput
-          value={password}
-          onChangeText={handlePasswordChange}
-          placeholder="비밀번호를 입력해주세요."
-          placeholderTextColor="#CCCCCC"
-          secureTextEntry
-          autoCapitalize="none"
-          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
-        />
-        <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
-          8자 이상, 영문·숫자·특수문자를 모두 포함해주세요.
+      <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
+        <BackButton />
+        <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
+          Roa{'\n'}me
         </Text>
-      </View>
 
-      <View className="mb-[10px]">
-        <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">닉네임</Text>
-        <Text
-    style={{color: nicknameGuideColor}}
-    className="text-[10px] leading-[10px]"
-  >
-    {nicknameGuideMessage}
-  </Text>
-</View>
-        <TextInput
-          value={nickname}
-          onChangeText={handleNicknameChange}
-          placeholder="닉네임을 입력해주세요."
-          placeholderTextColor="#CCCCCC"
-          autoCapitalize="none"
-          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
-        />
-      </View>
-      <View className="mt-[18px] mb-[20px]">
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setIsServiceTermsChecked(v => !v)}
-          className="flex-row items-center mb-[8px]"
-        >
-          <View className={checkboxBaseStyle}>
-            {isServiceTermsChecked ? <View className={checkboxInnerStyle} /> : null}
+        <View className="mb-[10px]">
+          <View className="flex-row items-center justify-between mb-[6px]">
+            <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
+              이메일
+            </Text>
+            <Text
+              style={{color: emailGuideColor}}
+              className="text-[10px] leading-[10px]"
+            >
+              {emailGuideMessage}
+            </Text>
           </View>
-          <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
-            서비스 이용약관 동의
+          <TextInput
+            value={email}
+            onChangeText={handleEmailChange}
+            placeholder="이메일을 입력해주세요."
+            placeholderTextColor="#CCCCCC"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          />
+        </View>
+
+        <View className="mb-[6px]">
+          <View className="flex-row items-center justify-between mb-[6px]">
+            <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
+              비밀번호
+            </Text>
+            <Text
+              style={{color: passwordGuideColor}}
+              className="text-[10px] leading-[10px]"
+            >
+              {passwordGuideMessage}
+            </Text>
+          </View>
+          <TextInput
+            value={password}
+            onChangeText={handlePasswordChange}
+            placeholder="비밀번호를 입력해주세요."
+            placeholderTextColor="#CCCCCC"
+            secureTextEntry
+            autoCapitalize="none"
+            className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          />
+          <Text className="text-[9px] leading-[9px] text-[#CCCCCC] text-right mt-[4px]">
+            8자 이상, 영문·숫자·특수문자를 모두 포함해주세요.
           </Text>
-          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">{'>'}</Text>
-        </TouchableOpacity>
+        </View>
+
+        <View className="mb-[10px]">
+          <View className="flex-row items-center justify-between mb-[6px]">
+            <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
+              닉네임
+            </Text>
+            <Text
+              style={{color: nicknameGuideColor}}
+              className="text-[10px] leading-[10px]"
+            >
+              {nicknameGuideMessage}
+            </Text>
+          </View>
+          <TextInput
+            value={nickname}
+            onChangeText={handleNicknameChange}
+            placeholder="닉네임을 입력해주세요."
+            placeholderTextColor="#CCCCCC"
+            autoCapitalize="none"
+            className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          />
+        </View>
+        <View className="mt-[18px] mb-[20px]">
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setIsServiceTermsChecked(v => !v)}
+            className="flex-row items-center mb-[8px]"
+          >
+            <View className={checkboxBaseStyle}>
+              {isServiceTermsChecked ? (
+                <View className={checkboxInnerStyle} />
+              ) : null}
+            </View>
+            <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
+              서비스 이용약관 동의
+            </Text>
+            <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
+              {'>'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setIsPrivacyPolicyChecked(v => !v)}
+            className="flex-row items-center mb-[8px]"
+          >
+            <View className={checkboxBaseStyle}>
+              {isPrivacyPolicyChecked ? (
+                <View className={checkboxInnerStyle} />
+              ) : null}
+            </View>
+            <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
+              개인정보 수집 및 이용 동의
+            </Text>
+            <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
+              {'>'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setIsAgeConfirmed(v => !v)}
+            className="flex-row items-center"
+          >
+            <View className={checkboxBaseStyle}>
+              {isAgeConfirmed ? <View className={checkboxInnerStyle} /> : null}
+            </View>
+            <Text className="text-[11px] leading-[11px] text-[#6E6E73]">
+              만 14세 이상입니다.
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setIsPrivacyPolicyChecked(v => !v)}
-          className="flex-row items-center mb-[8px]"
-        >
-          <View className={checkboxBaseStyle}>
-            {isPrivacyPolicyChecked ? <View className={checkboxInnerStyle} /> : null}
-          </View>
-          <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
-            개인정보 수집 및 이용 동의
-          </Text>
-          <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">{'>'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setIsAgeConfirmed(v => !v)}
-          className="flex-row items-center"
-        >
-          <View className={checkboxBaseStyle}>
-            {isAgeConfirmed ? <View className={checkboxInnerStyle} /> : null}
-          </View>
-          <Text className="text-[11px] leading-[11px] text-[#6E6E73]">만 14세 이상입니다.</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        activeOpacity={0.85}
-        disabled={!isSignupButtonEnabled || isLoading}
-        onPress={handleSignupPress}
-        className={`self-end w-[58px] h-[22px] rounded-[4px] items-center justify-center ${
-          isSignupButtonEnabled ? 'bg-primary' : 'bg-[#E5E5EA]'
-        }`}
-      >
-        <Text
-          className={`text-[10px] leading-[10px] ${
-            isSignupButtonEnabled ? 'text-white' : 'text-[#8E8E93]'
+          activeOpacity={0.85}
+          disabled={!isSignupButtonEnabled || isLoading}
+          onPress={handleSignupPress}
+          className={`self-end w-[58px] h-[22px] rounded-[4px] items-center justify-center ${
+            isSignupButtonEnabled ? 'bg-primary' : 'bg-[#E5E5EA]'
           }`}
         >
-          {isLoading ? '로딩중' : '회원가입'}
-        </Text>
-      </TouchableOpacity>
-    </View>
+          <Text
+            className={`text-[10px] leading-[10px] ${
+              isSignupButtonEnabled ? 'text-white' : 'text-[#8E8E93]'
+            }`}
+          >
+            {isLoading ? '로딩중' : '회원가입'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </TouchableWithoutFeedback>
   );
 }

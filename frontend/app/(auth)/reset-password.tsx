@@ -68,8 +68,13 @@ export default function ResetPasswordScreen() {
 
       <View className="mb-[22px]">
         <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">새 비밀번호 입력</Text>
-          <Text style={{color: passwordGuideColor}} className="text-[10px] leading-[10px]">
+          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
+            새 비밀번호 입력
+          </Text>
+          <Text
+            style={{color: passwordGuideColor}}
+            className="text-[10px] leading-[10px]"
+          >
             {passwordGuideMessage}
           </Text>
         </View>
