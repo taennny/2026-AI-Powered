@@ -93,17 +93,11 @@ describe('analyzeSchedule', () => {
       expect(analyzedDates()).toEqual(['2026-08-05']);
     });
 
-    it('daily_record_id를 주면 store에 넣는다 — 글쓰기에 필요하다', async () => {
-      mockAnalyze.mockResolvedValue({daily_record_id: 'rec-1'});
-
-      await analyzePeriodically(T);
-
-      expect(useTimelineStore.getState().dailyRecordId).toBe('rec-1');
-    });
-
-    it('daily_record_id가 없으면 기존 값을 덮어쓰지 않는다', async () => {
+    // 응답의 id는 늘 분석한 날짜('오늘') 것이라, 어제를 보고 있으면 화면과 어긋난다.
+    // 글쓰기 대상은 고른 날짜를 조회하는 useCalendar가 정한다.
+    it('daily_record_id를 store에 넣지 않는다', async () => {
       useTimelineStore.setState({dailyRecordId: 'rec-old'});
-      mockAnalyze.mockResolvedValue({daily_record_id: null});
+      mockAnalyze.mockResolvedValue({daily_record_id: 'rec-today'});
 
       await analyzePeriodically(T);
 

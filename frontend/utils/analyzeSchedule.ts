@@ -9,7 +9,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {analyzeGpsLogs} from '@/services/gpsApi';
-import {useTimelineStore} from '@/store/timelineStore';
 import {toLogicalDateKey} from '@/utils/formatDate';
 
 /** 마지막으로 analyze에 성공한 논리 날짜('YYYY-MM-DD') */
@@ -41,15 +40,13 @@ async function writeLastAnalyzedDate(dateKey: string): Promise<void> {
 }
 
 /**
- * 프론트 타임아웃(15초)이 서버(30초)보다 짧아 여기서 실패해도 서버는 저장한다 —
- * 실패로 잃는 건 `daily_record_id`뿐이다.
+ * 응답의 `daily_record_id`는 쓰지 않는다 — 이 값은 늘 분석한 날짜(대개 '오늘')의
+ * 것이라, 다른 날짜를 보고 있으면 화면과 어긋난다. 글쓰기 대상 id는 고른 날짜를
+ * 조회하는 `useCalendar`가 정한다.
  */
 async function analyzeDate(dateKey: string): Promise<boolean> {
   try {
-    const {daily_record_id} = await analyzeGpsLogs(dateKey);
-    if (daily_record_id) {
-      useTimelineStore.getState().setDailyRecordId(daily_record_id);
-    }
+    await analyzeGpsLogs(dateKey);
     return true;
   } catch {
     return false;
@@ -114,20 +111,22 @@ export async function analyzeOnForeground(now = Date.now()): Promise<boolean> {
  * 새로고침 버튼용 — 가드를 무시하고 지금 분석한다.
  * 사용자가 직접 누른 것이라 "아직 주기가 안 됐다"로 무시하면 안 된다.
  */
-export async function analyzeNow(now = Date.now()): Promise<boolean> {
+export async function analyzeNow(now = Date.now()): Promise<void> {
   lastAnalyzedAt = now;
 
   const today = toLogicalDateKey(new Date(now));
 
   await analyzeRolledOverDate(today);
 
-  if (await analyzeDate(today)) {
-    await writeLastAnalyzedDate(today);
-    return true;
+  try {
+    await analyzeGpsLogs(today);
+  } catch (error) {
+    // 자동 경로와 달리 원인을 숨기지 않는다 — 호출부가 문구로 바꾼다
+    lastAnalyzedAt = 0;
+    throw error;
   }
 
-  lastAnalyzedAt = 0;
-  return false;
+  await writeLastAnalyzedDate(today);
 }
 
 /** 계정이 바뀌면 비운다 — 가드가 기기 단위라 새 계정의 분석이 막힌다 */

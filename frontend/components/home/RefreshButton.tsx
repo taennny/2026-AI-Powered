@@ -4,6 +4,10 @@ import {Ionicons} from '@expo/vector-icons';
 
 import {useTimelineStore} from '@/store/timelineStore';
 import {analyzeNow} from '@/utils/analyzeSchedule';
+import {
+  describeAnalyzeError,
+  type AnalyzeErrorInfo,
+} from '@/utils/analyzeError';
 
 /**
  * 재조회만으로는 부족하다 — 장소를 만드는 건 analyze이고, 그게 안 돌았으면
@@ -36,20 +40,21 @@ export default function RefreshButton() {
     if (isRunning) return;
     setIsRunning(true);
 
+    let failure: AnalyzeErrorInfo | null = null;
+
     try {
-      const analyzed = await analyzeNow();
-
-      // 실패해도 갱신한다 — 앱이 먼저 끊었을 뿐 서버는 저장했을 수 있다
-      useTimelineStore.getState().requestRefresh();
-
-      if (!analyzed) {
-        Alert.alert(
-          '알림',
-          '기록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.',
-        );
-      }
+      await analyzeNow();
+    } catch (error) {
+      failure = describeAnalyzeError(error);
     } finally {
       setIsRunning(false);
+    }
+
+    // 실패해도 갱신한다 — 앱이 먼저 끊었을 뿐 서버는 저장했을 수 있다
+    useTimelineStore.getState().requestRefresh();
+
+    if (failure) {
+      Alert.alert(failure.title, failure.message);
     }
   };
 
