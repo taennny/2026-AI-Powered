@@ -21,6 +21,7 @@ import {
   type UserMe,
 } from '@/services/authApi';
 import {logError} from '@/utils/logError';
+import SettingsActions from '@/components/settings/SettingsActions';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
@@ -184,14 +185,17 @@ export default function AccountScreen() {
           </View>
         </View>
 
-        <View className="absolute bottom-20 left-6 gap-y-2">
-          <TouchableOpacity onPress={handleLogout} activeOpacity={0.6}>
-            <Text className="text-[15px] text-primary">로그아웃</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
-            <Text className="text-[15px] text-tertiary">회원탈퇴</Text>
-          </TouchableOpacity>
-        </View>
+        <SettingsActions
+          className="absolute bottom-20 left-6"
+          actions={[
+            {label: '로그아웃', onPress: handleLogout},
+            {
+              label: '회원탈퇴',
+              onPress: handleDeleteAccount,
+              tone: 'muted',
+            },
+          ]}
+        />
       </View>
     </SafeAreaView>
   );

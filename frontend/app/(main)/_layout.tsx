@@ -14,6 +14,7 @@ import {clearPhotoSyncState} from '@/utils/photoSync';
 import {resetAnalyzeSchedule} from '@/utils/analyzeSchedule';
 import {stopGpsTracking} from '@/hooks/useGpsTracking';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
+import {useThemeStore} from '@/store/themeStore';
 import {identifyUser, resetIdentifiedUser} from '@/services/purchases';
 
 export default function MainLayout() {
@@ -40,6 +41,8 @@ export default function MainLayout() {
     // 다음 계정이 이전 사용자의 구독 상태·결제 신원을 물려받으면 안 된다
     useSubscriptionStore.getState().reset();
     resetIdentifiedUser();
+    // 프리미엄 테마가 다음 계정에 그대로 남으면 안 된다
+    useThemeStore.getState().reset();
     // 같은 이유로 화면 캐시도 비운다 — 남겨두면 다음 계정에 이전 사용자의
     // 캘린더·저널이 잠깐 보인다
     clearCalendarCache();
