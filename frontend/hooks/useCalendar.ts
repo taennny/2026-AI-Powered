@@ -91,16 +91,16 @@ export function useCalendar() {
   }, [loadTimeline, refreshKey]);
 
   /**
-   * 고른 날짜의 사진을 올린다 — 보는 날짜만 채우는 구조라 과거도 열면 채워진다.
-   *
-   * 오늘은 `usePhotoSync`가 앱 진입·복귀 때 이미 올리지만, 5분 간격 가드를
-   * 공유하므로 중복 업로드는 일어나지 않는다.
+   * 오늘만 올린다. 과거 날짜는 analyze를 다시 돌릴 경로가 없어 `daily_record_id`가
+   * 채워지지 않고, 카드에 붙지 못한 채 용량만 쓴다.
    */
   useEffect(() => {
+    const dateKey = toDateKey(selectedDate);
+    if (dateKey !== toDateKey(logicalToday())) return;
+
     let cancelled = false;
 
-    syncPhotosForDate(toDateKey(selectedDate)).then(uploaded => {
-      // 올린 게 있을 때만 다시 받는다 — 방금 올린 사진이 카드에 붙도록
+    syncPhotosForDate(dateKey).then(uploaded => {
       if (uploaded > 0 && !cancelled) loadTimeline();
     });
 

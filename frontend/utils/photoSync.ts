@@ -113,11 +113,13 @@ function hasCaptureTime(info: MediaLibraryTypes.AssetInfo): boolean {
 export async function syncPhotosForDate(
   dateKey: string,
   now = Date.now(),
+  /** 새로고침 버튼용 — 사용자가 직접 눌렀으면 간격 가드를 건너뛴다 */
+  force = false,
 ): Promise<number> {
   if (isSyncing) return 0;
 
   const last = lastSyncedAt.get(dateKey) ?? 0;
-  if (now - last < SYNC_MIN_INTERVAL_MS) return 0;
+  if (!force && now - last < SYNC_MIN_INTERVAL_MS) return 0;
 
   const range = logicalDayRange(dateKey);
   if (!range) return 0;
@@ -148,8 +150,8 @@ export async function syncPhotosForDate(
       mediaType: 'photo',
       createdAfter: range.start,
       createdBefore: range.end,
-      // 오름차순 — 상한에 걸리면 늦게 찍은 것이 잘린다 (첫 사진이 더 자연스럽다)
-      sortBy: [['creationTime', true]],
+      // 내림차순 — 방금 찍은 사진이 먼저 올라가고, MAX_SCAN 밖으로 밀리지 않는다
+      sortBy: [['creationTime', false]],
       first: MAX_SCAN,
     });
 
