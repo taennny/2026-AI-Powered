@@ -4,7 +4,7 @@ import calendar
 from datetime import date
 
 from geoalchemy2.shape import to_shape
-from sqlalchemy import and_, exists, select, or_
+from sqlalchemy import Text, and_, cast, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.daily_record import DailyRecord
@@ -51,7 +51,12 @@ async def get_monthly_calendar(
             # 하루짜리 글은 daily_record_id로, 모아쓰기 글은 target_dates(포함된
             # 날짜 목록)로 판정한다. 모아쓰기는 daily_record_id가 비어 있어서
             # 그 조건만 보면 캘린더에 아예 표시되지 않는다.
-            date_key = record.target_date.isoformat()
+            # JSON 컬럼에 .contains()를 쓰면 LIKE로 컴파일되는데, PostgreSQL의
+            # json 타입에는 LIKE 연산자가 없어 쿼리 전체가 실패한다
+            # (operator does not exist: json ~~ text). SQLite에서는 통과해서
+            # 테스트로 걸리지 않았다. 텍스트로 캐스팅하면 두 DB 모두 동작한다.
+            # 날짜를 따옴표까지 포함해 찾으므로 다른 값에 잘못 걸리지 않는다.
+            date_key = f'"{record.target_date.isoformat()}"'
             has_journal_result = await db.execute(
                 select(
                     exists().where(
@@ -61,7 +66,7 @@ async def get_monthly_calendar(
                             or_(
                                 Blog.daily_record_id == record.id,
                                 Blog.target_dates.isnot(None)
-                                & Blog.target_dates.contains(date_key),
+                                & cast(Blog.target_dates, Text).like(f"%{date_key}%"),
                             ),
                         )
                     )
