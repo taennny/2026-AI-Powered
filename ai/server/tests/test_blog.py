@@ -56,6 +56,32 @@ def test_serialize_multi_day_has_day_headers():
     assert "도쿄 카페" in out
 
 
+def test_serialize_omits_empty_expense_and_photos():
+    """소비·사진이 없으면 '소비: 없음'/'사진: 0장'을 넣지 않는다 (부정 서술 방지)."""
+    data = {
+        "date": "2026-08-05",
+        "user": {"nickname": "태윤", "taste_tags": []},
+        "blocks": [_block(1, place="벤치", category="공원")],  # expense None, photos 0
+    }
+    data["blocks"][0]["expense"] = None
+    data["blocks"][0]["photos"] = 0
+    out = blog.serialize(data)
+    assert "소비: 없음" not in out
+    assert "사진: 0장" not in out
+
+
+def test_serialize_includes_expense_and_photos_when_present():
+    data = {
+        "date": "2026-08-05",
+        "user": {"nickname": "태윤", "taste_tags": []},
+        "blocks": [_block(1)],  # expense None, photos 2 (기본)
+    }
+    data["blocks"][0]["expense"] = {"item": "라떼", "amount": 5000}
+    out = blog.serialize(data)
+    assert "소비: 라떼 5,000원" in out
+    assert "사진: 2장" in out
+
+
 def test_normalize_days_both_forms():
     assert len(blog._normalize_days(SINGLE)) == 1
     assert len(blog._normalize_days(MULTI)) == 2
