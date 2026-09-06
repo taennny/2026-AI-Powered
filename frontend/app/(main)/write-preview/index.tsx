@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useLocalSearchParams, useRouter} from 'expo-router';
+import {useLocalSearchParams, useNavigation, useRouter} from 'expo-router';
 
 import {deleteBlog, fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
@@ -31,6 +31,7 @@ function invalidateCaches() {
 
 export default function WritePreviewScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const tc = useThemeColors();
 
   const {blogId, title, content, targetData, dates, createdAt} =
@@ -163,6 +164,24 @@ export default function WritePreviewScreen() {
 
     return () => subscription.remove();
   }, []);
+
+  /**
+   * iOS 스와이프 뒤로가기도 같은 취소 경로로 보낸다.
+   *
+   * `gestureEnabled: false`만 믿을 수 없었다 — New Architecture에서 그 옵션이
+   * 무시돼 스와이프가 통하는 경우가 있었고, 그러면 생성한 글이 서버에 남은 채
+   * 화면만 사라진다. 확인 후의 이동은 replace라 GO_BACK이 아니어서 다시 걸리지 않는다.
+   */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', event => {
+      if (event.data.action.type !== 'GO_BACK') return;
+
+      event.preventDefault();
+      backActionRef.current();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   const handleDeletePress = () => {
     if (!blogId) return;

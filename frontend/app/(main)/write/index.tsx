@@ -12,7 +12,12 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
+import {
+  Stack,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from 'expo-router';
 
 import {
   buildDateTarget,
@@ -33,6 +38,7 @@ import {useDateSelectionStore} from '@/store/dateSelectionStore';
 
 export default function WriteScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const tc = useThemeColors();
 
   const {dailyRecordId, dates} = useLocalSearchParams<{
@@ -69,6 +75,36 @@ export default function WriteScreen() {
 
     return () => subscription.remove();
   }, [isLoading]);
+
+  /**
+   * 화면을 벗어나려는 시도를 여기서 가로챈다 — 스와이프든 뒤로가기든 전부 지난다.
+   *
+   * `gestureEnabled: false`만으로는 부족했다. New Architecture에서 그 옵션이
+   * 무시돼 생성 중에도 스와이프로 빠져나가지는 경우가 있었다.
+   * 'Home' 버튼은 replace라 GO_BACK이 아니고, 미리보기로 넘어가는 것은 push라
+   * 이 화면이 스택에서 빠지지 않으므로 둘 다 여기 걸리지 않는다.
+   */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', event => {
+      if (event.data.action.type !== 'GO_BACK') return;
+
+      event.preventDefault();
+
+      // 생성 중에는 물어볼 것도 없다 — 나가면 만들던 글이 서버에 남는다
+      if (isLoading) return;
+
+      Alert.alert('작성 취소', '글쓰기를 취소하고 나갈까요?', [
+        {text: '계속 작성', style: 'cancel'},
+        {
+          text: '나가기',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(event.data.action),
+        },
+      ]);
+    });
+
+    return unsubscribe;
+  }, [navigation, isLoading]);
   // 입력은 전부 선택이다 — 아무것도 안 적으면 타임라인만으로 생성한다
   const canSubmit = isMultiDay || !!dailyRecordId;
 
