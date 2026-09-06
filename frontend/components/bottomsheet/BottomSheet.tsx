@@ -17,7 +17,7 @@ import {
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDate} from '@/utils/formatDate';
+import {DAY_BOUNDARY_HOUR, formatDate} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 import PostCard from '@/components/bottomsheet/PostCard';
 
@@ -36,8 +36,12 @@ function groupByHour(
     if (!map.has(hour)) map.set(hour, []);
     map.get(hour)!.push(place);
   });
+  // 하루가 04시에 시작하므로 정렬도 04시를 0으로 본다. 시계 순서(0~23)로
+  // 정렬하면 자정을 넘겨 찍힌 새벽 기록이 그날 아침보다 위로 올라간다.
+  const logicalHour = (hour: number) => (hour - DAY_BOUNDARY_HOUR + 24) % 24;
+
   return Array.from(map.entries())
-    .sort(([a], [b]) => a - b)
+    .sort(([a], [b]) => logicalHour(a) - logicalHour(b))
     .map(([hour, ps]) => ({hour, places: ps}));
 }
 
