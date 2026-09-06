@@ -114,10 +114,11 @@ def _serialize_block(block: dict) -> list[str]:
     address_head = " ".join(block.get("address", "").split()[:3])
     lines.append(f"장소: {block['place']} ({block['category']}) / {address_head}")
     expense = block.get("expense")
-    lines.append(
-        f"소비: {expense['item']} {expense['amount']:,}원" if expense else "소비: 없음"
-    )
-    lines.append(f"사진: {block.get('photos', 0)}장")
+    if expense:
+        lines.append(f"소비: {expense['item']} {expense['amount']:,}원")
+    photos = block.get("photos", 0)
+    if photos:
+        lines.append(f"사진: {photos}장")
     if block.get("memo"):
         lines.append(f"메모: {block['memo']}")
     lines.append("")
@@ -154,6 +155,14 @@ USER_NOTE_MAX_LEN = 1000  # 과도한 입력 방지 (초과분은 잘림)
 
 # 모델이 제목/본문을 JSON 으로 깔끔하게 분리해 반환하도록 강제하는 지시.
 # response_format=json_object 사용을 위해 프롬프트에 "JSON" 이 포함돼야 한다.
+# 소비·사진 등 정보가 비어 있어도 '안 샀다', '그냥 앉아만 있었다'처럼 굳이 부정
+# 서술을 만들지 않도록 하는 가드. (없는 항목은 타임라인에서 아예 빠지지만 이중 안전장치)
+NO_NEGATIVE_INSTRUCTION = (
+    "\n\n[주의] 소비·사진·메모 등 정보가 없다고 해서 '아무것도 사지 않았다', "
+    "'그냥 앉아만 있었다'처럼 굳이 부정적으로 서술하지 마세요. 주어진 정보만 "
+    "자연스럽게 풀어 쓰고, 없는 항목은 언급하지 마세요."
+)
+
 OUTPUT_INSTRUCTION = (
     "\n\n[출력 형식] 아래 JSON 하나만 출력하세요 (코드블록·설명 없이):\n"
     '{"title": "제목", "content": "본문"}\n'
@@ -216,7 +225,7 @@ def compose_user_prompt(
             "\n\n[작성자 메모] 아래 내용을 글에 자연스럽게 반영하세요. "
             "단, 메모에 없는 사실을 지어내지는 마세요:\n" + note
         )
-    return user_prompt + OUTPUT_INSTRUCTION
+    return user_prompt + NO_NEGATIVE_INSTRUCTION + OUTPUT_INSTRUCTION
 
 
 _TITLE_PREFIXES = ("제목:", "제목 :", "title:")
@@ -337,4 +346,5 @@ class Generate(Resource):
 
         except Exception as e:
             logger.error("블로그 생성 오류: %s", e)
-            return {"error": str(e)}, 500
+            # 내부 예외 메시지는 로그에만, 응답은 일반 메시지 (내부정보 노출 방지)
+            return {"error": "블로그 생성 중 오류가 발생했습니다."}, 500

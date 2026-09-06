@@ -32,11 +32,14 @@ ns = Namespace(
 # ──────────────────────────────────────────
 # 체류 감지 (baseline: 거리 임계값)
 # ──────────────────────────────────────────
+# 이 거리 이내면 같은 장소로 판단. 넓히면 인접한 서로 다른 장소(예: 옆 가게)가
+# 한 체류로 합쳐지고, 좁히면 실내 GPS 튐에 취약해진다. 장소 구분을 우선해 50m로 둔다.
+# (드리프트 조각화는 촘촘한 수집(distanceInterval=0) + accuracy 필터로 완화)
 STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
 MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
-# 정상 GPS 수집 간격은 30초. 그보다 큰 끊김이라도 이 값 이하이고 같은 자리면
-# (앱이 잠깐 종료돼 GPS가 끊긴 경우 등) 하나의 체류로 이어붙인다. 초과 시엔 경계.
-GAP_BRIDGE_MINUTES = 3
+# 수집 간격이 불규칙(백그라운드 스로틀 등)해도 같은 자리면 이어붙이도록 여유를 둔다.
+# 이 값 이하 끊김은 하나의 체류로 잇고, 초과 시엔 경계로 본다.
+GAP_BRIDGE_MINUTES = 5
 # 실내 GPS는 정확도가 나빠(오차 ~150m) 임계값을 넉넉히 둔다. 너무 낮으면
 # 카페·식당 같은 실내 체류의 점이 통째로 걸러져 체류가 사라진다.
 ACCURACY_MAX_M = 200  # 이보다 나쁜(값 큰) 점만 노이즈로 제외
@@ -83,6 +86,7 @@ def detect_stays(gps_logs: list) -> list:
     # (기본 추론은 첫 값 포맷을 전체에 적용해 정밀도가 섞이면 실패함)
     df["time"] = pd.to_datetime(df["time"], format="ISO8601", utc=True)
     df = df.sort_values("time").reset_index(drop=True)
+    span_min = (df["time"].iloc[-1] - df["time"].iloc[0]).total_seconds() / 60
 
     # 1) 앵커 기반 원시 군집화 (gap ≤ 3분 + 같은 자리 → 이어붙임)
     segments = []
@@ -101,9 +105,11 @@ def detect_stays(gps_logs: list) -> list:
             current = _new_segment(t, lat, lng)
     if current is not None:
         segments.append(current)
+    n_raw = len(segments)
 
     # 2) 이동/이상치(단일 점) 제거 → GPS 튐으로 갈라진 인접 체류가 다시 붙도록
     segments = [s for s in segments if len(s["lats"]) >= 2]
+    n_multi = len(segments)
 
     # 3) 같은 자리 + 짧은 간격(≤3분)으로 나뉜 체류 병합 (튐·앱 종료 복원)
     segments = _merge_adjacent(segments)
@@ -119,9 +125,12 @@ def detect_stays(gps_logs: list) -> list:
         stays.append(seg)
 
     logger.info(
-        "detect_stays | 입력=%d 정확도필터후=%d 체류=%d",
+        "detect_stays | 입력=%d 필터후=%d 시간범위=%.1f분 원시구간=%d 유효구간=%d 체류=%d",
         n_input,
         n_kept,
+        span_min,
+        n_raw,
+        n_multi,
         len(stays),
     )
     return stays
@@ -176,10 +185,21 @@ def _merge_adjacent(segments: list) -> list:
 # 카카오 장소 매칭
 # ──────────────────────────────────────────
 # 라이프로그 "체류형" 장소 카테고리. 순서에 의존하지 않고(아래 _nearest_place)
-# 전부 조회해 최단거리를 고른다.
-#   FD6 음식점 / CE7 카페 / AT4 관광명소 / CT1 문화시설 /
-#   AD5 숙박 / MT1 대형마트 / CS2 편의점
-KAKAO_STAY_CATEGORIES = ["FD6", "CE7", "AT4", "CT1", "AD5", "MT1", "CS2"]
+# 전부 조회해 최단거리를 고른다. (카테고리 수 = 체류당 카카오 호출 수 → 쿼터 고려)
+KAKAO_STAY_CATEGORIES = [
+    "FD6",  # 음식점
+    "CE7",  # 카페
+    "AT4",  # 관광명소
+    "CT1",  # 문화시설
+    "AD5",  # 숙박
+    "MT1",  # 대형마트
+    "CS2",  # 편의점
+    "SC4",  # 학교
+    "AC5",  # 학원
+    "HP8",  # 병원
+    "BK9",  # 은행
+    "PO3",  # 공공기관
+]
 # 이동 지점(지하철역 등) — 체류형 후보가 전혀 없을 때만 폴백으로 사용
 KAKAO_TRANSIT_CATEGORIES = ["SW8"]
 
@@ -373,4 +393,5 @@ class Analyze(Resource):
 
         except Exception as e:
             logger.error("분석 오류: %s", e)
-            return {"error": str(e)}, 500
+            # 내부 예외 메시지는 로그에만, 응답은 일반 메시지 (내부정보 노출 방지)
+            return {"error": "분석 중 오류가 발생했습니다."}, 500

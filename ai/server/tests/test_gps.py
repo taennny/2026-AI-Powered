@@ -79,9 +79,9 @@ def test_bridges_short_gap_same_location():
 
 
 def test_long_gap_splits():
-    """3분 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
+    """GAP_BRIDGE_MINUTES 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
-    logs = _stay_run(base, 0, 4) + _stay_run(base, 10, 14)  # 사이 6분 공백
+    logs = _stay_run(base, 0, 4) + _stay_run(base, 15, 19)  # 사이 11분 공백(>5분)
     stays = gps.detect_stays(logs)
     assert len(stays) == 2
 
@@ -93,10 +93,23 @@ def test_jitter_outlier_does_not_split():
         _log(base, 37.5, 127.0),
         _log(base + timedelta(minutes=1), 37.5, 127.0),
         _log(base + timedelta(minutes=2), 37.5, 127.0),
-        _log(base + timedelta(minutes=3), 37.5006, 127.0),  # ~66m 튐(단일)
+        _log(base + timedelta(minutes=3), 37.5006, 127.0),  # ~66m 튐(반경 밖, 단일)
         _log(base + timedelta(minutes=4), 37.5, 127.0),
         _log(base + timedelta(minutes=5), 37.5, 127.0),
         _log(base + timedelta(minutes=6), 37.5, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+
+
+def test_drift_within_radius_kept_as_one_stay():
+    """반경 내 GPS 드리프트(~30m)로 흔들려도 한 체류로 잡는다."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5, 127.0),
+        _log(base + timedelta(minutes=2), 37.5003, 127.0),  # ~33m
+        _log(base + timedelta(minutes=4), 37.5, 127.0003),  # ~26m
+        _log(base + timedelta(minutes=6), 37.5002, 127.0001),  # 근처
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
