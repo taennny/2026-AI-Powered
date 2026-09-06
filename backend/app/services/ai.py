@@ -34,7 +34,10 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 async def analyze_and_save(
-    db: AsyncSession, user_id: uuid.UUID, target_date: date
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    target_date: date,
+    user_timezone: str | None = None,
 ) -> tuple[uuid.UUID | None, int]:
     # 1. 해당 날짜 GPS 로그 조회 (하루 경계: 04:00 KST 기준)
     start_dt, end_dt = day_bounds(target_date)
@@ -44,6 +47,7 @@ async def analyze_and_save(
             GpsLog.recorded_at,
             func.ST_Y(GpsLog.location).label("lat"),
             func.ST_X(GpsLog.location).label("lng"),
+            GpsLog.accuracy,
         )
         .where(GpsLog.user_id == user_id)
         .where(GpsLog.recorded_at >= start_dt)
@@ -68,7 +72,10 @@ async def analyze_and_save(
 
     # 3. AI 서버 호출
     gps_items = [
-        AIGpsLogItem(time=row.recorded_at, lat=row.lat, lng=row.lng) for row in log_rows
+        AIGpsLogItem(
+            time=row.recorded_at, lat=row.lat, lng=row.lng, accuracy=row.accuracy
+        )
+        for row in log_rows
     ]
     request_body = AIAnalyzeRequest(user_id=str(user_id), gps_logs=gps_items)
 
@@ -87,7 +94,20 @@ async def analyze_and_save(
         )
         raise
 
-    # 4. daily_record upsert (사진도 같은 04:00 경계 기준으로 집계)
+    # 4. stays가 비어있으면 AI 분석 실패/무응답으로 보고 기존 기록을 건드리지 않는다.
+    if not stays:
+        logger.warning(
+            f"AI 분석 결과 0건 — 기존 기록 보존: user={user_id}, date={target_date}"
+        )
+        dr_result = await db.execute(
+            select(DailyRecord)
+            .where(DailyRecord.user_id == user_id)
+            .where(DailyRecord.target_date == target_date)
+        )
+        daily_record = dr_result.scalar_one_or_none()
+        return (daily_record.id if daily_record else None), 0
+
+    # 5. daily_record upsert (사진도 같은 04:00 경계 기준으로 집계)
     photo_result = await db.execute(
         select(func.count(Photo.id))
         .where(Photo.user_id == user_id)
@@ -108,19 +128,19 @@ async def analyze_and_save(
             user_id=user_id,
             target_date=target_date,
             total_distance=round(total_distance, 2),
-            place_count=len(stays),
+            place_count=0,
             photo_count=photo_count,
+            timezone=user_timezone,
         )
         db.add(daily_record)
-        await db.flush()  # id 정보
+        await db.flush()
     else:
         daily_record.total_distance = round(total_distance, 2)
-        daily_record.place_count = len(stays)
         daily_record.photo_count = photo_count
         daily_record.updated_at = datetime.now(timezone.utc)
         await db.flush()
 
-    # 5. 해당 날짜 사진들 daily_record에 연결 (같은 04:00 경계 기준)
+    # 6. 해당 날짜 사진들 daily_record에 연결 (같은 04:00 경계 기준)
     await db.execute(
         update(Photo)
         .where(Photo.user_id == user_id)
@@ -129,10 +149,20 @@ async def analyze_and_save(
         .values(daily_record_id=daily_record.id)
     )
 
-    # 6. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
-    # 지우지 않으면 analyze를 부를 때마다 같은 체류가 통째로 다시 insert되어
-    # 타임라인에 같은 카드가 계속 쌓인다.
-    await db.execute(delete(Place).where(Place.daily_record_id == daily_record.id))
+    # 7. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
+    # 단, is_corrected=True(사용자가 직접 수정한 장소)는 재분석해도 보존한다.
+    await db.execute(
+        delete(Place)
+        .where(Place.daily_record_id == daily_record.id)
+        .where(Place.is_corrected.is_(False))
+    )
+
+    corrected_count_result = await db.execute(
+        select(func.count(Place.id))
+        .where(Place.daily_record_id == daily_record.id)
+        .where(Place.is_corrected.is_(True))
+    )
+    corrected_count = corrected_count_result.scalar() or 0
 
     for stay in stays:
         place = Place(
@@ -146,6 +176,8 @@ async def analyze_and_save(
             is_corrected=False,
         )
         db.add(place)
+
+    daily_record.place_count = corrected_count + len(stays)
 
     await db.commit()
     return daily_record.id, len(stays)
