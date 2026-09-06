@@ -24,13 +24,13 @@ async def upload_photo_api(
 
     file_bytes = await photo.read()
 
-    try: 
-     saved = await upload_photo(
+    try:
+        saved = await upload_photo(
             file_bytes=file_bytes,
             content_type=photo.content_type,
             user_id=current_user.id,
             db=db,
-    )
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
 
