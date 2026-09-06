@@ -18,7 +18,7 @@ async def upload_photo_api(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    allowed_types = {"image/jpeg", "image/png", "image/jpg"}
+    allowed_types = {"image/jpeg", "image/png", "image/jpg", "image/heic", "image/heif"}
     if photo.content_type not in allowed_types:
         raise HTTPException(status_code=422, detail="지원하지 않는 파일 형식입니다")
 
