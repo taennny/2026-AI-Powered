@@ -157,10 +157,18 @@ async def get_timeline(
         ]
 
         # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
+        # 카드는 썸네일, 확대 보기는 원본을 쓴다 — 둘 다 내려준다.
+        # 썸네일 컬럼이 생기기 전에 올라온 사진은 축소본 파일이 없으므로 원본으로 폴백한다.
         photo_urls = []
+        thumbnail_urls = []
         if place_photos:
-            url = await get_presigned_url(place_photos[0].storage_key)
-            photo_urls.append(url)
+            first = place_photos[0]
+            photo_urls.append(await get_presigned_url(first.storage_key))
+            thumbnail_urls.append(
+                await get_presigned_url(first.thumbnail_key)
+                if first.thumbnail_key
+                else photo_urls[0]
+            )
 
         place_list.append(
             {
@@ -172,6 +180,7 @@ async def get_timeline(
                 "lat": to_shape(place.location).y,
                 "lng": to_shape(place.location).x,
                 "photos": photo_urls,
+                "thumbnails": thumbnail_urls,
             }
         )
 
