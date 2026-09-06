@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -10,6 +11,8 @@ from app.schemas.gps import GPSLogBatchRequest, GPSLogBatchResponse
 from app.services.ai import analyze_and_save
 from app.services.gps import save_gps_logs
 from app.utils.dependencies import get_current_user
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/gps", tags=["GPS"])
 
@@ -29,15 +32,16 @@ async def upload_gps_logs(
 @router.post("/logs/{date}/analyze", response_model=AnalyzeResponse)
 async def analyze_gps_logs(
     date: date,
-    user_timezone: str | None = None,
+    timezone: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
         daily_record_id, place_count = await analyze_and_save(
-            db, current_user.id, date, timezone=user_timezone
+            db, current_user.id, date, user_timezone=timezone
         )
     except Exception:
+        logger.exception("GPS 분석 실패")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI 서버 호출에 실패했습니다",
