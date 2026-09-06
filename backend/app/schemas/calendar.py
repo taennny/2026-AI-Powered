@@ -32,8 +32,6 @@ class PlaceEntry(BaseModel):
     lat: float
     lng: float
     photos: List[str] = []
-    # 카드 썸네일용. 축소본이 없는 예전 사진은 원본 URL이 그대로 들어온다.
-    # photos(원본)를 그대로 두는 이유는 확대 보기에 필요하기 때문이다
     thumbnails: List[str] = []
 
 

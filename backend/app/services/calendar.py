@@ -157,8 +157,6 @@ async def get_timeline(
         ]
 
         # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
-        # 카드는 썸네일, 확대 보기는 원본을 쓴다 — 둘 다 내려준다.
-        # 썸네일 컬럼이 생기기 전에 올라온 사진은 축소본 파일이 없으므로 원본으로 폴백한다.
         photo_urls = []
         thumbnail_urls = []
         if place_photos:
