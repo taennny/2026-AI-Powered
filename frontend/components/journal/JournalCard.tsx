@@ -3,7 +3,7 @@ import {router} from 'expo-router';
 
 import {type JournalData} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDateStr, formatDateFromISO} from '@/utils/formatDate';
+import {formatRecordDateLabel, formatDateFromISO} from '@/utils/formatDate';
 
 type Props = {
   data: JournalData;
@@ -64,12 +64,7 @@ function HighlightText({
 
 export default function JournalCard({data, query = ''}: Props) {
   const tc = useThemeColors();
-  // 모아쓰기는 첫 날만 적고 나머지는 개수로 줄인다 — 미리보기 화면과 같은 규칙.
-  // `date`가 첫 날이므로 나머지는 전체에서 하나 뺀 값이다
-  const extraDayCount = Math.max((data.dates?.length ?? 0) - 1, 0);
-  const dateLabel =
-    `위치 기록일 ${formatDateStr(data.date)}` +
-    (extraDayCount > 0 ? ` 외 ${extraDayCount}일` : '');
+  const dateLabel = `위치 기록일 ${formatRecordDateLabel(data.date, data.dates)}`;
 
   return (
     <TouchableOpacity

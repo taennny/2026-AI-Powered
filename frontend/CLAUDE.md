@@ -531,6 +531,10 @@ npx jest gpsTask      # 파일 하나
 |---|---|---|
 | **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
 | **모아쓰기 — 불연속 선택** | 백엔드 `BlogGenerateRequest` | 프론트는 끝났습니다(아래 "모아쓰기" 참고). 백엔드가 `start_date`/`end_date`만 받아 **띄엄띄엄 고른 날짜를 표현할 수 없습니다.** `dates: list[date]` 추가 요청 중이고, 들어오면 프론트 재배포 없이 켜집니다 |
+| `beforeRemove` 훅으로 묶기 | `write`, `write-preview` | 뒤로가기 차단 로직이 두 화면에 복제됨. 막을 화면이 하나 더 생기면 `useConfirmBeforeLeave`로 |
+| 입력 필드 컴포넌트화 | `write/index.tsx` | 같은 모양의 `레이블 + TextInput` 4벌. `LabeledTextInput`으로 빼면 60줄쯤 줄어듦 |
+| `write-preview` 분해 | `write-preview/index.tsx` | 336줄에 조회·수정·저장·삭제·취소가 다 있음. `useBlogDraft()` 훅 분리 — 라우터 파라미터로 본문 넘기는 문제와 같이 정리 |
+| `RotatingMessage` 위치 | `components/write/` | write 전용이 아닌 범용 컴포넌트. 두 번째 사용처가 생기면 `components/common/`으로 |
 | 리포트 | — | 와이어프레임 대기 |
 | 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
 | 사진 모아보기 | `settings/records` | 다른 담당자 구현 중. 설정 > 기록 화면에 붙일 자리를 만들어 뒀습니다 |

@@ -18,6 +18,7 @@ import {deleteBlog, fetchBlogDetail, updateBlog} from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {clearCalendarCache} from '@/hooks/useCalendar';
 import {clearJournalCache} from '@/hooks/useJournalList';
+import {formatRecordDateLabel} from '@/utils/formatDate';
 
 /**
  * 글 목록이 달라졌으니 캐시를 버린다 — 삭제·저장 양쪽 다 필요하다.
@@ -88,28 +89,6 @@ export default function WritePreviewScreen() {
 
   const canSave =
     journalTitle.trim().length > 0 && journalContent.trim().length > 0;
-  const formatDate = (date?: string) => {
-    if (!date) return '-';
-
-    const parsedDate = new Date(date);
-
-    if (Number.isNaN(parsedDate.getTime())) {
-      return date;
-    }
-
-    const yy = String(parsedDate.getFullYear()).slice(2);
-    const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
-    const dd = String(parsedDate.getDate()).padStart(2, '0');
-
-    return `${yy}.${mm}.${dd}`;
-  };
-
-  /**
-   * 모아쓰기는 첫 날만 적고 나머지는 개수로 줄인다 — 날짜를 다 나열하면
-   * 31일까지 가능해서 한 줄을 넘긴다.
-   * `target_date`가 첫 날이므로 나머지는 전체에서 하나 뺀 값이다.
-   */
-  const extraDayCount = Math.max(journalDates.length - 1, 0);
 
   const handleCancelPress = () => {
     Alert.alert(
@@ -295,12 +274,12 @@ export default function WritePreviewScreen() {
         >
           <View className="w-[90%] mb-5">
             <Text className="text-sm font-semibold text-primary">
-              위치 기록 날짜 {formatDate(journalTargetDate)}
-              {extraDayCount > 0 ? ` 외 ${extraDayCount}일` : ''}
+              위치 기록일{' '}
+              {formatRecordDateLabel(journalTargetDate, journalDates)}
             </Text>
 
             <Text className="mt-1 text-xs text-muted">
-              작성일 {formatDate(journalCreatedAt)}
+              작성일 {formatRecordDateLabel(journalCreatedAt)}
             </Text>
           </View>
           <TextInput

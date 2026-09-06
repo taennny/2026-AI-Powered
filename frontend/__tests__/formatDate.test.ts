@@ -1,6 +1,8 @@
 import {
   formatDate,
   formatDateStr,
+  formatRecordDateLabel,
+  formatShortDate,
   formatTimeAgo,
   formatTimeFromISO,
   logicalToday,
@@ -147,5 +149,57 @@ describe('formatTimeAgo', () => {
     [ago(365 * DAY), '12달 전'],
   ])('%s → %s', (iso, expected) => {
     expect(formatTimeAgo(iso)).toBe(expected);
+  });
+});
+
+describe('formatShortDate', () => {
+  it("요일 없이 'YY.MM.DD'", () => {
+    expect(formatShortDate(new Date(2026, 8, 5))).toBe('26.09.05');
+  });
+
+  it('formatDate와 앞부분이 같다 — 요일만 더 붙는다', () => {
+    const date = new Date(2026, 8, 5);
+
+    expect(formatDate(date)).toBe(`${formatShortDate(date)}(sat)`);
+  });
+});
+
+describe('formatRecordDateLabel', () => {
+  it('하루짜리는 날짜만', () => {
+    expect(formatRecordDateLabel('2026-09-05')).toBe('26.09.05');
+    expect(formatRecordDateLabel('2026-09-05', null)).toBe('26.09.05');
+  });
+
+  // 첫 날은 date와 같으니 나머지만 센다
+  it('모아쓰기는 첫 날 + 나머지 개수', () => {
+    const dates = [
+      '2026-09-05',
+      '2026-09-06',
+      '2026-09-07',
+      '2026-09-08',
+      '2026-09-09',
+    ];
+
+    expect(formatRecordDateLabel('2026-09-05', dates)).toBe('26.09.05 외 4일');
+  });
+
+  it('하루만 담긴 목록은 "외 0일"이 되지 않는다', () => {
+    expect(formatRecordDateLabel('2026-09-05', ['2026-09-05'])).toBe(
+      '26.09.05',
+    );
+  });
+
+  it('ISO 8601도 받는다 — 작성일에 쓴다', () => {
+    expect(formatRecordDateLabel('2026-09-05T12:34:56.000Z')).toBe('26.09.05');
+  });
+
+  it('비었으면 하이픈', () => {
+    expect(formatRecordDateLabel(undefined)).toBe('-');
+    expect(formatRecordDateLabel('')).toBe('-');
+  });
+
+  // 뭉개면 서버가 무엇을 보냈는지 알 수 없다
+  it('해석할 수 없으면 원본을 그대로 보여준다', () => {
+    expect(formatRecordDateLabel('언젠가')).toBe('언젠가');
   });
 });

@@ -26,6 +26,7 @@ import {
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {formatShortDate} from '@/utils/formatDate';
 import RotatingMessage from '@/components/write/RotatingMessage';
 import {
   CLOSING_MESSAGE,
@@ -108,14 +109,9 @@ export default function WriteScreen() {
   // 입력은 전부 선택이다 — 아무것도 안 적으면 타임라인만으로 생성한다
   const canSubmit = isMultiDay || !!dailyRecordId;
 
-  const dateStr = useMemo(() => {
-    const today = new Date();
-    const yy = String(today.getFullYear()).slice(2);
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-
-    return `${yy}.${mm}.${dd}`;
-  }, []);
+  // 작성일(오늘)이다. 표시용이라 4시 경계를 적용하지 않는다 —
+  // 새벽 2시에 쓴 글의 작성일은 실제로 오늘이다
+  const dateStr = useMemo(() => formatShortDate(new Date()), []);
 
   const handleHomePress = () => {
     Alert.alert('작성 취소', '글쓰기를 취소하고 홈으로 이동할까요?', [

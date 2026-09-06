@@ -31,13 +31,18 @@ export function logicalToday(): Date {
   return new Date(shifted.getFullYear(), shifted.getMonth(), shifted.getDate());
 }
 
-/** Date → 'YY.MM.DD(day)' */
-export function formatDate(date: Date): string {
-  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+/** Date → 'YY.MM.DD'. 요일까지 필요하면 `formatDate` */
+export function formatShortDate(date: Date): string {
   const yy = String(date.getFullYear()).slice(2);
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   const dd = String(date.getDate()).padStart(2, '0');
-  return `${yy}.${mm}.${dd}(${days[date.getDay()]})`;
+  return `${yy}.${mm}.${dd}`;
+}
+
+/** Date → 'YY.MM.DD(day)' */
+export function formatDate(date: Date): string {
+  const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  return `${formatShortDate(date)}(${days[date.getDay()]})`;
 }
 
 /** 'YYYY-MM-DD' → 'YY.MM.DD(day)' */
@@ -66,4 +71,34 @@ export function formatTimeAgo(updatedAt: string): string {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}일 전`;
   return `${Math.floor(days / 30)}달 전`;
+}
+
+/**
+ * 위치 기록 날짜 표기 — 모아쓰기는 **첫 날만 적고 나머지는 개수로 줄인다**.
+ * 날짜를 다 나열하면 31일까지 가능해서 한 줄을 넘긴다.
+ *
+ *   하루      → '26.09.05'
+ *   모아쓰기  → '26.09.05 외 4일'
+ *
+ * `dates`는 서버가 준 **실제로 글에 들어간 날짜** 목록이다. 기록이 없는 날은
+ * 서버가 빼므로 사용자가 고른 개수보다 적을 수 있다. 첫 날은 `date`와 같으니
+ * 나머지는 전체에서 하나 뺀 값이다.
+ *
+ * 저널 리스트와 미리보기가 같은 문구를 써야 해서 여기 둔다 — 규칙이 갈리면
+ * 같은 글이 화면마다 다른 날짜로 보인다.
+ *
+ * @param date  'YYYY-MM-DD' 또는 ISO 8601. 비었으면 '-'
+ */
+export function formatRecordDateLabel(
+  date: string | undefined,
+  dates?: readonly string[] | null,
+): string {
+  if (!date) return '-';
+
+  const parsed = new Date(date);
+  // 형식을 모르면 원본을 그대로 보여준다 — '-'로 뭉개면 원인을 알 수 없다
+  const head = Number.isNaN(parsed.getTime()) ? date : formatShortDate(parsed);
+
+  const extraDayCount = Math.max((dates?.length ?? 0) - 1, 0);
+  return extraDayCount > 0 ? `${head} 외 ${extraDayCount}일` : head;
 }
