@@ -136,6 +136,9 @@ NativeWind v4로 전체 스타일링. `StyleSheet.create`는 사용하지 않습
 인라인 `style` prop을 유지해야 하는 경우: `Animated.Value` 기반 값, `boxShadow` 문자열,
 `contentContainerStyle`, `borderLeftColor` 등 동적 색상.
 
+사진은 `expo-image`를 씁니다(디스크 캐시라 같은 날짜를 다시 열면 즉시 뜹니다).
+className을 안 받아서 그 자리만 인라인 `style`입니다. **네이티브 모듈이라 재빌드가 필요합니다.**
+
 그림자는 RN 0.76+ 기준으로 `shadow*` prop 대신 `boxShadow`를 씁니다.
 className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 `useThemeColors()` 훅을 씁니다 — 테마 전환에 함께 반응합니다.
@@ -204,6 +207,8 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 **analyze 호출 시점**(`utils/analyzeSchedule.ts`): GPS 배치마다가 아니라 **1시간 주기 + 논리 날짜가
 넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
 갱신해 실패한 날짜가 다음 주기에 자동 재시도됩니다.
+연속 실패는 지수 백오프로 간격을 벌립니다(1→2→4분 … 60분 상한, 첫 실패는 즉시 재시도).
+새로고침 버튼은 백오프를 무시합니다 — 사용자가 직접 누른 것입니다.
 
 ### 모아쓰기
 
@@ -234,6 +239,10 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 
 안드로이드 하드웨어 뒤로가기는 별개라 `write-preview`가 `BackHandler`로 직접 막고
 Cancel과 같은 확인 경로로 보냅니다.
+
+**제스처 옵션만 믿지 않습니다.** New Architecture에서 `gestureEnabled`가 무시된 적이 있어,
+`write`·`write-preview`가 `beforeRemove`로 이탈을 한 번 더 가로챕니다.
+**`GO_BACK`만 막습니다** — `router.replace`(Home·취소·저장)까지 막으면 나갈 길이 없어집니다.
 
 ### 토큰 저장
 
@@ -336,6 +345,7 @@ MapPreview가 페이드인됩니다(`isMapMounted` + `mapOpacity`).
 HomeFooter 글쓰기 버튼 → /(main)/write (dailyRecordId 전달)
 ├── 프롬프트 + 스타일(정보 위주 / 감성적) → POST /blog/generate (202 + blog_id)
 ├── waitForBlogGeneration: status 폴링 → completed 시 상세 조회
+│   (대기 화면은 RotatingMessage가 문구를 갈아 끼운다 — 위 "훅" 참고)
 └── /(main)/write-preview → PUT /blog/{id} → 저널 리스트
 
 저널 리스트 카드 탭 → /(main)/write-preview (blogId만) → 해당 화면이 상세 조회
@@ -387,6 +397,10 @@ constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리�
                           처리방침은 아직 목 주소입니다
 services/purchases.ts     결제 SDK — 초기화·사용자 식별·가격 조회·결제·복원
 utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 reset_at까지 읽음)
+utils/loadingSequence.ts  글 생성 대기 문구 순서 — 진행 안내↔튜토리얼 교대, 튜토리얼은 매번 셔플
+constants/loadingMessages.ts  그 문구 목록과 교체 간격
+components/write/RotatingMessage.tsx  문구 표시 — 점이 차오르다(`.`→`...`) 페이드로 교체
+components/common/PhotoViewer.tsx  사진 전체 화면 보기 (아무 데나 누르면 닫힘)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
@@ -400,6 +414,8 @@ utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 r
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
 | `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
 | `formatTimeAgo(iso)` | ISO 8601 → `'방금'` / `'N분 전'` 등 |
+| `formatShortDate(date)` | `Date` → `'YY.MM.DD'` (요일 없이) |
+| `formatRecordDateLabel(date, dates?)` | 위치 기록일 표기. 모아쓰기는 `'26.09.05 외 4일'`. 저널 카드와 미리보기가 함께 씁니다 |
 
 ### 경로 별칭
 
@@ -417,13 +433,14 @@ npx jest gpsTask      # 파일 하나
 
 | 파일 | 대상 | 핵심 |
 |---|---|---|
-| `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값 |
+| `__tests__/formatDate.test.ts` | `utils/formatDate.ts` | 새벽 4시 경계, 달력 날짜와 순간의 구분, 12AM/PM, `formatTimeAgo` 임계값, `formatRecordDateLabel`(하루/모아쓰기/해석 실패) |
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
 | `__tests__/pricing.test.ts` | `constants/pricing.ts` | 할인율을 손으로 적지 않고 두 가격에서 계산, 레이블에 그 값이 들어감 |
 | `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분, 로그인·연동 딥링크 분리 |
 | `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
-| `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유 |
+| `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유, 연속 실패 백오프 |
+| `__tests__/loadingSequence.test.ts` | `utils/loadingSequence.ts` | 진행↔튜토리얼 교대, 진행 안내는 안 섞음, 튜토리얼 누락 없음, 원본 불변, 개수가 달라도 이어 붙임 |
 | `__tests__/blogApi.test.ts` | `waitForBlogGeneration` | completed/failed 분기, **15회(37.5초) 타임아웃 상한** |
 | `__tests__/staticMapUrl.test.ts` | `utils/staticMapUrl.ts` | 키 없으면 null, 장소 0/1/N개별 center·zoom, 미리보기와 저장본이 같은 시야 |
 | `__tests__/authStore.test.ts` | `authStore` + `tokenStorage` + `onboardingStorage` | 토큰을 store에 복제하지 않음, `clearAuth`와 `logout`의 차이, `initialize` 복원 |
@@ -496,19 +513,33 @@ npx jest gpsTask      # 파일 하나
 > **하루 경계 4시는 백엔드에도 반영됐습니다** — `config.DAY_BOUNDARY_HOUR=4`,
 > `utils/timezone.py`의 `day_bounds()`·`week_bounds()`. 새벽 0~4시 GPS 유실은 해소됐습니다.
 >
-> 남은 것은 두 가지입니다. **①`daily_records.timezone`에 값을 넣는 코드가 없습니다**
-> (`ai.py`의 `DailyRecord(...)` 생성부에 `timezone=` 인자 없음) — 컬럼도 있고
-> `timeline_serializer`가 읽기도 하는데 항상 NULL이라 `Asia/Seoul`로 폴백합니다.
-> **②`day_bounds()`가 KST를 하드코딩**해 그 값을 채워도 경계는 전 세계 KST입니다.
-> GPS 업로드 body의 `timezone`과 analyze의 `?timezone=`도 아직 안 받습니다
-> (스키마·시그니처에 필드 없음). 프론트는 이미 둘 다 보내고 있습니다.
+> analyze의 `?timezone=`은 `daily_records.timezone`에 저장됩니다(**기록 생성 시에만**).
+> 다만 **`day_bounds()`가 KST를 하드코딩**해 그 값을 경계 계산에 쓰지 않습니다 —
+> 위 "알려진 문제"의 해외 베타 블로커가 이것입니다.
+
+### tz 정책 (결정됨)
+
+| | |
+|---|---|
+| **어느 날짜에 속하나** | 그날 레코드가 **처음 만들어질 때의 tz 하나로 고정** (`daily_records.timezone`). 한 번 정해지면 안 바뀝니다 — 나중에 옮기면 이미 저장된 기록이 다른 날짜로 튑니다 |
+| **몇 시로 보이나** | 기기 tz. 현지에 있는 동안은 그게 곧 현지 시각이라 맞습니다. **귀국 후 해외 기록을 볼 때만 어긋납니다** — 고치려면 `places`에 tz를 두면 됩니다(좌표에서 유도 가능, 하루 5~10행) |
+
+비행기 탄 날 하루는 출발지 기준으로 잘립니다. **다음 날부터는 도착지 tz로 저절로 넘어갑니다** —
+새 날의 레코드가 도착지에서 만들어지기 때문입니다. 그 하루는 감수합니다.
+
+현지 시각으로 표시하게 되면 **서쪽으로 갈 때 카드의 시각이 거꾸로 갑니다**
+(서울 10:00 출발 → LA 03:00 도착). 순서는 `arrived_at`(UTC) 기준이라 맞지만,
+tz가 바뀌는 자리에 표시가 없으면 버그로 보입니다.
+
+GPS 업로드 body의 `timezone`은 **받지만 쓰지 않습니다.** 하루의 tz는 analyze의
+`?timezone=`으로 충분합니다. 로그별 tz는 하루 경계를 정하는 데 쓰이지 않아 두지 않습니다.
+
+EXIF에 `OffsetTimeOriginal`이 있으면 그 tz를 쓰고, **없으면 KST로 간주합니다.**
+해외에서 오프셋 없이 찍은 사진은 어느 장소에도 안 붙지만, 엉뚱한 곳에 붙지는 않습니다.
 
 ### 남은 미결
 
 1. 4시 경계를 **표시**에도 적용할지 — 새벽 3시 기록을 `3:00AM`으로 볼지 `27:00`으로 볼지
-2. 여행 중 tz가 바뀌는 날 — `daily_records.timezone`이 한 칼럼이라 하루에 tz가 하나뿐입니다.
-   비행기 탄 날이 어긋납니다. 출발지 / 도착지 / 로그별 중 택일
-3. EXIF `OffsetTimeOriginal` 우선 사용 — 해외에서 찍은 사진이 KST 고정이라 어긋납니다
 
 > 구독 횟수 리셋은 **월요일 새벽 4시(KST)** 로 정해졌습니다. 무료 주 3회.
 
@@ -516,21 +547,16 @@ npx jest gpsTask      # 파일 하나
 
 | 문제 | 위치 | 영향 | 담당 |
 |---|---|---|---|
-| **비밀번호 재설정이 껍데기** | `backend/app/api/v1/auth.py:78-89` | 두 엔드포인트가 아무 일도 안 하고 성공 응답만 반환합니다. 이메일도 안 나가고 비밀번호도 안 바뀌는데 앱에는 성공으로 보여, 비밀번호를 잊으면 계정 복구가 불가능합니다 | 백엔드 |
-| **연동 URL을 리다이렉트로 준다** | `backend/app/api/v1/auth.py` `kakao_link_start` | `RedirectResponse` 대신 `{"authorize_url": ...}` JSON이어야 합니다. 이 엔드포인트는 `Authorization` 헤더가 필요한데 앱은 브라우저로 여는 구조라 지금은 401입니다. 프론트는 JSON을 가정해 배선을 끝냈습니다 | 백엔드 |
-| 카카오 로그인 시 이메일 중복 | `services/auth.py:76` | `social_id`로만 찾고 없으면 새로 만드는데 `users.email`이 unique라, 같은 이메일로 가입한 사람이 카카오로 로그인하면 IntegrityError가 납니다 | 백엔드 |
-| `daily_records.timezone` 값이 안 채워짐 | `services/ai.py` `DailyRecord(...)` | 컬럼도 있고 읽는 쪽도 있는데 넣는 코드가 없어 항상 `Asia/Seoul` 폴백입니다. 하루 경계(4시)는 반영됐으나 `day_bounds()`가 KST 고정이라 해외에서는 여전히 어긋납니다 | 백엔드(analyze 담당) |
-| 검색어가 미리보기 밖에 있으면 안 보임 | `backend/app/api/v1/blog.py:50` | `summary`가 `content[:100]` 고정이라, 본문 200자 지점이 검색돼도 카드에서 확인할 수 없습니다 | 백엔드 |
-| AI 장소 매칭이 카테고리 순서에 의존 | `ai/server/modules/gps.py` | 거리 비교 없이 먼저 조회한 카테고리가 이깁니다. 카페에 있어도 300m 안 음식점으로 기록됩니다. 조회 카테고리도 4종뿐이라 병원·학교·마트 등은 "알 수 없음" | AI(강태윤) |
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시. 상한을 늘리려면 `__tests__/blogApi.test.ts`도 같이 고쳐야 합니다 | 프론트(글쓰기) |
-| 날짜 비교가 인덱스를 못 탐 | `calendar.py`, `ai.py` | `func.date(func.timezone(...))`로 컬럼을 감쌌습니다 | 백엔드 |
+| 타임라인 사진이 원본 | `services/photos.py` | 60px 썸네일에 원본(3~5MB)을 그대로 내려줍니다. 업로드 때 축소본을 같이 만들어달라고 요청해둔 상태 | 백엔드 |
+| **`day_bounds()`가 KST 하드코딩** | `backend/app/utils/timezone.py` | **해외 베타 블로커.** 앱은 기기 tz 4시로 "오늘"을 정하는데 서버는 KST 4시로 자릅니다. 뉴욕이면 현지 오후 3시에 날짜가 바뀌어 저녁 기록이 다음 날 칸으로 갑니다. `daily_records.timezone`은 채워지는데 경계 계산이 그 값을 안 봅니다 (아래 "타임존" 참고) | 백엔드 |
+| 로깅 설정이 없음 | `backend/app/main.py` | `basicConfig`가 없어 앱 로거의 INFO는 사라지고 ERROR는 포맷 없이 찍힙니다. 장애 때 원인 추적이 어렵습니다 | 백엔드 |
 
 ## 미구현 / TODO
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
 | **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
-| **모아쓰기 — 불연속 선택** | 백엔드 `BlogGenerateRequest` | 프론트는 끝났습니다(아래 "모아쓰기" 참고). 백엔드가 `start_date`/`end_date`만 받아 **띄엄띄엄 고른 날짜를 표현할 수 없습니다.** `dates: list[date]` 추가 요청 중이고, 들어오면 프론트 재배포 없이 켜집니다 |
 | `beforeRemove` 훅으로 묶기 | `write`, `write-preview` | 뒤로가기 차단 로직이 두 화면에 복제됨. 막을 화면이 하나 더 생기면 `useConfirmBeforeLeave`로 |
 | 입력 필드 컴포넌트화 | `write/index.tsx` | 같은 모양의 `레이블 + TextInput` 4벌. `LabeledTextInput`으로 빼면 60줄쯤 줄어듦 |
 | `write-preview` 분해 | `write-preview/index.tsx` | 336줄에 조회·수정·저장·삭제·취소가 다 있음. `useBlogDraft()` 훅 분리 — 라우터 파라미터로 본문 넘기는 문제와 같이 정리 |
@@ -546,21 +572,12 @@ npx jest gpsTask      # 파일 하나
 
 ## 백엔드·AI 협의 중
 
-**1. 카카오 로그인/연동 흐름** — 지금 `kakao_login`은 `social_id`로만 사용자를 찾고 없으면
-새로 만듭니다. 그래서 (a) 이메일로 가입한 사람이 연동을 시도하면 별개 계정이 생기고,
-(b) 같은 이메일이면 unique 제약에 걸립니다.
-`social_id`로 못 찾았을 때 **email로도 찾아 기존 계정에 붙이면** 두 문제가 함께 풀리고,
-"카카오로 한 번 로그인하면 자동 연동"이 됩니다.
-`/auth/kakao/link`(state 기반)는 이미 들어왔지만 **로그인 경로의 이메일 중복은 그대로**라,
-사용자가 설정 > 계정에서 연동을 거쳐야만 계정이 합쳐집니다.
+**1. 모아쓰기 요청 형식** — 확정됐습니다. `daily_record_id`(하루) / `start_date`+`end_date`(기간) /
+`dates`(불연속) 배타, 최대 31일(`MAX_BLOG_PERIOD_DAYS`), 기록 없는 날은 백엔드가 제외,
+횟수는 1회 차감, 같은 기간 생성 **진행 중**일 때만 409.
 
-**2. 모아쓰기 요청 형식** — 대부분 확정됐습니다. `daily_record_id`(하루) /
-`start_date`+`end_date`(기간) 배타, 최대 31일(`MAX_BLOG_PERIOD_DAYS`), 기록 없는 날은
-백엔드가 알아서 제외, 횟수는 1회 차감, 같은 기간 생성 **진행 중**일 때만 409(완료된 뒤에는
-몇 번이든 다시 쓸 수 있습니다). AI 서버 payload도 `days` 배열로 합의됐습니다.
-**남은 건 불연속 선택(`dates: list[date]`) 하나입니다.**
+**2. 타임존** — analyze `?timezone=`은 `daily_records.timezone`에 저장됩니다.
+남은 건 `day_bounds()`의 KST 하드코딩과 GPS 업로드 body의 `timezone`입니다 (위 "알려진 문제").
 
-**3. 타임존 값 채우기** — 하루 경계 4시는 반영됐습니다(`DAY_BOUNDARY_HOUR`).
-남은 건 ①GPS 업로드 body의 `timezone`과 analyze `?timezone=`을 받아
-`daily_records.timezone`에 저장하는 것, ②`day_bounds()`의 KST 하드코딩을
-그 값으로 바꾸는 것입니다. 프론트는 이미 둘 다 보내고 있어 받기만 하면 켜집니다.
+**3. 사진 썸네일** — 위 "알려진 문제" 참고. 업로드 때 축소본을 만들고 타임라인이 그 URL을
+주면 됩니다. `Pillow`·`pillow-heif`는 이미 들어가 있습니다.

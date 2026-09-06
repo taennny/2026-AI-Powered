@@ -38,10 +38,6 @@ export async function fetchBlogs(
 }
 export type WritingStyle = 'info' | 'emotion';
 
-/**
- * 하루 모드는 `daily_record_id`, 모아쓰기는 날짜 지정 — 서버가 둘을 배타로 검증한다.
- * `dates`(불연속)는 백엔드 지원 대기 중이라 연속 선택은 start/end로 보낸다.
- */
 export type GenerateBlogRequest = {
   daily_record_id?: string;
   start_date?: string;

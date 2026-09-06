@@ -11,8 +11,8 @@ export type GpsLog = {
 };
 
 /**
- * tz를 미리 동봉한다 — 백엔드가 아직 안 받지만 조용히 버려질 뿐이고,
- * 받기 시작하면 앱 재배포 없이 켜진다 (앱 배포는 심사 때문에 느리다).
+ * tz를 동봉한다 — 스키마는 받지만 아직 저장하지 않는다(`save_gps_logs`가 안 읽음).
+ * 쓰기 시작하면 앱 재배포 없이 켜진다 (앱 배포는 심사 때문에 느리다).
  */
 export async function uploadGpsLogs(logs: GpsLog[]): Promise<void> {
   await api.post('/api/v1/gps/logs', {logs, timezone: getDeviceTimeZone()});
