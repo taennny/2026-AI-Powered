@@ -37,12 +37,18 @@ export default function RotatingMessage({
   const [tick, setTick] = useState(0);
   const opacity = useRef(new Animated.Value(1)).current;
 
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const stepsPerMessage = MAX_DOTS * cyclesPerMessage;
   const isLastMessage = index >= messages.length - 1;
 
   useEffect(() => {
-    let animation: Animated.CompositeAnimation | null = null;
-
     const timer = setTimeout(() => {
       // 점이 마지막으로 세 개가 된 다음 칸에서 넘어간다
       const shouldAdvance =
@@ -53,33 +59,26 @@ export default function RotatingMessage({
         return;
       }
 
-      animation = Animated.timing(opacity, {
+      Animated.timing(opacity, {
         toValue: 0,
         duration: fadeMs,
         useNativeDriver: true,
-      });
-
-      animation.start(({finished}) => {
-        // 언마운트로 stop()된 경우 — 사라진 화면의 상태를 건드리지 않는다
-        if (!finished) return;
+      }).start(() => {
+        if (!isMountedRef.current) return;
 
         setIndex(current => current + 1);
         // stepsPerMessage가 MAX_DOTS의 배수라 새 문구는 점 하나에서 시작한다
         setTick(current => current + 1);
 
-        animation = Animated.timing(opacity, {
+        Animated.timing(opacity, {
           toValue: 1,
           duration: fadeMs,
           useNativeDriver: true,
-        });
-        animation.start();
+        }).start();
       });
     }, dotStepMs);
 
-    return () => {
-      clearTimeout(timer);
-      animation?.stop();
-    };
+    return () => clearTimeout(timer);
   }, [tick, isLastMessage, stepsPerMessage, dotStepMs, fadeMs, opacity]);
 
   const dotCount = (tick % MAX_DOTS) + 1;
