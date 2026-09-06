@@ -232,7 +232,7 @@ export default function BottomSheet({
                 style={{left: 6 + BAR_LEFT}}
               />
               {hourGroups.map(({hour, places: hourPlaces}) => (
-                <View key={hour} className="flex-row mb-2">
+                <View key={hour} className="flex-row">
                   <View className="w-8 pt-[14px] items-end pr-2">
                     <Text className="text-xs font-medium text-tertiary">
                       {hour}
