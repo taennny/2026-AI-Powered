@@ -136,7 +136,12 @@ export default function WritePreviewScreen() {
               }
             }
 
-            router.replace('/(main)/(tabs)/journal-list');
+            // 새 글을 취소하면 남는 게 없으니 홈으로. 저장했을 때(저널 리스트)와
+            // 도착지가 같으면 취소한 건지 저장된 건지 구분이 안 된다.
+            // 수정 취소는 저널 리스트에서 온 것이라 그대로 돌려보낸다
+            router.replace(
+              isNewBlog ? '/(main)/(tabs)/home' : '/(main)/(tabs)/journal-list',
+            );
           },
         },
       ],
