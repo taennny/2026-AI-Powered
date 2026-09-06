@@ -29,11 +29,14 @@ async def upload_gps_logs(
 @router.post("/logs/{date}/analyze", response_model=AnalyzeResponse)
 async def analyze_gps_logs(
     date: date,
+    user_timezone: str | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        daily_record_id, place_count = await analyze_and_save(db, current_user.id, date)
+        daily_record_id, place_count = await analyze_and_save(
+            db, current_user.id, date, timezone=user_timezone
+        )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
