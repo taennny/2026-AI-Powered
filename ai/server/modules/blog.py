@@ -346,4 +346,5 @@ class Generate(Resource):
 
         except Exception as e:
             logger.error("블로그 생성 오류: %s", e)
-            return {"error": str(e)}, 500
+            # 내부 예외 메시지는 로그에만, 응답은 일반 메시지 (내부정보 노출 방지)
+            return {"error": "블로그 생성 중 오류가 발생했습니다."}, 500
