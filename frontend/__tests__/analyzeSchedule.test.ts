@@ -5,8 +5,10 @@ import {useTimelineStore} from '@/store/timelineStore';
 import {
   analyzeOnForeground,
   analyzePeriodically,
+  analyzeNow,
   BACKGROUND_INTERVAL_MS,
   FOREGROUND_MIN_INTERVAL_MS,
+  RETRY_BASE_MS,
   __resetAnalyzeSchedule,
 } from '@/utils/analyzeSchedule';
 
@@ -145,6 +147,99 @@ describe('analyzeSchedule', () => {
 
       await expect(analyzeOnForeground(T + 5_000)).resolves.toBe(false);
       expect(mockAnalyze).not.toHaveBeenCalled();
+    });
+  });
+
+  // 서버가 죽어 있는 동안 실패할 때마다 즉시 재시도하면, 안 될수록 더 세게 때린다.
+  // 실제로 analyze가 502로 계속 실패하는 동안 GPS 배치마다 하루치 로그가 올라갔다.
+  describe('연속 실패 백오프', () => {
+    /** 두 번 연속 실패시켜 백오프를 켠다. @returns 두 번째 실패 시각 */
+    const failTwice = async (): Promise<number> => {
+      mockAnalyze.mockRejectedValue(new Error('502'));
+      await analyzePeriodically(T); // 1회차 실패 — 대기 없음
+      await analyzePeriodically(T + 1000); // 2회차 실패 — 여기서 1분이 걸린다
+      return T + 1000;
+    };
+
+    it('두 번째 실패부터는 곧바로 재시도하지 않는다', async () => {
+      const failedAt = await failTwice();
+      mockAnalyze.mockClear();
+
+      await analyzePeriodically(failedAt + RETRY_BASE_MS - 1);
+
+      expect(mockAnalyze).not.toHaveBeenCalled();
+    });
+
+    it('백오프가 지나면 다시 시도한다', async () => {
+      const failedAt = await failTwice();
+      mockAnalyze.mockClear();
+
+      await analyzePeriodically(failedAt + RETRY_BASE_MS);
+
+      expect(analyzedDates()).toEqual(['2026-08-05']);
+    });
+
+    it('실패가 이어질수록 간격이 벌어진다', async () => {
+      const failedAt = await failTwice();
+
+      // 3회차 실패 → 2분
+      await analyzePeriodically(failedAt + RETRY_BASE_MS);
+      mockAnalyze.mockClear();
+
+      const thirdFailedAt = failedAt + RETRY_BASE_MS;
+      await analyzePeriodically(thirdFailedAt + RETRY_BASE_MS); // 1분 뒤 — 아직 이르다
+      expect(mockAnalyze).not.toHaveBeenCalled();
+
+      await analyzePeriodically(thirdFailedAt + 2 * RETRY_BASE_MS);
+      expect(mockAnalyze).toHaveBeenCalled();
+    });
+
+    it('성공하면 간격이 초기화된다', async () => {
+      const failedAt = await failTwice();
+
+      mockAnalyze.mockClear().mockResolvedValue({daily_record_id: 'rec-1'});
+      await analyzePeriodically(failedAt + RETRY_BASE_MS); // 성공
+
+      // 다시 한 번 실패해도 첫 실패 취급이라 곧바로 재시도된다
+      const okAt = failedAt + RETRY_BASE_MS;
+      mockAnalyze.mockClear().mockRejectedValue(new Error('502'));
+      await analyzePeriodically(okAt + BACKGROUND_INTERVAL_MS);
+
+      mockAnalyze.mockClear().mockResolvedValue({daily_record_id: 'rec-2'});
+      await analyzePeriodically(okAt + BACKGROUND_INTERVAL_MS + 1000);
+
+      expect(mockAnalyze).toHaveBeenCalled();
+    });
+
+    it('포그라운드 복귀도 백오프를 지킨다', async () => {
+      const failedAt = await failTwice();
+      mockAnalyze.mockClear();
+
+      await expect(
+        analyzeOnForeground(failedAt + RETRY_BASE_MS - 1),
+      ).resolves.toBe(false);
+      expect(mockAnalyze).not.toHaveBeenCalled();
+    });
+
+    // 사용자가 직접 누른 것이라 "아직 기다려야 한다"로 막으면 버튼이 죽은 것처럼 보인다
+    it('새로고침 버튼은 백오프를 무시한다', async () => {
+      const failedAt = await failTwice();
+      mockAnalyze.mockClear().mockResolvedValue({daily_record_id: 'rec-1'});
+
+      await analyzeNow(failedAt + 1000);
+
+      expect(analyzedDates()).toEqual(['2026-08-05']);
+    });
+
+    it('새로고침 버튼이 성공하면 자동 경로의 백오프도 풀린다', async () => {
+      const failedAt = await failTwice();
+      mockAnalyze.mockClear().mockResolvedValue({daily_record_id: 'rec-1'});
+      await analyzeNow(failedAt + 1000);
+
+      mockAnalyze.mockClear();
+      await analyzePeriodically(failedAt + 1000 + BACKGROUND_INTERVAL_MS);
+
+      expect(mockAnalyze).toHaveBeenCalled();
     });
   });
 });
