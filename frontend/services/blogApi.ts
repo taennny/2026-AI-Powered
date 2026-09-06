@@ -82,7 +82,15 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
+  /** 모아쓰기면 첫 날. 하루짜리는 그 날 */
   target_date: string;
+  /**
+   * 글에 실제로 포함된 날짜 목록. 하루짜리는 없다.
+   * 서버가 기록 없는 날을 빼고 주므로, 고를 때의 목록보다 짧을 수 있다.
+   * 연속 구간을 뜻하는 `period_end`도 서버에 있지만, 불연속 모아쓰기에서는
+   * 비어 있어 개수를 셀 수 없다 — 표기는 이 배열만 본다.
+   */
+  dates?: string[] | null;
   created_at: string;
   photo_urls?: string[];
 };

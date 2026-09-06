@@ -119,6 +119,9 @@ export default function WriteScreen() {
           title: blog.title,
           content: blog.content,
           targetData: blog.target_date,
+          // 고를 때의 dateKeys가 아니라 서버가 준 목록을 넘긴다 —
+          // 기록이 없는 날은 서버가 빼므로 개수가 다를 수 있다
+          dates: (blog.dates ?? []).join(','),
           createdAt: blog.created_at,
         },
       });

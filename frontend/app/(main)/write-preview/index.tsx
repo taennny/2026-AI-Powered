@@ -33,17 +33,23 @@ export default function WritePreviewScreen() {
   const router = useRouter();
   const tc = useThemeColors();
 
-  const {blogId, title, content, targetData, createdAt} = useLocalSearchParams<{
-    blogId?: string;
-    title?: string;
-    content?: string;
-    targetData?: string;
-    createdAt?: string;
-  }>();
+  const {blogId, title, content, targetData, dates, createdAt} =
+    useLocalSearchParams<{
+      blogId?: string;
+      title?: string;
+      content?: string;
+      targetData?: string;
+      /** 모아쓰기에 포함된 날짜 — 'YYYY-MM-DD' 콤마 목록 */
+      dates?: string;
+      createdAt?: string;
+    }>();
 
   const [journalTitle, setJournalTitle] = useState(title || '');
   const [journalContent, setJournalContent] = useState(content || '');
   const [journalTargetDate, setJournalTargetDate] = useState(targetData || '');
+  const [journalDates, setJournalDates] = useState<string[]>(() =>
+    dates ? dates.split(',').filter(Boolean) : [],
+  );
   const [journalCreatedAt, setJournalCreatedAt] = useState(createdAt || '');
 
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +69,7 @@ export default function WritePreviewScreen() {
         setJournalTitle(detail.title);
         setJournalContent(detail.content);
         setJournalTargetDate(detail.target_date);
+        setJournalDates(detail.dates ?? []);
         setJournalCreatedAt(detail.created_at);
       })
       .catch(() => {
@@ -89,8 +96,19 @@ export default function WritePreviewScreen() {
       return date;
     }
 
-    return parsedDate.toLocaleDateString('ko-KR');
+    const yy = String(parsedDate.getFullYear()).slice(2);
+    const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(parsedDate.getDate()).padStart(2, '0');
+
+    return `${yy}.${mm}.${dd}`;
   };
+
+  /**
+   * 모아쓰기는 첫 날만 적고 나머지는 개수로 줄인다 — 날짜를 다 나열하면
+   * 31일까지 가능해서 한 줄을 넘긴다.
+   * `target_date`가 첫 날이므로 나머지는 전체에서 하나 뺀 값이다.
+   */
+  const extraDayCount = Math.max(journalDates.length - 1, 0);
 
   const handleCancelPress = () => {
     Alert.alert(
@@ -254,6 +272,7 @@ export default function WritePreviewScreen() {
           <View className="w-[90%] mb-5">
             <Text className="text-sm font-semibold text-primary">
               위치 기록 날짜 {formatDate(journalTargetDate)}
+              {extraDayCount > 0 ? ` 외 ${extraDayCount}일` : ''}
             </Text>
 
             <Text className="mt-1 text-xs text-muted">
