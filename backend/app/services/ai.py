@@ -34,7 +34,10 @@ def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 async def analyze_and_save(
-    db: AsyncSession, user_id: uuid.UUID, target_date: date
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    target_date: date,
+    user_timezone: str | None = None,
 ) -> tuple[uuid.UUID | None, int]:
     # 1. 해당 날짜 GPS 로그 조회 (하루 경계: 04:00 KST 기준)
     start_dt, end_dt = day_bounds(target_date)
@@ -125,8 +128,9 @@ async def analyze_and_save(
             user_id=user_id,
             target_date=target_date,
             total_distance=round(total_distance, 2),
-            place_count=0,  # 아래서 보존/신규 개수 합산 후 갱신
+            place_count=0,
             photo_count=photo_count,
+            timezone=user_timezone,
         )
         db.add(daily_record)
         await db.flush()

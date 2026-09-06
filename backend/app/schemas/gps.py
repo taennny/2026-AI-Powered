@@ -12,6 +12,7 @@ class GPSLogItem(BaseModel):
 
 class GPSLogBatchRequest(BaseModel):
     logs: list[GPSLogItem]
+    timezone: str | None = None
 
 
 class GPSLogBatchResponse(BaseModel):
