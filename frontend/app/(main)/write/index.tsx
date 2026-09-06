@@ -21,6 +21,13 @@ import {
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import RotatingMessage from '@/components/write/RotatingMessage';
+import {
+  CLOSING_MESSAGE,
+  PROGRESS_MESSAGES,
+  TIP_MESSAGES,
+} from '@/constants/loadingMessages';
+import {buildLoadingSequence} from '@/utils/loadingSequence';
 import {describeBlogGenerationError} from '@/utils/blogGenerationError';
 import {useDateSelectionStore} from '@/store/dateSelectionStore';
 
@@ -47,6 +54,11 @@ export default function WriteScreen() {
   const [feeling, setFeeling] = useState('');
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // 생성을 누를 때마다 다시 섞는다 — 실패 후 또 눌러도 같은 순서가 반복되지 않고,
+  // 금방 끝나는 사람도 매번 다른 팁을 본다
+  const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
+
   useEffect(() => {
     if (!isLoading) return;
 
@@ -87,6 +99,9 @@ export default function WriteScreen() {
     }
 
     try {
+      setLoadingMessages(
+        buildLoadingSequence(PROGRESS_MESSAGES, TIP_MESSAGES, CLOSING_MESSAGE),
+      );
       setIsLoading(true);
       // 빈 항목은 빼고 보낸다 — `오늘 간 장소: `처럼 레이블만 가면 AI가 그걸 내용으로 읽는다
       const userNote =
@@ -160,9 +175,9 @@ export default function WriteScreen() {
         <SafeAreaView className="flex-1 bg-surface justify-center items-center">
           <ActivityIndicator size="large" />
 
-          <Text className="mt-[14px] text-sm text-tertiary">
-            로미가 열심히 적고 있어요.
-          </Text>
+          <View className="mt-[14px]">
+            <RotatingMessage messages={loadingMessages} />
+          </View>
         </SafeAreaView>
       </>
     );
