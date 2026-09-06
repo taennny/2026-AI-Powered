@@ -1,6 +1,6 @@
 """add photos.thumbnail_key
 
-Revision ID: a2c4e6f8b0d1
+Revision ID: c1f3a5b7d9e2
 Revises: b6d8f0a2c4e5
 Create Date: 2026-09-07
 
@@ -16,7 +16,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "a2c4e6f8b0d1"
+revision: str = "c1f3a5b7d9e2"
 down_revision: Union[str, None] = "b6d8f0a2c4e5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
