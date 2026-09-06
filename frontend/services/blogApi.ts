@@ -6,7 +6,9 @@ export async function deleteBlog(blogId: string): Promise<void> {
 
 export type JournalData = {
   id: string;
-  date: string; // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD' — 모아쓰기면 첫 날
+  /** 글에 실제로 포함된 날짜 목록. 하루짜리는 없다 (상세의 `dates`와 같은 값) */
+  dates?: string[] | null;
   title: string;
   summary: string | null; // 카드 미리보기용 (본문 앞 100자, nullable)
   thumbnail_url: string | null;
