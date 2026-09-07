@@ -20,6 +20,23 @@ def resolve_tz(tz_name: str | None):
         return KST
 
 
+def utc_offset_minutes(moment: datetime, tz_name: str | None) -> int:
+    """그 순간 그 지역의 UTC 오프셋(분).
+
+    **순간마다 다시 계산해야 한다** — 서머타임이 있는 지역은 같은 장소라도
+    계절에 따라 오프셋이 바뀐다.
+
+    naive로 올라온 시각은 UTC로 본다. 그대로 astimezone하면 서버의
+    로컬 시간대로 해석돼 조용히 틀어진다.
+    """
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+
+    offset = moment.astimezone(resolve_tz(tz_name)).utcoffset()
+    # UTC 지역은 timedelta(0)이고 그건 falsy다 — `if offset`으로 쓰면 버그로 읽힌다
+    return int(offset.total_seconds() // 60) if offset is not None else 0
+
+
 def week_bounds(now: datetime | None = None) -> tuple[datetime, datetime]:
     """현재 시각이 속한 주의 [시작, 끝) — 월요일 04:00 KST 기준, UTC aware로 반환.
 

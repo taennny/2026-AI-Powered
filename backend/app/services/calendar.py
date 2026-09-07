@@ -12,7 +12,7 @@ from app.models.gps_log import GpsLog
 from app.models.photos import Photo
 from app.models.place import Place
 from app.services.storage import get_presigned_url
-from app.utils.timezone import day_bounds
+from app.utils.timezone import day_bounds, utc_offset_minutes
 
 try:
     from app.models.blog import Blog
@@ -163,6 +163,8 @@ async def get_timeline(
             url = await get_presigned_url(place_photos[0].storage_key)
             photo_urls.append(url)
 
+        place_tz = place.timezone or record.timezone
+
         place_list.append(
             {
                 "place_id": str(place.id),
@@ -173,7 +175,8 @@ async def get_timeline(
                 "lat": to_shape(place.location).y,
                 "lng": to_shape(place.location).x,
                 # 앱이 폴백을 또 짜지 않도록 여기서 채운다
-                "timezone": place.timezone or record.timezone,
+                "timezone": place_tz,
+                "utc_offset_minutes": utc_offset_minutes(place.arrived_at, place_tz),
                 "photos": photo_urls,
             }
         )
