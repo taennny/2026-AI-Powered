@@ -103,8 +103,9 @@ async def get_timeline(
     if not record:
         return None
 
-    # GPS 로그도 하루 경계(04:00 KST) 기준으로 조회
-    start_dt, end_dt = day_bounds(target_date)
+    # GPS 로그도 하루 경계(04:00) 기준으로 조회 — 그 기록의 시간대를 쓴다.
+    # 여기만 KST로 남으면 해외에서 지도 폴리라인만 어긋난다.
+    start_dt, end_dt = day_bounds(target_date, record.timezone)
     gps_result = await db.execute(
         select(GpsLog)
         .where(
