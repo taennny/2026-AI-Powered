@@ -171,6 +171,8 @@ async def get_timeline(
                 "left_at": place.left_at,
                 "lat": to_shape(place.location).y,
                 "lng": to_shape(place.location).x,
+                # 앱이 폴백을 또 짜지 않도록 여기서 채운다
+                "timezone": place.timezone or record.timezone,
                 "photos": photo_urls,
             }
         )

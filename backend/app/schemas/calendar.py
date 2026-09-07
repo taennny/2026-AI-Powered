@@ -31,6 +31,8 @@ class PlaceEntry(BaseModel):
     left_at: datetime | None
     lat: float
     lng: float
+    # 이 장소를 어느 지역 시각으로 보여줄지. 서버가 폴백까지 채워 보낸다
+    timezone: str | None = None
     photos: List[str] = []
 
 
