@@ -8,8 +8,14 @@ import {useCalendar} from '@/hooks/useCalendar';
 export default function HomeIndex() {
   const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const [calendarHeight, setCalendarHeight] = useState<number | null>(null);
-  const {selectedDate, setSelectedDate, viewDate, setViewDate, calendarDays, places} =
-    useCalendar();
+  const {
+    selectedDate,
+    setSelectedDate,
+    viewDate,
+    setViewDate,
+    calendarDays,
+    places,
+  } = useCalendar();
 
   const peekHeight =
     containerHeight !== null && calendarHeight !== null

@@ -32,6 +32,7 @@ class PlaceEntry(BaseModel):
     lat: float
     lng: float
     photos: List[str] = []
+    thumbnails: List[str] = []
 
 
 class TimelineResponse(BaseModel):

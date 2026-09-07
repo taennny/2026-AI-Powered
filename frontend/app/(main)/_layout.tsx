@@ -11,8 +11,10 @@ import {clearCalendarCache} from '@/hooks/useCalendar';
 import {clearJournalCache} from '@/hooks/useJournalList';
 import {useDateSelectionStore} from '@/store/dateSelectionStore';
 import {clearPhotoSyncState} from '@/utils/photoSync';
+import {resetAnalyzeSchedule} from '@/utils/analyzeSchedule';
 import {stopGpsTracking} from '@/hooks/useGpsTracking';
 import {useSubscriptionStore} from '@/store/subscriptionStore';
+import {useThemeStore} from '@/store/themeStore';
 import {identifyUser, resetIdentifiedUser} from '@/services/purchases';
 
 export default function MainLayout() {
@@ -39,12 +41,16 @@ export default function MainLayout() {
     // 다음 계정이 이전 사용자의 구독 상태·결제 신원을 물려받으면 안 된다
     useSubscriptionStore.getState().reset();
     resetIdentifiedUser();
+    // 프리미엄 테마가 다음 계정에 그대로 남으면 안 된다
+    useThemeStore.getState().reset();
     // 같은 이유로 화면 캐시도 비운다 — 남겨두면 다음 계정에 이전 사용자의
     // 캘린더·저널이 잠깐 보인다
     clearCalendarCache();
     clearJournalCache();
     useDateSelectionStore.getState().clear();
     void clearPhotoSyncState();
+    void resetAnalyzeSchedule();
+    // GPS 큐는 비우지 않는다 — 아직 못 올린 좌표는 그 계정으로 다시 로그인할 때 올라간다
     // 로그아웃·회원탈퇴·토큰 만료가 모두 여기를 지난다.
     // 백그라운드 태스크는 화면이 사라져도 살아남으므로 명시적으로 꺼야 한다 —
     // 안 그러면 로그아웃한 사용자의 위치를 계속 수집한다.

@@ -14,6 +14,7 @@ type ThemeStore = {
   themeVars: ReturnType<typeof vars>;
   setTheme: (id: ThemeId) => void;
   initialize: () => Promise<void>;
+  reset: () => void;
 };
 
 export const useThemeStore = create<ThemeStore>(set => ({
@@ -30,5 +31,11 @@ export const useThemeStore = create<ThemeStore>(set => ({
     if (saved && VALID_THEMES.includes(saved as ThemeId)) {
       set({themeId: saved as ThemeId, themeVars: THEMES[saved as ThemeId]});
     }
+  },
+
+  /** 로그아웃 시 — 테마는 기기가 아니라 계정에 딸린 설정이다 */
+  reset: () => {
+    set({themeId: 'basic', themeVars: THEMES.basic});
+    AsyncStorage.removeItem(THEME_KEY).catch(() => {});
   },
 }));

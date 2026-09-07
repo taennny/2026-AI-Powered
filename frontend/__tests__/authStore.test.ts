@@ -8,6 +8,7 @@ import {
   getRefreshToken,
   removeTokens,
   saveTokens,
+  __resetSecureStoreCache,
 } from '@/utils/tokenStorage';
 
 const reset = () => useAuthStore.setState({isAuthenticated: false});
@@ -16,6 +17,8 @@ const reset = () => useAuthStore.setState({isAuthenticated: false});
 const clearStorages = async () => {
   await AsyncStorage.clear();
   (SecureStore as unknown as {__clear: () => void}).__clear();
+  // 모듈에 남은 가용성 판단·접근성 이관 기록까지 비운다
+  __resetSecureStoreCache();
 };
 
 describe('authStore', () => {
@@ -86,6 +89,31 @@ describe('tokenStorage — 보안 저장소', () => {
     // 평문 저장소에는 흔적이 남으면 안 된다 — 백업으로 새는 경로다
     await expect(AsyncStorage.getItem('accessToken')).resolves.toBeNull();
     await expect(AsyncStorage.getItem('refreshToken')).resolves.toBeNull();
+  });
+
+  // 기본값(WHEN_UNLOCKED)이면 잠긴 동안 못 읽어, 걷는 중 GPS 업로드가 통째로 실패한다
+  it('잠금 중에도 읽히고 기기를 벗어나지 않는 접근성으로 저장한다', async () => {
+    await saveTokens('access-1', 'refresh-1');
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      'accessToken',
+      'access-1',
+      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY},
+    );
+  });
+
+  // 접근성은 저장할 때 박힌다 — 옛 속성으로 저장된 토큰은 다시 써야 바뀐다
+  it('이미 저장된 토큰은 읽을 때 새 접근성으로 옮긴다', async () => {
+    await SecureStore.setItemAsync('accessToken', 'old-access');
+    (SecureStore.setItemAsync as jest.Mock).mockClear();
+
+    await expect(getAccessToken()).resolves.toBe('old-access');
+
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      'accessToken',
+      'old-access',
+      {keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY},
+    );
   });
 
   it('예전 평문 저장소에 있던 토큰을 옮겨온다 — 업데이트 시 로그인이 풀리면 안 된다', async () => {

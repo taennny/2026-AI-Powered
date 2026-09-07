@@ -35,8 +35,18 @@ const SLIDE_DISTANCE = SCREEN_WIDTH * 0.25;
 const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 /** 선택 오버레이가 켜지고 꺼지는 시간 */
@@ -263,23 +273,32 @@ function Calendar({
       style={{transform: [{translateX}], opacity}}
       {...panResponder.panHandlers}
     >
-
       <View className="flex-row items-center mb-[14px]">
         <TouchableOpacity onPress={goToPrevMonth} className="pr-[10px]">
-          <Text className="text-[22px] font-medium text-teal-accent">{'<'}</Text>
+          <Text className="text-[22px] font-medium text-teal-accent">
+            {'<'}
+          </Text>
         </TouchableOpacity>
-        <Text className="text-[28px] font-extrabold text-primary" style={{letterSpacing: -0.5}}>
+        <Text
+          className="text-[28px] font-extrabold text-primary"
+          style={{letterSpacing: -0.5}}
+        >
           {MONTH_NAMES[month]} {year}
         </Text>
         <TouchableOpacity onPress={goToNextMonth} className="pl-[10px]">
-          <Text className="text-[22px] font-medium text-teal-accent">{'>'}</Text>
+          <Text className="text-[22px] font-medium text-teal-accent">
+            {'>'}
+          </Text>
         </TouchableOpacity>
       </View>
 
       <View className="flex-row mb-1">
         {DAY_LABELS.map(label => (
           <View key={label} className="flex-1 items-center pb-[6px]">
-            <Text className="text-[11px] font-medium text-dow" style={{letterSpacing: 0.4}}>
+            <Text
+              className="text-[11px] font-medium text-dow"
+              style={{letterSpacing: 0.4}}
+            >
               {label}
             </Text>
           </View>
@@ -326,7 +345,6 @@ function Calendar({
           })}
         </View>
       ))}
-
     </Animated.View>
   );
 }

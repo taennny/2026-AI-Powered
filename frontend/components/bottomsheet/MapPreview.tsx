@@ -44,7 +44,10 @@ export default function MapPreview({places}: Props) {
     setSharing(true);
     try {
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('공유할 수 없어요', '이 기기에서는 공유가 지원되지 않아요.');
+        Alert.alert(
+          '공유할 수 없어요',
+          '이 기기에서는 공유가 지원되지 않아요.',
+        );
         return;
       }
 
@@ -70,7 +73,9 @@ export default function MapPreview({places}: Props) {
         <Text className="text-sm text-secondary mb-1">
           지도를 불러올 수 없어요
         </Text>
-        <Text className="text-[11px] text-tertiary">잠시 후 다시 열어주세요</Text>
+        <Text className="text-[11px] text-tertiary">
+          잠시 후 다시 열어주세요
+        </Text>
       </View>
     );
   }

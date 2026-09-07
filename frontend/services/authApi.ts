@@ -37,7 +37,9 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
 // 토큰 재발급은 utils/api.ts의 인터셉터가 처리한다 — 여기 두면 경로가 갈라진다
 
 export async function sendResetEmail(email: string) {
-  const response = await api.post('/api/v1/auth/password-reset/request', {email});
+  const response = await api.post('/api/v1/auth/password-reset/request', {
+    email,
+  });
   return response.data;
 }
 

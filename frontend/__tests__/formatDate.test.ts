@@ -1,8 +1,11 @@
 import {
   formatDate,
   formatDateStr,
+  formatRecordDateLabel,
+  formatShortDate,
   formatTimeAgo,
   formatTimeFromISO,
+  hourFromISO,
   logicalToday,
   toDateKey,
   toLogicalDateKey,
@@ -147,5 +150,91 @@ describe('formatTimeAgo', () => {
     [ago(365 * DAY), '12달 전'],
   ])('%s → %s', (iso, expected) => {
     expect(formatTimeAgo(iso)).toBe(expected);
+  });
+});
+
+describe('formatShortDate', () => {
+  it("요일 없이 'YY.MM.DD'", () => {
+    expect(formatShortDate(new Date(2026, 8, 5))).toBe('26.09.05');
+  });
+
+  it('formatDate와 앞부분이 같다 — 요일만 더 붙는다', () => {
+    const date = new Date(2026, 8, 5);
+
+    expect(formatDate(date)).toBe(`${formatShortDate(date)}(sat)`);
+  });
+});
+
+describe('formatRecordDateLabel', () => {
+  it('하루짜리는 날짜만', () => {
+    expect(formatRecordDateLabel('2026-09-05')).toBe('26.09.05');
+    expect(formatRecordDateLabel('2026-09-05', null)).toBe('26.09.05');
+  });
+
+  // 첫 날은 date와 같으니 나머지만 센다
+  it('모아쓰기는 첫 날 + 나머지 개수', () => {
+    const dates = [
+      '2026-09-05',
+      '2026-09-06',
+      '2026-09-07',
+      '2026-09-08',
+      '2026-09-09',
+    ];
+
+    expect(formatRecordDateLabel('2026-09-05', dates)).toBe('26.09.05 외 4일');
+  });
+
+  it('하루만 담긴 목록은 "외 0일"이 되지 않는다', () => {
+    expect(formatRecordDateLabel('2026-09-05', ['2026-09-05'])).toBe(
+      '26.09.05',
+    );
+  });
+
+  it('ISO 8601도 받는다 — 작성일에 쓴다', () => {
+    expect(formatRecordDateLabel('2026-09-05T12:34:56.000Z')).toBe('26.09.05');
+  });
+
+  it('비었으면 하이픈', () => {
+    expect(formatRecordDateLabel(undefined)).toBe('-');
+    expect(formatRecordDateLabel('')).toBe('-');
+  });
+
+  // 뭉개면 서버가 무엇을 보냈는지 알 수 없다
+  it('해석할 수 없으면 원본을 그대로 보여준다', () => {
+    expect(formatRecordDateLabel('언젠가')).toBe('언젠가');
+  });
+});
+
+describe('오프셋을 준 시각 표시', () => {
+  // 서울 10:00 출발 → LA 03:00 도착. 같은 하루인데 현지 시각은 거꾸로 간다
+  const seoulDeparture = '2026-09-06T01:00:00.000Z';
+  const laArrival = '2026-09-06T10:00:00.000Z';
+
+  it('그 지역 시각으로 그린다', () => {
+    expect(formatTimeFromISO(seoulDeparture, 9 * 60)).toBe('10:00AM');
+    expect(formatTimeFromISO(laArrival, -7 * 60)).toBe('3:00AM');
+  });
+
+  it('오프셋이 없으면 기기 시간대 — 기존 호출이 안 깨진다', () => {
+    expect(formatTimeFromISO(seoulDeparture)).toBe(
+      formatTimeFromISO(seoulDeparture, 9 * 60),
+    );
+  });
+
+  it('null도 기기 시간대로 본다 — 서버가 모를 때 보내는 값', () => {
+    expect(formatTimeFromISO(seoulDeparture, null)).toBe('10:00AM');
+  });
+
+  it('0 오프셋(UTC)을 기기 시간대로 착각하지 않는다', () => {
+    expect(formatTimeFromISO(seoulDeparture, 0)).toBe('1:00AM');
+  });
+
+  it('30분 단위 오프셋도 맞는다 — 인도 등', () => {
+    expect(formatTimeFromISO(seoulDeparture, 5 * 60 + 30)).toBe('6:30AM');
+  });
+
+  it('hourFromISO는 그 지역의 몇 시인지 준다', () => {
+    expect(hourFromISO(laArrival, -7 * 60)).toBe(3);
+    expect(hourFromISO(laArrival, 9 * 60)).toBe(19);
   });
 });

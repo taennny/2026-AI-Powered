@@ -1,18 +1,19 @@
 import {api} from '@/utils/api';
 
-
 export async function deleteBlog(blogId: string): Promise<void> {
   await api.delete(`/api/v1/blog/${blogId}`);
 }
 
 export type JournalData = {
   id: string;
-  date: string;              // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD' — 모아쓰기면 첫 날
+  /** 글에 실제로 포함된 날짜 목록. 하루짜리는 없다 (상세의 `dates`와 같은 값) */
+  dates?: string[] | null;
   title: string;
-  summary: string | null;    // 카드 미리보기용 (본문 앞 100자, nullable)
+  summary: string | null; // 카드 미리보기용 (본문 앞 100자, nullable)
   thumbnail_url: string | null;
   is_published: boolean;
-  created_at: string;        // ISO 8601
+  created_at: string; // ISO 8601
 };
 
 export type BlogsResponse = {
@@ -24,21 +25,19 @@ export type BlogsResponse = {
 
 type FetchBlogsParams = {
   q?: string;
-  date?: string;   // 'YYYY-MM-DD'
+  date?: string; // 'YYYY-MM-DD'
   page?: number;
   size?: number;
 };
 
-export async function fetchBlogs(params: FetchBlogsParams = {}): Promise<BlogsResponse> {
+export async function fetchBlogs(
+  params: FetchBlogsParams = {},
+): Promise<BlogsResponse> {
   const {data} = await api.get<BlogsResponse>('/api/v1/blogs', {params});
   return data;
 }
 export type WritingStyle = 'info' | 'emotion';
 
-/**
- * 하루 모드는 `daily_record_id`, 모아쓰기는 날짜 지정 — 서버가 둘을 배타로 검증한다.
- * `dates`(불연속)는 백엔드 지원 대기 중이라 연속 선택은 start/end로 보낸다.
- */
 export type GenerateBlogRequest = {
   daily_record_id?: string;
   start_date?: string;
@@ -81,10 +80,18 @@ export type BlogDetail = {
   blog_id: string;
   title: string;
   content: string;
+  /** 모아쓰기면 첫 날. 하루짜리는 그 날 */
   target_date: string;
+  /**
+   * 글에 실제로 포함된 날짜 목록. 하루짜리는 없다.
+   * 서버가 기록 없는 날을 빼고 주므로, 고를 때의 목록보다 짧을 수 있다.
+   * 연속 구간을 뜻하는 `period_end`도 서버에 있지만, 불연속 모아쓰기에서는
+   * 비어 있어 개수를 셀 수 없다 — 표기는 이 배열만 본다.
+   */
+  dates?: string[] | null;
   created_at: string;
   photo_urls?: string[];
-}
+};
 export async function generateBlog(
   body: GenerateBlogRequest,
 ): Promise<GenerateBlogResponse> {
@@ -110,7 +117,9 @@ export async function fetchBlogDetail(blogId: string): Promise<BlogDetail> {
   return data;
 }
 
-export async function waitForBlogGeneration(blogId: string): Promise<BlogDetail> {
+export async function waitForBlogGeneration(
+  blogId: string,
+): Promise<BlogDetail> {
   const maxRetryCount = 15;
 
   for (let i = 0; i < maxRetryCount; i += 1) {
@@ -142,4 +151,3 @@ export async function updateBlog(
   const {data} = await api.put<BlogDetail>(`/api/v1/blog/${blogId}`, body);
   return data;
 }
-

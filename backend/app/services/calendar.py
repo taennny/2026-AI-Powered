@@ -103,8 +103,9 @@ async def get_timeline(
     if not record:
         return None
 
-    # GPS 로그도 하루 경계(04:00 KST) 기준으로 조회
-    start_dt, end_dt = day_bounds(target_date)
+    # GPS 로그도 하루 경계(04:00) 기준으로 조회 — 그 기록의 시간대를 쓴다.
+    # 여기만 KST로 남으면 해외에서 지도 폴리라인만 어긋난다.
+    start_dt, end_dt = day_bounds(target_date, record.timezone)
     gps_result = await db.execute(
         select(GpsLog)
         .where(
@@ -158,9 +159,15 @@ async def get_timeline(
 
         # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
         photo_urls = []
+        thumbnail_urls = []
         if place_photos:
-            url = await get_presigned_url(place_photos[0].storage_key)
-            photo_urls.append(url)
+            first = place_photos[0]
+            photo_urls.append(await get_presigned_url(first.storage_key))
+            thumbnail_urls.append(
+                await get_presigned_url(first.thumbnail_key)
+                if first.thumbnail_key
+                else photo_urls[0]
+            )
 
         place_list.append(
             {
@@ -172,6 +179,7 @@ async def get_timeline(
                 "lat": to_shape(place.location).y,
                 "lng": to_shape(place.location).x,
                 "photos": photo_urls,
+                "thumbnails": thumbnail_urls,
             }
         )
 

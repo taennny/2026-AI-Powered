@@ -66,10 +66,12 @@ describe('dateSelectionStore', () => {
 
 describe('buildDateTarget', () => {
   it('연속이면 범위로 보낸다 — 현재 서버가 아는 형태다', () => {
-    expect(buildDateTarget(['2026-08-03', '2026-08-04', '2026-08-05'])).toEqual({
-      start_date: '2026-08-03',
-      end_date: '2026-08-05',
-    });
+    expect(buildDateTarget(['2026-08-03', '2026-08-04', '2026-08-05'])).toEqual(
+      {
+        start_date: '2026-08-03',
+        end_date: '2026-08-05',
+      },
+    );
   });
 
   it('하루만 골라도 범위다', () => {

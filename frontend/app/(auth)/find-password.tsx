@@ -1,11 +1,17 @@
 import {useState} from 'react';
-import {Text, TextInput, TouchableOpacity, View, Keyboard, TouchableWithoutFeedback} from 'react-native';
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Keyboard,
+  TouchableWithoutFeedback,
+} from 'react-native';
 
 import {sendResetEmail} from '@/services/authApi';
 import BackButton from '@/components/common/BackButton';
 
 export default function FindPasswordScreen() {
-
   const [email, setEmail] = useState('');
   const [guideMessage, setGuideMessage] = useState('');
   const [guideColor, setGuideColor] = useState('#CCCCCC');
@@ -46,47 +52,52 @@ export default function FindPasswordScreen() {
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-    <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
-      <BackButton />
-      <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
-        Roa{'\n'}me
-      </Text>
+      <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
+        <BackButton />
+        <Text className="text-[#111111] text-[22px] leading-[22px] font-black mb-[56px]">
+          Roa{'\n'}me
+        </Text>
 
-      <View className="mb-[10px]">
-        <View className="flex-row items-center justify-between mb-[6px]">
-          <Text className="text-[12px] leading-[12px] text-[#3C3C43]">이메일</Text>
-          <Text style={{color: guideColor}} className="text-[10px] leading-[10px]">
-            {guideMessage}
-          </Text>
+        <View className="mb-[10px]">
+          <View className="flex-row items-center justify-between mb-[6px]">
+            <Text className="text-[12px] leading-[12px] text-[#3C3C43]">
+              이메일
+            </Text>
+            <Text
+              style={{color: guideColor}}
+              className="text-[10px] leading-[10px]"
+            >
+              {guideMessage}
+            </Text>
+          </View>
+          <TextInput
+            value={email}
+            onChangeText={text => {
+              setEmail(text);
+              setGuideMessage('');
+              setGuideColor('#CCCCCC');
+            }}
+            placeholder="이메일을 입력해주세요."
+            placeholderTextColor="#CCCCCC"
+            autoCapitalize="none"
+            keyboardType="email-address"
+            className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
+          />
         </View>
-        <TextInput
-          value={email}
-          onChangeText={text => {
-            setEmail(text);
-            setGuideMessage('');
-            setGuideColor('#CCCCCC');
-          }}
-          placeholder="이메일을 입력해주세요."
-          placeholderTextColor="#CCCCCC"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          className="h-[31px] rounded-[5px] border border-line px-[11px] text-[12px] text-[#3C3C43] bg-white"
-        />
-      </View>
 
-      <View className="flex-row justify-end mt-[12px]">
-        <TouchableOpacity
-          activeOpacity={0.85}
-          disabled={isLoading}
-          onPress={handleSendResetEmail}
-          className="w-[90px] h-[22px] rounded-[4px] items-center justify-center bg-primary"
-        >
-          <Text className="text-[10px] leading-[10px] text-white">
-            {isLoading ? '로딩중' : '메일 발송'}
-          </Text>
-        </TouchableOpacity>
+        <View className="flex-row justify-end mt-[12px]">
+          <TouchableOpacity
+            activeOpacity={0.85}
+            disabled={isLoading}
+            onPress={handleSendResetEmail}
+            className="w-[90px] h-[22px] rounded-[4px] items-center justify-center bg-primary"
+          >
+            <Text className="text-[10px] leading-[10px] text-white">
+              {isLoading ? '로딩중' : '메일 발송'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
     </TouchableWithoutFeedback>
   );
 }

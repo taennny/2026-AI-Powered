@@ -52,9 +52,9 @@ describe('describeBlogGenerationError', () => {
 
   // 429로 합의되기 전 임시로 받아주던 코드들이다
   it.each([402, 403])('%d는 더 이상 횟수 초과로 보지 않는다', status => {
-    expect(describeBlogGenerationError(httpError(status)).showSubscription).toBe(
-      false,
-    );
+    expect(
+      describeBlogGenerationError(httpError(status)).showSubscription,
+    ).toBe(false);
   });
 
   it('409는 이미 생성 중이라고 알린다 — 구독과 무관하다', () => {

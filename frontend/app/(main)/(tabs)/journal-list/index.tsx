@@ -140,7 +140,9 @@ export default function JournalListScreen() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <Text className="text-center text-sm text-secondary mt-10">
-              {appliedQuery ? '검색 결과가 없어요.' : '아직 작성한 글이 없어요.'}
+              {appliedQuery
+                ? '검색 결과가 없어요.'
+                : '아직 작성한 글이 없어요.'}
             </Text>
           }
           ListFooterComponent={

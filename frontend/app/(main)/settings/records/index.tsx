@@ -46,6 +46,17 @@ export default function RecordsSettingsScreen() {
                 : '지금은 위치를 기록하지 않아요. 꺼둔 동안 타임라인은 비게 됩니다.'}
             </Text>
           </View>
+
+          {/* 온보딩이 "위치 기록으로 하루를 남긴다"를 설명하는 내용이라 이 화면에 둔다 */}
+          <View className="gap-y-2">
+            <TouchableOpacity
+              onPress={() => router.push('/onboarding')}
+              activeOpacity={0.6}
+              className="pr-[34%]"
+            >
+              <Text className="text-[15px] text-primary">온보딩 다시 보기</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </SafeAreaView>

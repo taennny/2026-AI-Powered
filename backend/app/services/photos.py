@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import piexif
 import pillow_heif
-from PIL import Image
+from PIL import Image, ImageOps
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -47,6 +47,24 @@ def _parse_exif(exif_source: bytes) -> dict:
     return result
 
 
+THUMBNAIL_MAX_PX = 200
+
+THUMBNAIL_QUALITY = 80
+
+
+def _make_thumbnail(file_bytes: bytes) -> bytes | None:
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img = ImageOps.exif_transpose(img)
+        img.thumbnail((THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX))
+
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="JPEG", quality=THUMBNAIL_QUALITY)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
 def _convert_heic_to_jpeg(file_bytes: bytes) -> tuple[bytes, bytes | None]:
     """HEIC/HEIF 바이트를 JPEG로 변환하고, 원본 EXIF 바이트를 같이 반환."""
     img = Image.open(io.BytesIO(file_bytes))
@@ -79,10 +97,17 @@ async def upload_photo(
     storage_key = f"photos/{user_id}/{photo_id}.{ext}"
     await upload_file(storage_key, file_bytes, content_type)
 
+    thumbnail_key: str | None = None
+    thumbnail_bytes = _make_thumbnail(file_bytes)
+    if thumbnail_bytes is not None:
+        thumbnail_key = f"photos/{user_id}/{photo_id}_thumb.jpg"
+        await upload_file(thumbnail_key, thumbnail_bytes, "image/jpeg")
+
     photo = Photo(
         id=photo_id,
         user_id=user_id,
         storage_key=storage_key,
+        thumbnail_key=thumbnail_key,
         taken_at=taken_at,
     )
     db.add(photo)

@@ -5,7 +5,36 @@ import {GPS_TASK_NAME} from '@/tasks/gpsTask';
 
 const INTERVAL_MS = 30_000;
 
-export async function startGpsTracking() {
+const TRACKING_OPTIONS =
+  Platform.OS === 'ios'
+    ? {accuracy: Location.Accuracy.High, distanceInterval: 0}
+    : {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: INTERVAL_MS,
+        distanceInterval: 0,
+      };
+
+/**
+ * 시작·정지를 순서대로 실행한다 — 계정을 바꾸면 로그아웃의 정지와 로그인의 시작이
+ * 겹쳐, 시작이 "이미 켜져 있음"으로 건너뛴 뒤 정지가 끝나면서 추적이 꺼진 채 남는다.
+ */
+let chain: Promise<unknown> = Promise.resolve();
+
+function serialize<T>(task: () => Promise<T>): Promise<T> {
+  const next = chain.then(task, task);
+  chain = next.catch(() => {});
+  return next;
+}
+
+export function startGpsTracking(): Promise<void> {
+  return serialize(runStart);
+}
+
+export function stopGpsTracking(): Promise<void> {
+  return serialize(runStop);
+}
+
+async function runStart() {
   // 웹에는 백그라운드 위치 태스크가 없다 — Expo 웹으로 열었을 때 크래시 방지
   if (Platform.OS === 'web') return;
 
@@ -23,9 +52,7 @@ export async function startGpsTracking() {
   if (isRunning) return;
 
   await Location.startLocationUpdatesAsync(GPS_TASK_NAME, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: INTERVAL_MS,
-    distanceInterval: 0,
+    ...TRACKING_OPTIONS,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: 'Roame',
@@ -35,7 +62,7 @@ export async function startGpsTracking() {
   });
 }
 
-export async function stopGpsTracking() {
+async function runStop() {
   const isRunning = await Location.hasStartedLocationUpdatesAsync(
     GPS_TASK_NAME,
   ).catch(() => false);
