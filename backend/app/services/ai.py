@@ -58,8 +58,22 @@ async def analyze_and_save(
     target_date: date,
     user_timezone: str | None = None,
 ) -> tuple[uuid.UUID | None, int]:
-    # 1. 해당 날짜 GPS 로그 조회 (하루 경계: 04:00 KST 기준)
-    start_dt, end_dt = day_bounds(target_date)
+    # 0. 그날의 daily_record를 먼저 읽는다 — 하루를 어느 시간대의 04시로 자를지가
+    # 그 안에 들어 있다.
+    dr_result = await db.execute(
+        select(DailyRecord)
+        .where(DailyRecord.user_id == user_id)
+        .where(DailyRecord.target_date == target_date)
+    )
+    daily_record = dr_result.scalar_one_or_none()
+
+    # 하루의 시간대는 그 기록이 처음 만들어질 때 정해지고 이후 바뀌지 않는다.
+    # 재분석마다 요청 tz로 덮으면 여행 중에 하루 경계가 밀려서
+    # 이미 저장된 장소들이 다른 날짜로 튄다.
+    tz_name = daily_record.timezone if daily_record else user_timezone
+
+    # 1. 해당 날짜 GPS 로그 조회 (하루 경계: 그 시간대의 04:00 기준)
+    start_dt, end_dt = day_bounds(target_date, tz_name)
 
     result = await db.execute(
         select(
@@ -119,12 +133,6 @@ async def analyze_and_save(
         logger.warning(
             f"AI 분석 결과 0건 — 기존 기록 보존: user={user_id}, date={target_date}"
         )
-        dr_result = await db.execute(
-            select(DailyRecord)
-            .where(DailyRecord.user_id == user_id)
-            .where(DailyRecord.target_date == target_date)
-        )
-        daily_record = dr_result.scalar_one_or_none()
         return (daily_record.id if daily_record else None), 0
 
     # 5. daily_record upsert (사진도 같은 04:00 경계 기준으로 집계)
@@ -135,13 +143,6 @@ async def analyze_and_save(
         .where(Photo.taken_at < end_dt)
     )
     photo_count = photo_result.scalar() or 0
-
-    dr_result = await db.execute(
-        select(DailyRecord)
-        .where(DailyRecord.user_id == user_id)
-        .where(DailyRecord.target_date == target_date)
-    )
-    daily_record = dr_result.scalar_one_or_none()
 
     if daily_record is None:
         daily_record = DailyRecord(
