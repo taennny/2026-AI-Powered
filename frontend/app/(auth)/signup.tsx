@@ -11,6 +11,12 @@ import {useRouter} from 'expo-router';
 
 import {signup} from '@/services/authApi';
 import BackButton from '@/components/common/BackButton';
+import ConsentList from '@/components/auth/ConsentList';
+import {
+  emptyConsents,
+  hasAllRequired,
+  type ConsentState,
+} from '@/constants/consent';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,9 +33,7 @@ export default function SignupScreen() {
   const [nickname, setNickname] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const [isServiceTermsChecked, setIsServiceTermsChecked] = useState(false);
-  const [isPrivacyPolicyChecked, setIsPrivacyPolicyChecked] = useState(false);
-  const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
+  const [consents, setConsents] = useState<ConsentState>(emptyConsents);
 
   const [emailGuideMessage, setEmailGuideMessage] = useState('');
   const [emailGuideColor, setEmailGuideColor] = useState('#CCCCCC');
@@ -40,23 +44,14 @@ export default function SignupScreen() {
   const [nicknameGuideMessage, setNicknameGuideMessage] = useState('');
   const [nicknameGuideColor, setNicknameGuideColor] = useState('#CCCCCC');
 
-  const isSignupButtonEnabled = useMemo(() => {
-    return (
+  const isSignupButtonEnabled = useMemo(
+    () =>
       EMAIL_REGEX.test(email.trim()) &&
       PASSWORD_REGEX.test(password) &&
       NICKNAME_REGEX.test(nickname.trim()) &&
-      isServiceTermsChecked &&
-      isPrivacyPolicyChecked &&
-      isAgeConfirmed
-    );
-  }, [
-    email,
-    password,
-    nickname,
-    isServiceTermsChecked,
-    isPrivacyPolicyChecked,
-    isAgeConfirmed,
-  ]);
+      hasAllRequired(consents),
+    [email, password, nickname, consents],
+  );
 
   const handleEmailChange = (text: string) => {
     setEmail(text);
@@ -148,10 +143,6 @@ export default function SignupScreen() {
     }
   };
 
-  const checkboxBaseStyle =
-    'w-[11px] h-[11px] rounded-full border border-[#BDBDBD] items-center justify-center mr-[6px]';
-  const checkboxInnerStyle = 'w-[5px] h-[5px] rounded-full bg-[#BDBDBD]';
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View className="flex-1 bg-[#F6F6F6] px-[42px] pt-[140px]">
@@ -231,54 +222,7 @@ export default function SignupScreen() {
           />
         </View>
         <View className="mt-[18px] mb-[20px]">
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setIsServiceTermsChecked(v => !v)}
-            className="flex-row items-center mb-[8px]"
-          >
-            <View className={checkboxBaseStyle}>
-              {isServiceTermsChecked ? (
-                <View className={checkboxInnerStyle} />
-              ) : null}
-            </View>
-            <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
-              서비스 이용약관 동의
-            </Text>
-            <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
-              {'>'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setIsPrivacyPolicyChecked(v => !v)}
-            className="flex-row items-center mb-[8px]"
-          >
-            <View className={checkboxBaseStyle}>
-              {isPrivacyPolicyChecked ? (
-                <View className={checkboxInnerStyle} />
-              ) : null}
-            </View>
-            <Text className="text-[11px] leading-[11px] text-[#6E6E73] flex-1">
-              개인정보 수집 및 이용 동의
-            </Text>
-            <Text className="text-[12px] leading-[12px] text-[#9A9A9A]">
-              {'>'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => setIsAgeConfirmed(v => !v)}
-            className="flex-row items-center"
-          >
-            <View className={checkboxBaseStyle}>
-              {isAgeConfirmed ? <View className={checkboxInnerStyle} /> : null}
-            </View>
-            <Text className="text-[11px] leading-[11px] text-[#6E6E73]">
-              만 14세 이상입니다.
-            </Text>
-          </TouchableOpacity>
+          <ConsentList consents={consents} onChange={setConsents} />
         </View>
 
         <TouchableOpacity
