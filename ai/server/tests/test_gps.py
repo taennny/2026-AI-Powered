@@ -136,7 +136,9 @@ def test_filter_by_accuracy_drops_bad_keeps_unknown():
         _log(base, 37.5, 127.0, accuracy=10),  # 양호 → 유지
         _log(base + timedelta(minutes=1), 37.5, 127.0, accuracy=0),  # 값없음 → 유지
         _log(base + timedelta(minutes=2), 37.5, 127.0),  # 미지정 → 유지
-        _log(base + timedelta(minutes=3), 37.5, 127.0, accuracy=250),  # 나쁨(>200) → 제외
+        _log(
+            base + timedelta(minutes=3), 37.5, 127.0, accuracy=250
+        ),  # 나쁨(>200) → 제외
     ]
     filtered = gps._filter_by_accuracy(logs)
     assert len(filtered) == 3  # 1개만 걸러짐(25%<50%)이라 필터 적용
@@ -150,7 +152,8 @@ def test_indoor_accuracy_is_kept():
     """실내 수준 정확도(~150m)는 보존한다 — 실내 체류가 사라지면 안 됨."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
-        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=150) for m in range(0, 5)
+        _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=150)
+        for m in range(0, 5)
     ]
     assert len(gps._filter_by_accuracy(logs)) == 5  # 150 ≤ 200 → 전부 유지
     assert len(gps.detect_stays(logs)) == 1  # 실내 체류 살아있음
@@ -307,3 +310,113 @@ def test_unknown_when_everything_fails(monkeypatch):
 def test_no_api_key_returns_unknown(monkeypatch):
     monkeypatch.setattr(settings, "KAKAO_API_KEY", "")
     assert gps.get_place_info(37.5, 127.0)["place_name"] == "알 수 없음"
+
+
+# ── 국내/해외 하이브리드 (구글 Places) ─────
+class _FakeGoogleResp:
+    def __init__(self, results, status="OK"):
+        self._results = results
+        self._status = status
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return {"status": self._status, "results": self._results}
+
+
+def _gplace(name, types, lat, lng):
+    return {
+        "name": name,
+        "types": types,
+        "geometry": {"location": {"lat": lat, "lng": lng}},
+    }
+
+
+def test_in_korea_bbox():
+    assert gps._in_korea(37.5, 127.0) is True  # 서울
+    assert gps._in_korea(33.4, 126.5) is True  # 제주
+    assert gps._in_korea(48.8584, 2.2945) is False  # 파리
+    assert gps._in_korea(40.7128, -74.0060) is False  # 뉴욕
+    assert gps._in_korea(35.6895, 139.6917) is False  # 도쿄
+
+
+def test_overseas_routes_to_google(monkeypatch):
+    """해외 좌표는 카카오가 아니라 구글 Places로 매칭한다."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "gkey")
+
+    def fake_get(url, params=None, timeout=None, **kw):
+        assert "googleapis.com" in url  # 카카오 아님
+        return _FakeGoogleResp(
+            [
+                _gplace(
+                    "에펠탑",
+                    ["tourist_attraction", "point_of_interest"],
+                    48.8584,
+                    2.2945,
+                )
+            ]
+        )
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+
+    info = gps.get_place_info(48.8584, 2.2945)  # 파리
+    assert info["place_name"] == "에펠탑"
+    assert info["category"] == "관광명소"
+
+
+def test_google_picks_nearest_by_distance(monkeypatch):
+    """구글 결과 중 체류 중심에서 가장 가까운 장소를 고른다."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "gkey")
+    center = (35.6895, 139.6917)  # 도쿄
+
+    def fake_get(url, params=None, timeout=None, **kw):
+        return _FakeGoogleResp(
+            [
+                _gplace("먼 상점", ["store"], 35.6905, 139.6930),  # ~150m
+                _gplace("가까운 카페", ["cafe"], 35.6895, 139.6917),  # 0m
+            ]
+        )
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+
+    info = gps.get_place_info(*center)
+    assert info["place_name"] == "가까운 카페"
+    assert info["category"] == "카페"
+
+
+def test_overseas_no_google_key_returns_unknown(monkeypatch):
+    """구글 키 미설정이면 해외는 매칭 없이 '알 수 없음' (기존 동작 유지)."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "")
+    # 구글 호출 자체가 없어야 함 — 호출되면 에러로 감지
+    monkeypatch.setattr(
+        gps.requests,
+        "get",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("호출 금지")),
+    )
+    assert gps.get_place_info(48.8584, 2.2945)["place_name"] == "알 수 없음"
+
+
+def test_google_request_denied_returns_unknown(monkeypatch):
+    """구글 status가 OK/ZERO_RESULTS가 아니면(키·결제 문제 등) '알 수 없음'."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "gkey")
+    monkeypatch.setattr(
+        gps.requests,
+        "get",
+        lambda *a, **k: _FakeGoogleResp([], status="REQUEST_DENIED"),
+    )
+    assert gps.get_place_info(48.8584, 2.2945)["place_name"] == "알 수 없음"
+
+
+def test_domestic_never_calls_google(monkeypatch):
+    """국내 좌표는 구글 URL을 절대 호출하지 않는다 (카카오만)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None, **kw):
+        assert "googleapis.com" not in url  # 국내는 구글 금지
+        return _FakeResp([_doc("서울 카페", "음식점 > 카페", 20)])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+
+    info = gps.get_place_info(37.5, 127.0)
+    assert info["place_name"] == "서울 카페"

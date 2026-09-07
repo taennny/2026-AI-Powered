@@ -2,7 +2,7 @@
 # 백엔드와 분리된 인스턴스라 GHCR 이미지를 pull 해서 단독 실행한다.
 #
 # 사용:
-#   cp .env.example .env   # KAKAO_API_KEY / OPENAI_API_KEY 채우기
+#   cp .env.example .env   # KAKAO_API_KEY / GOOGLE_MAPS_API_KEY / OPENAI_API_KEY 채우기
 #   docker compose -f docker-compose.prod.yml pull
 #   docker compose -f docker-compose.prod.yml up -d
 #
