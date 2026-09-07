@@ -16,3 +16,5 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+# pytest가 만드는 sqlite 파일
+test.db

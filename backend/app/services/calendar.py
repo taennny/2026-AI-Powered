@@ -158,9 +158,15 @@ async def get_timeline(
 
         # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
         photo_urls = []
+        thumbnail_urls = []
         if place_photos:
-            url = await get_presigned_url(place_photos[0].storage_key)
-            photo_urls.append(url)
+            first = place_photos[0]
+            photo_urls.append(await get_presigned_url(first.storage_key))
+            thumbnail_urls.append(
+                await get_presigned_url(first.thumbnail_key)
+                if first.thumbnail_key
+                else photo_urls[0]
+            )
 
         place_list.append(
             {
@@ -172,6 +178,7 @@ async def get_timeline(
                 "lat": to_shape(place.location).y,
                 "lng": to_shape(place.location).x,
                 "photos": photo_urls,
+                "thumbnails": thumbnail_urls,
             }
         )
 

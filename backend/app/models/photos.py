@@ -15,6 +15,7 @@ class Photo(Base):
         ForeignKey("daily_records.id"), nullable=True
     )
     storage_key: Mapped[str] = mapped_column(Text, nullable=False)
+    thumbnail_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     taken_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
