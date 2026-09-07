@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "Roame",
-    "slug": "Roame-App",
+    "slug": "roame",
+    "owner": "roame-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -18,7 +19,10 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "걷는 동안 위치를 기록합니다.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "백그라운드에서도 위치를 기록합니다.",
-        "UIBackgroundModes": ["location", "location"],
+        "UIBackgroundModes": [
+          "location",
+          "location"
+        ],
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -76,7 +80,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "04de4a5d-65fd-410b-9e62-91029919d87a"
+        "projectId": "4e193d2d-264d-4eef-9239-bff461306387"
       }
     }
   }
