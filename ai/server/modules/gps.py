@@ -207,15 +207,121 @@ PRIMARY_RADIUS_M = 80  # 체류 반경(50m)에 가깝게: 실제 머문 자리 �
 FALLBACK_RADIUS_M = 200  # 1차에서 못 찾으면 넓혀서 재시도
 _UNKNOWN_PLACE = {"place_name": "알 수 없음", "category": ""}
 
+# ── 국내/해외 하이브리드 라우팅 ────────────
+# 카카오는 국내 전용이라 해외 좌표는 결과가 비어 "알 수 없음"이 된다.
+# 좌표가 한국 대략 범위(bbox) 밖이면 구글 Places로 매칭한다.
+# bbox는 본토+제주+울릉/독도를 넉넉히 포함(대마도 등 경계는 무시 가능한 예외).
+_KOREA_BBOX = (33.0, 38.7, 124.5, 132.0)  # (lat_min, lat_max, lng_min, lng_max)
+
+GOOGLE_NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+GOOGLE_SEARCH_RADIUS_M = 100  # 체류 중심에서 이 반경 내 장소를 조회
+# 구글 place type → 한글 카테고리(카카오와 톤 맞춤). 없으면 빈 문자열.
+_GOOGLE_TYPE_KO = {
+    "restaurant": "음식점",
+    "cafe": "카페",
+    "bar": "술집",
+    "bakery": "베이커리",
+    "food": "음식점",
+    "tourist_attraction": "관광명소",
+    "lodging": "숙박",
+    "shopping_mall": "쇼핑몰",
+    "store": "상점",
+    "supermarket": "마트",
+    "convenience_store": "편의점",
+    "park": "공원",
+    "museum": "박물관",
+    "art_gallery": "미술관",
+    "amusement_park": "놀이공원",
+    "zoo": "동물원",
+    "aquarium": "아쿠아리움",
+    "school": "학교",
+    "university": "대학교",
+    "hospital": "병원",
+    "bank": "은행",
+    "subway_station": "지하철역",
+    "train_station": "기차역",
+    "airport": "공항",
+}
+
+
+def _in_korea(lat: float, lng: float) -> bool:
+    """좌표가 국내(카카오 커버 범위) 대략 범위 안인지."""
+    lat_min, lat_max, lng_min, lng_max = _KOREA_BBOX
+    return lat_min <= lat <= lat_max and lng_min <= lng <= lng_max
+
+
+def _google_place_info(lat: float, lng: float) -> dict | None:
+    """해외 좌표를 구글 Places(Nearby Search)로 매칭. 실패/미설정 시 None.
+
+    카카오와 달리 한 번의 호출로 주변 여러 장소를 받아 최단거리 1곳을 고른다.
+    language=ko 로 가능한 경우 한글 장소명을 받는다(예: '에펠탑').
+    """
+    if not settings.GOOGLE_MAPS_API_KEY:
+        logger.warning("GOOGLE_MAPS_API_KEY 미설정 — 해외 좌표 매칭 생략")
+        return None
+    try:
+        res = requests.get(
+            GOOGLE_NEARBY_URL,
+            params={
+                "location": f"{lat},{lng}",
+                "radius": GOOGLE_SEARCH_RADIUS_M,
+                "language": "ko",
+                "key": settings.GOOGLE_MAPS_API_KEY,
+            },
+            timeout=5,
+        )
+        res.raise_for_status()
+        body = res.json()
+        status_code = body.get("status")
+        if status_code not in ("OK", "ZERO_RESULTS"):
+            # REQUEST_DENIED(키/결제 문제) 등은 원인 파악 위해 남긴다.
+            logger.error(
+                "구글 Places 오류: status=%s msg=%s",
+                status_code,
+                body.get("error_message", ""),
+            )
+            return None
+        results = body.get("results", [])
+        if not results:
+            return None
+
+        def _dist(r: dict) -> float:
+            loc = r.get("geometry", {}).get("location", {})
+            rlat, rlng = loc.get("lat"), loc.get("lng")
+            if rlat is None or rlng is None:
+                return float("inf")
+            return geodesic((lat, lng), (rlat, rlng)).meters
+
+        nearest = min(results, key=_dist)
+        name = nearest.get("name")
+        if not name:
+            return None
+        types = nearest.get("types", [])
+        category = next((_GOOGLE_TYPE_KO[t] for t in types if t in _GOOGLE_TYPE_KO), "")
+        return {"place_name": name, "category": category}
+    except requests.exceptions.Timeout:
+        logger.warning("구글 Places 타임아웃")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error("구글 Places 요청 실패: %s", e)
+        return None
+
 
 def get_place_info(lat: float, lng: float) -> dict:
-    """좌표에 가장 가까운 카카오 장소를 반환한다. 실패 시 기본값.
+    """좌표에 가장 가까운 장소를 반환한다. 실패 시 기본값.
 
-    카테고리 순서가 아니라 실제 거리로 선택한다:
+    국내/해외 하이브리드:
+      - 국내(bbox 안): 카카오 로컬 (아래 흐름)
+      - 해외(bbox 밖): 구글 Places (카카오는 국내 전용이라 결과 없음)
+
+    국내 카카오 흐름 — 카테고리 순서가 아니라 실제 거리로 선택한다:
       1) 체류형 카테고리 전역 최단거리 (좁은 반경 → 없으면 넓혀서)
       2) 그래도 없으면 이동 지점(지하철 등)까지 포함
       3) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
     """
+    if not _in_korea(lat, lng):
+        return _google_place_info(lat, lng) or dict(_UNKNOWN_PLACE)
+
     if not settings.KAKAO_API_KEY:
         logger.warning("KAKAO_API_KEY가 설정되지 않았습니다.")
         return dict(_UNKNOWN_PLACE)
