@@ -18,6 +18,7 @@ async def save_gps_logs(
             accuracy=item.accuracy,
             speed=item.speed,
             recorded_at=item.timestamp,
+            timezone=request.timezone,
         )
         logs.append(log)
 

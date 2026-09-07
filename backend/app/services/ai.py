@@ -19,6 +19,25 @@ from app.utils.timezone import day_bounds
 logger = logging.getLogger(__name__)
 
 
+def _as_utc(value: datetime) -> datetime:
+    """naive와 aware를 섞어 비교하면 TypeError로 분석이 통째로 죽는다."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _stay_timezone(log_rows, start: datetime, end: datetime) -> str | None:
+    """그 체류 구간에 걸린 첫 로그의 시간대. 없으면 None(그날의 tz로 폴백).
+
+    daily_record의 값 하나로는 도착지 장소를 출발지 시각으로 그리게 된다.
+    """
+    start_utc, end_utc = _as_utc(start), _as_utc(end)
+    for row in log_rows:
+        if row.timezone and start_utc <= _as_utc(row.recorded_at) <= end_utc:
+            return row.timezone
+    return None
+
+
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """두 좌표 간 거리 계산 (km)"""
     R = 6371.0
@@ -62,6 +81,7 @@ async def analyze_and_save(
             func.ST_Y(GpsLog.location).label("lat"),
             func.ST_X(GpsLog.location).label("lng"),
             GpsLog.accuracy,
+            GpsLog.timezone,
         )
         .where(GpsLog.user_id == user_id)
         .where(GpsLog.recorded_at >= start_dt)
@@ -174,6 +194,7 @@ async def analyze_and_save(
             location=WKTElement(f"POINT({stay.lng} {stay.lat})", srid=4326),
             arrived_at=stay.start,
             left_at=stay.end,
+            timezone=_stay_timezone(log_rows, stay.start, stay.end),
             is_corrected=False,
         )
         db.add(place)

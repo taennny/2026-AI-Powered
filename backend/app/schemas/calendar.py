@@ -31,6 +31,12 @@ class PlaceEntry(BaseModel):
     left_at: datetime | None
     lat: float
     lng: float
+    # 이 장소를 어느 지역 시각으로 보여줄지. 서버가 폴백까지 채워 보낸다
+    timezone: str | None = None
+    # 그 시간대의 UTC 오프셋(분). 앱이 Intl 없이 현지 시각을 그린다.
+    # 0은 "모름"이 아니라 UTC라는 값이라, 비었으면 None으로 둔다 —
+    # 앱이 그때만 기기 시간대로 폴백한다
+    utc_offset_minutes: int | None = None
     photos: List[str] = []
 
 

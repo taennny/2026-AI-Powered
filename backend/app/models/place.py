@@ -35,6 +35,8 @@ class Place(Base):
     left_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # 이 체류의 현지 시간대. 비어 있으면 그날(daily_record)의 것을 쓴다
+    timezone: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     is_corrected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

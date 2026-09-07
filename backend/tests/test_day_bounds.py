@@ -7,7 +7,12 @@
 
 from datetime import date, datetime, timedelta, timezone
 
-from app.utils.timezone import KST, day_bounds, resolve_tz
+from app.utils.timezone import (
+    KST,
+    day_bounds,
+    resolve_tz,
+    utc_offset_minutes,
+)
 
 
 def _hours(start: datetime, end: datetime) -> float:
@@ -83,3 +88,51 @@ def test_resolve_tz_keeps_valid_name():
     tz = resolve_tz("Asia/Tokyo")
 
     assert tz.utcoffset(datetime(2026, 8, 6)) == timedelta(hours=9)
+
+
+# 앱은 Intl의 timeZone 옵션을 못 믿어(Hermes 빌드에 따라 조용히 틀림) 오프셋으로 그린다.
+# 그래서 서버가 그 순간의 오프셋을 정확히 줘야 한다.
+class TestUtcOffsetMinutes:
+    def test_kst(self):
+        assert (
+            utc_offset_minutes(datetime(2026, 8, 6, tzinfo=timezone.utc), "Asia/Seoul")
+            == 540
+        )
+
+    def test_none_falls_back_to_kst(self):
+        assert (
+            utc_offset_minutes(datetime(2026, 8, 6, tzinfo=timezone.utc), None) == 540
+        )
+
+    def test_unknown_name_falls_back_to_kst(self):
+        assert (
+            utc_offset_minutes(datetime(2026, 8, 6, tzinfo=timezone.utc), "Not/AZone")
+            == 540
+        )
+
+    def test_half_hour_offset(self):
+        """인도처럼 30분 단위인 지역"""
+        assert (
+            utc_offset_minutes(
+                datetime(2026, 8, 6, tzinfo=timezone.utc), "Asia/Kolkata"
+            )
+            == 330
+        )
+
+    # 같은 장소라도 계절마다 다르다 — 저장해두고 재사용하면 안 되는 이유
+    def test_dst_changes_the_offset(self):
+        tz = "America/New_York"
+        summer = utc_offset_minutes(datetime(2026, 8, 6, tzinfo=timezone.utc), tz)
+        winter = utc_offset_minutes(datetime(2026, 1, 6, tzinfo=timezone.utc), tz)
+
+        assert summer == -240  # EDT
+        assert winter == -300  # EST
+
+    def test_naive_moment_is_treated_as_utc(self):
+        """DB나 AI에서 naive로 올라오는 경우 — 서버 로컬 시간대로 해석하면 안 된다"""
+        aware = utc_offset_minutes(
+            datetime(2026, 8, 6, 15, tzinfo=timezone.utc), "America/New_York"
+        )
+        naive = utc_offset_minutes(datetime(2026, 8, 6, 15), "America/New_York")
+
+        assert naive == aware
