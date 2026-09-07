@@ -17,7 +17,7 @@ import {
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {DAY_BOUNDARY_HOUR, formatDate} from '@/utils/formatDate';
+import {formatDate, hourFromISO} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 import PostCard from '@/components/bottomsheet/PostCard';
 
@@ -27,22 +27,36 @@ type Props = {
   places: TimelinePlace[];
 };
 
-function groupByHour(
-  places: TimelinePlace[],
-): {hour: number; places: TimelinePlace[]}[] {
-  const map = new Map<number, TimelinePlace[]>();
-  places.forEach(place => {
-    const hour = new Date(place.arrived_at).getHours();
-    if (!map.has(hour)) map.set(hour, []);
-    map.get(hour)!.push(place);
-  });
-  // 하루가 04시에 시작하므로 정렬도 04시를 0으로 본다. 시계 순서(0~23)로
-  // 정렬하면 자정을 넘겨 찍힌 새벽 기록이 그날 아침보다 위로 올라간다.
-  const logicalHour = (hour: number) => (hour - DAY_BOUNDARY_HOUR + 24) % 24;
+type HourGroup = {
+  hour: number;
+  timezone: string | null;
+  places: TimelinePlace[];
+};
 
-  return Array.from(map.entries())
-    .sort(([a], [b]) => logicalHour(a) - logicalHour(b))
-    .map(([hour, ps]) => ({hour, places: ps}));
+export function groupPlaces(places: TimelinePlace[]): HourGroup[] {
+  const groups: HourGroup[] = [];
+
+  places.forEach(place => {
+    const hour = hourFromISO(place.arrived_at, place.utc_offset_minutes);
+    const timezone = place.timezone ?? null;
+    const last = groups[groups.length - 1];
+
+    if (last && last.hour === hour && last.timezone === timezone) {
+      last.places.push(place);
+      return;
+    }
+    groups.push({hour, timezone, places: [place]});
+  });
+
+  return groups;
+}
+
+function isTimezoneChange(
+  previous: HourGroup | undefined,
+  current: HourGroup,
+): boolean {
+  if (!previous?.timezone || !current.timezone) return false;
+  return previous.timezone !== current.timezone;
 }
 
 const BAR_LEFT = 40;
@@ -174,7 +188,7 @@ export default function BottomSheet({
   ).current;
 
   const tc = useThemeColors();
-  const hourGroups = groupByHour(places);
+  const hourGroups = groupPlaces(places);
   const hasPlaces = hourGroups.length > 0;
   hasPlacesRef.current = hasPlaces;
 
@@ -231,18 +245,30 @@ export default function BottomSheet({
                 className="absolute top-0 bottom-0 w-2 bg-teal"
                 style={{left: 6 + BAR_LEFT}}
               />
-              {hourGroups.map(({hour, places: hourPlaces}) => (
-                <View key={hour} className="flex-row">
-                  <View className="w-8 pt-[14px] items-end pr-2">
-                    <Text className="text-xs font-medium text-tertiary">
-                      {hour}
-                    </Text>
-                  </View>
-                  <View className="w-6" />
-                  <View className="flex-1">
-                    {hourPlaces.map(place => (
-                      <PostCard key={place.place_id} data={place} />
-                    ))}
+              {hourGroups.map((group, index) => (
+                <View key={group.places[0].place_id}>
+                  {isTimezoneChange(hourGroups[index - 1], group) && (
+                    <View className="flex-row items-center mt-[5px] mb-[15px]">
+                      <View className="flex-1 h-px bg-line" />
+                      <Text className="mx-3 text-[11px] text-tertiary">
+                        시간대 변경
+                      </Text>
+                      <View className="flex-1 h-px bg-line" />
+                    </View>
+                  )}
+
+                  <View className="flex-row">
+                    <View className="w-8 pt-[14px] items-end pr-2">
+                      <Text className="text-xs font-medium text-tertiary">
+                        {group.hour}
+                      </Text>
+                    </View>
+                    <View className="w-6" />
+                    <View className="flex-1">
+                      {group.places.map(place => (
+                        <PostCard key={place.place_id} data={place} />
+                      ))}
+                    </View>
                   </View>
                 </View>
               ))}

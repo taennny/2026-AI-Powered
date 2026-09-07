@@ -50,11 +50,39 @@ export function formatDateStr(dateStr: string): string {
   return formatDate(new Date(dateStr + 'T00:00:00'));
 }
 
-/** ISO 8601 → '12:00PM' 형식 (로컬 시간 기준) */
-export function formatTimeFromISO(iso: string): string {
+/**
+ * 그 순간의 '시·분'. `offsetMinutes`를 주면 그 오프셋의 지역 시각으로,
+ * 없으면 기기 시간대로 읽는다.
+ *
+ * `Intl`의 timeZone 옵션을 쓰지 않는 이유는 Hermes 빌드에 따라 조용히
+ * 틀린 값을 주기 때문이다. 오프셋만큼 옮겨 UTC 게터로 읽으면 확실하다.
+ */
+function clockAt(
+  iso: string,
+  offsetMinutes?: number | null,
+): {hour: number; minute: number} {
   const d = new Date(iso);
-  const h = d.getHours();
-  const m = d.getMinutes();
+  if (offsetMinutes === undefined || offsetMinutes === null) {
+    return {hour: d.getHours(), minute: d.getMinutes()};
+  }
+  const shifted = new Date(d.getTime() + offsetMinutes * 60 * 1000);
+  return {hour: shifted.getUTCHours(), minute: shifted.getUTCMinutes()};
+}
+
+/** ISO 8601 → 그 지역의 '몇 시'(0~23). 타임라인 묶음에 쓴다 */
+export function hourFromISO(
+  iso: string,
+  offsetMinutes?: number | null,
+): number {
+  return clockAt(iso, offsetMinutes).hour;
+}
+
+/** ISO 8601 → '12:00PM' (오프셋을 주면 그 지역 시각, 없으면 기기 기준) */
+export function formatTimeFromISO(
+  iso: string,
+  offsetMinutes?: number | null,
+): string {
+  const {hour: h, minute: m} = clockAt(iso, offsetMinutes);
   const period = h >= 12 ? 'PM' : 'AM';
   const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
   return `${hour}:${String(m).padStart(2, '0')}${period}`;

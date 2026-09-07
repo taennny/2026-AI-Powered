@@ -5,6 +5,7 @@ import {
   formatShortDate,
   formatTimeAgo,
   formatTimeFromISO,
+  hourFromISO,
   logicalToday,
   toDateKey,
   toLogicalDateKey,
@@ -201,5 +202,39 @@ describe('formatRecordDateLabel', () => {
   // 뭉개면 서버가 무엇을 보냈는지 알 수 없다
   it('해석할 수 없으면 원본을 그대로 보여준다', () => {
     expect(formatRecordDateLabel('언젠가')).toBe('언젠가');
+  });
+});
+
+describe('오프셋을 준 시각 표시', () => {
+  // 서울 10:00 출발 → LA 03:00 도착. 같은 하루인데 현지 시각은 거꾸로 간다
+  const seoulDeparture = '2026-09-06T01:00:00.000Z';
+  const laArrival = '2026-09-06T10:00:00.000Z';
+
+  it('그 지역 시각으로 그린다', () => {
+    expect(formatTimeFromISO(seoulDeparture, 9 * 60)).toBe('10:00AM');
+    expect(formatTimeFromISO(laArrival, -7 * 60)).toBe('3:00AM');
+  });
+
+  it('오프셋이 없으면 기기 시간대 — 기존 호출이 안 깨진다', () => {
+    expect(formatTimeFromISO(seoulDeparture)).toBe(
+      formatTimeFromISO(seoulDeparture, 9 * 60),
+    );
+  });
+
+  it('null도 기기 시간대로 본다 — 서버가 모를 때 보내는 값', () => {
+    expect(formatTimeFromISO(seoulDeparture, null)).toBe('10:00AM');
+  });
+
+  it('0 오프셋(UTC)을 기기 시간대로 착각하지 않는다', () => {
+    expect(formatTimeFromISO(seoulDeparture, 0)).toBe('1:00AM');
+  });
+
+  it('30분 단위 오프셋도 맞는다 — 인도 등', () => {
+    expect(formatTimeFromISO(seoulDeparture, 5 * 60 + 30)).toBe('6:30AM');
+  });
+
+  it('hourFromISO는 그 지역의 몇 시인지 준다', () => {
+    expect(hourFromISO(laArrival, -7 * 60)).toBe(3);
+    expect(hourFromISO(laArrival, 9 * 60)).toBe(19);
   });
 });

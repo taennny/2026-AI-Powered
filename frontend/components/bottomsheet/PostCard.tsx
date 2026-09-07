@@ -30,7 +30,9 @@ const THUMBNAIL_STYLE = {
 
 export default function PostCard({data}: Props) {
   const {name, category, arrived_at, left_at, photos, thumbnails} = data;
-  const timeLabel = `${formatTimeFromISO(arrived_at)} ~ ${formatTimeFromISO(left_at)}`;
+  // 그 장소의 현지 시각으로 그린다 — 여행한 날은 카드마다 시간대가 다르다
+  const offset = data.utc_offset_minutes;
+  const timeLabel = `${formatTimeFromISO(arrived_at, offset)} ~ ${formatTimeFromISO(left_at, offset)}`;
   const firstPhoto = photos?.[0];
   // 카드는 축소본(~30KB), 확대는 원본(3~5MB). 서버가 축소본을 안 주면 원본으로 폴백한다
   const firstThumbnail = thumbnails?.[0] ?? firstPhoto;
