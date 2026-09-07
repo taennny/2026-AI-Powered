@@ -29,9 +29,11 @@ const THUMBNAIL_STYLE = {
 } as const;
 
 export default function PostCard({data}: Props) {
-  const {name, category, arrived_at, left_at, photos} = data;
+  const {name, category, arrived_at, left_at, photos, thumbnails} = data;
   const timeLabel = `${formatTimeFromISO(arrived_at)} ~ ${formatTimeFromISO(left_at)}`;
   const firstPhoto = photos?.[0];
+  // 카드는 축소본(~30KB), 확대는 원본(3~5MB). 서버가 축소본을 안 주면 원본으로 폴백한다
+  const firstThumbnail = thumbnails?.[0] ?? firstPhoto;
 
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -56,7 +58,7 @@ export default function PostCard({data}: Props) {
             accessibilityLabel={`${name} 사진 크게 보기`}
           >
             <Image
-              source={firstPhoto}
+              source={firstThumbnail}
               style={THUMBNAIL_STYLE}
               contentFit="cover"
               cachePolicy="memory-disk"
@@ -64,7 +66,7 @@ export default function PostCard({data}: Props) {
             />
           </TouchableOpacity>
 
-          {/* 썸네일과 같은 URL이라 확대할 때 캐시를 그대로 쓴다 */}
+          {/* 카드는 축소본을 썼으니 여기서 원본을 한 번 받는다 */}
           <PhotoViewer
             uri={firstPhoto}
             visible={isZoomed}

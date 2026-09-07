@@ -20,7 +20,12 @@ export type TimelinePlace = {
   left_at: string;
   lat: number;
   lng: number;
-  photos?: string[]; // 촬영된 사진 url 목록
+  photos?: string[]; // 원본 url — 확대 보기용
+  /**
+   * 카드 썸네일용 축소본 url. 축소본이 없는 예전 사진에는 서버가 원본을 넣어 준다.
+   * 옵셔널인 건 구버전 서버 대응 — 호출부가 `photos`로 폴백한다.
+   */
+  thumbnails?: string[];
 };
 
 export type TimelineData = {
