@@ -1,5 +1,12 @@
 import {useRef} from 'react';
-import {View, Text, TouchableOpacity, FlatList, Dimensions} from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  Dimensions,
+  Image,
+} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 import {useState} from 'react';
@@ -12,10 +19,30 @@ import {PREMIUM_THEMES, type ThemeId} from '@/constants/themes';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const THEMES = [
-  {id: 'basic' as ThemeId, label: '베이직', bg: '#E6F0F1'},
-  {id: 'dark' as ThemeId, label: '다크', bg: '#1e1e1e'},
-  {id: 'strawberry' as ThemeId, label: '딸기', bg: '#FFE4EC'},
-  {id: 'aqua' as ThemeId, label: '아쿠아', bg: '#E0F4FF'},
+  {
+    id: 'basic' as ThemeId,
+    label: '베이직',
+    bg: '#E6F0F1',
+    preview: require('../../../../assets/images/theme-basic.png'),
+  },
+  {
+    id: 'dark' as ThemeId,
+    label: '다크',
+    bg: '#1e1e1e',
+    preview: require('../../../../assets/images/theme-dark.png'),
+  },
+  {
+    id: 'strawberry' as ThemeId,
+    label: '딸기',
+    bg: '#FFE4EC',
+    preview: require('../../../../assets/images/theme-strawberry.png'),
+  },
+  {
+    id: 'aqua' as ThemeId,
+    label: '아쿠아',
+    bg: '#E0F4FF',
+    preview: require('../../../../assets/images/theme-aqua.png'),
+  },
 ];
 
 export default function ThemeScreen() {
@@ -90,8 +117,16 @@ export default function ThemeScreen() {
                 height: PREVIEW_H,
                 borderRadius: 24,
                 backgroundColor: item.bg,
+                // 이미지가 모서리 둥글기를 따라가게
+                overflow: 'hidden',
               }}
-            />
+            >
+              <Image
+                source={item.preview}
+                style={{width: '100%', height: '100%'}}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
           </View>
         )}
       />

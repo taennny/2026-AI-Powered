@@ -1,7 +1,7 @@
 import {api} from '@/utils/api';
 
 export type CalendarDay = {
-  date: string;          // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
   has_journal: boolean;
   has_timeline: boolean;
 };
@@ -20,19 +20,20 @@ export type TimelinePlace = {
   left_at: string;
   lat: number;
   lng: number;
-  photos?: string[];     // 촬영된 사진 url 목록
+
+  timezone?: string | null;
+
+  utc_offset_minutes?: number | null;
+  photos?: string[]; // 원본 url — 확대 보기용
+
+  thumbnails?: string[];
 };
 
 export type TimelineData = {
-  date: string;          // 'YYYY-MM-DD'
+  date: string; // 'YYYY-MM-DD'
   polyline: {lat: number; lng: number}[];
   places: TimelinePlace[];
-  /**
-   * 고른 날짜의 daily_record id. 글쓰기가 이 값을 쓴다 —
-   * analyze 응답으로 받으면 항상 '오늘'이라 어제 카드에서 쓴 글이 오늘로 갔다.
-   *
-   * 옵셔널로 둔 건 구버전 서버 대응일 뿐이다(현재 서버는 항상 내려준다).
-   */
+
   daily_record_id?: string | null;
 };
 

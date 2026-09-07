@@ -20,6 +20,7 @@ import {
 import {saveTokens} from '@/utils/tokenStorage';
 import {login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
+import {logError} from '@/utils/logError';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -98,10 +99,7 @@ export default function LoginScreen() {
       const accessToken = queryParams?.accessToken;
       const refreshToken = queryParams?.refreshToken;
 
-      if (
-        typeof accessToken !== 'string' ||
-        typeof refreshToken !== 'string'
-      ) {
+      if (typeof accessToken !== 'string' || typeof refreshToken !== 'string') {
         throw new Error('토큰을 받지 못했습니다.');
       }
 
@@ -110,7 +108,7 @@ export default function LoginScreen() {
 
       router.replace('/');
     } catch (error) {
-      console.error('kakao login error', error);
+      logError('kakao login', error);
       setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
     }
   };

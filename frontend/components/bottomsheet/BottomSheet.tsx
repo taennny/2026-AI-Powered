@@ -17,7 +17,7 @@ import {
 
 import {type TimelinePlace} from '@/services/calendarApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
-import {formatDate} from '@/utils/formatDate';
+import {formatDate, hourFromISO} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
 import PostCard from '@/components/bottomsheet/PostCard';
 
@@ -27,18 +27,36 @@ type Props = {
   places: TimelinePlace[];
 };
 
-function groupByHour(
-  places: TimelinePlace[],
-): {hour: number; places: TimelinePlace[]}[] {
-  const map = new Map<number, TimelinePlace[]>();
+type HourGroup = {
+  hour: number;
+  timezone: string | null;
+  places: TimelinePlace[];
+};
+
+export function groupPlaces(places: TimelinePlace[]): HourGroup[] {
+  const groups: HourGroup[] = [];
+
   places.forEach(place => {
-    const hour = new Date(place.arrived_at).getHours();
-    if (!map.has(hour)) map.set(hour, []);
-    map.get(hour)!.push(place);
+    const hour = hourFromISO(place.arrived_at, place.utc_offset_minutes);
+    const timezone = place.timezone ?? null;
+    const last = groups[groups.length - 1];
+
+    if (last && last.hour === hour && last.timezone === timezone) {
+      last.places.push(place);
+      return;
+    }
+    groups.push({hour, timezone, places: [place]});
   });
-  return Array.from(map.entries())
-    .sort(([a], [b]) => a - b)
-    .map(([hour, ps]) => ({hour, places: ps}));
+
+  return groups;
+}
+
+function isTimezoneChange(
+  previous: HourGroup | undefined,
+  current: HourGroup,
+): boolean {
+  if (!previous?.timezone || !current.timezone) return false;
+  return previous.timezone !== current.timezone;
 }
 
 const BAR_LEFT = 40;
@@ -170,7 +188,7 @@ export default function BottomSheet({
   ).current;
 
   const tc = useThemeColors();
-  const hourGroups = groupByHour(places);
+  const hourGroups = groupPlaces(places);
   const hasPlaces = hourGroups.length > 0;
   hasPlacesRef.current = hasPlaces;
 
@@ -227,18 +245,30 @@ export default function BottomSheet({
                 className="absolute top-0 bottom-0 w-2 bg-teal"
                 style={{left: 6 + BAR_LEFT}}
               />
-              {hourGroups.map(({hour, places: hourPlaces}) => (
-                <View key={hour} className="flex-row mb-2">
-                  <View className="w-8 pt-[14px] items-end pr-2">
-                    <Text className="text-xs font-medium text-tertiary">
-                      {hour}
-                    </Text>
-                  </View>
-                  <View className="w-6" />
-                  <View className="flex-1">
-                    {hourPlaces.map(place => (
-                      <PostCard key={place.place_id} data={place} />
-                    ))}
+              {hourGroups.map((group, index) => (
+                <View key={group.places[0].place_id}>
+                  {isTimezoneChange(hourGroups[index - 1], group) && (
+                    <View className="flex-row items-center mt-[5px] mb-[15px]">
+                      <View className="flex-1 h-px bg-line" />
+                      <Text className="mx-3 text-[11px] text-tertiary">
+                        시간대 변경
+                      </Text>
+                      <View className="flex-1 h-px bg-line" />
+                    </View>
+                  )}
+
+                  <View className="flex-row">
+                    <View className="w-8 pt-[14px] items-end pr-2">
+                      <Text className="text-xs font-medium text-tertiary">
+                        {group.hour}
+                      </Text>
+                    </View>
+                    <View className="w-6" />
+                    <View className="flex-1">
+                      {group.places.map(place => (
+                        <PostCard key={place.place_id} data={place} />
+                      ))}
+                    </View>
                   </View>
                 </View>
               ))}

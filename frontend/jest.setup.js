@@ -15,6 +15,8 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('expo-secure-store', () => {
   const store = new Map();
   return {
+    // 잠금 중에도 읽히고, 백업·기기 이전에는 따라가지 않는 접근성 레벨
+    AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY: 2,
     isAvailableAsync: jest.fn(async () => true),
     getItemAsync: jest.fn(async key =>
       store.has(key) ? store.get(key) : null,

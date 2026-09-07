@@ -12,7 +12,12 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Stack, useLocalSearchParams, useRouter} from 'expo-router';
+import {
+  Stack,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from 'expo-router';
 
 import {
   buildDateTarget,
@@ -21,11 +26,20 @@ import {
   WritingStyle,
 } from '@/services/blogApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import {formatShortDate} from '@/utils/formatDate';
+import RotatingMessage from '@/components/write/RotatingMessage';
+import {
+  CLOSING_MESSAGE,
+  PROGRESS_MESSAGES,
+  TIP_MESSAGES,
+} from '@/constants/loadingMessages';
+import {buildLoadingSequence} from '@/utils/loadingSequence';
 import {describeBlogGenerationError} from '@/utils/blogGenerationError';
 import {useDateSelectionStore} from '@/store/dateSelectionStore';
 
 export default function WriteScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const tc = useThemeColors();
 
   const {dailyRecordId, dates} = useLocalSearchParams<{
@@ -43,31 +57,61 @@ export default function WriteScreen() {
 
   const [writingStyle, setWritingStyle] = useState<WritingStyle>('info');
   const [place, setPlace] = useState('');
-const [companion, setCompanion] = useState('');
-const [feeling, setFeeling] = useState('');
-const [prompt, setPrompt] = useState('');
+  const [companion, setCompanion] = useState('');
+  const [feeling, setFeeling] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-useEffect(() => {
-  if (!isLoading) return;
 
-  const subscription = BackHandler.addEventListener(
-    'hardwareBackPress',
-    () => true,
-  );
+  // 생성을 누를 때마다 다시 섞는다 — 실패 후 또 눌러도 같은 순서가 반복되지 않고,
+  // 금방 끝나는 사람도 매번 다른 팁을 본다
+  const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
 
-  return () => subscription.remove();
-}, [isLoading]);
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => true,
+    );
+
+    return () => subscription.remove();
+  }, [isLoading]);
+
+  /**
+   * 화면을 벗어나려는 시도를 여기서 가로챈다 — 스와이프든 뒤로가기든 전부 지난다.
+   *
+   * `gestureEnabled: false`만으로는 부족했다. New Architecture에서 그 옵션이
+   * 무시돼 생성 중에도 스와이프로 빠져나가지는 경우가 있었다.
+   * 'Home' 버튼은 replace라 GO_BACK이 아니고, 미리보기로 넘어가는 것은 push라
+   * 이 화면이 스택에서 빠지지 않으므로 둘 다 여기 걸리지 않는다.
+   */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', event => {
+      if (event.data.action.type !== 'GO_BACK') return;
+
+      event.preventDefault();
+
+      // 생성 중에는 물어볼 것도 없다 — 나가면 만들던 글이 서버에 남는다
+      if (isLoading) return;
+
+      Alert.alert('작성 취소', '글쓰기를 취소하고 나갈까요?', [
+        {text: '계속 작성', style: 'cancel'},
+        {
+          text: '나가기',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(event.data.action),
+        },
+      ]);
+    });
+
+    return unsubscribe;
+  }, [navigation, isLoading]);
   // 입력은 전부 선택이다 — 아무것도 안 적으면 타임라인만으로 생성한다
   const canSubmit = isMultiDay || !!dailyRecordId;
 
-  const dateStr = useMemo(() => {
-    const today = new Date();
-    const yy = String(today.getFullYear()).slice(2);
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-
-    return `${yy}.${mm}.${dd}`;
-  }, []);
+  // 작성일(오늘)이다. 표시용이라 4시 경계를 적용하지 않는다 —
+  // 새벽 2시에 쓴 글의 작성일은 실제로 오늘이다
+  const dateStr = useMemo(() => formatShortDate(new Date()), []);
 
   const handleHomePress = () => {
     Alert.alert('작성 취소', '글쓰기를 취소하고 홈으로 이동할까요?', [
@@ -87,6 +131,9 @@ useEffect(() => {
     }
 
     try {
+      setLoadingMessages(
+        buildLoadingSequence(PROGRESS_MESSAGES, TIP_MESSAGES, CLOSING_MESSAGE),
+      );
       setIsLoading(true);
       // 빈 항목은 빼고 보낸다 — `오늘 간 장소: `처럼 레이블만 가면 AI가 그걸 내용으로 읽는다
       const userNote =
@@ -115,12 +162,15 @@ useEffect(() => {
       router.push({
         pathname: '/(main)/write-preview',
         params: {
-  blogId: String(blog.blog_id),
-  title: blog.title,
-  content: blog.content,
-  targetData: blog.target_date,
-  createdAt: blog.created_at,
-},
+          blogId: String(blog.blog_id),
+          title: blog.title,
+          content: blog.content,
+          targetData: blog.target_date,
+          // 고를 때의 dateKeys가 아니라 서버가 준 목록을 넘긴다 —
+          // 기록이 없는 날은 서버가 빼므로 개수가 다를 수 있다
+          dates: (blog.dates ?? []).join(','),
+          createdAt: blog.created_at,
+        },
       });
     } catch (error) {
       const {title, message, showSubscription} =
@@ -145,25 +195,25 @@ useEffect(() => {
   };
 
   if (isLoading) {
-  return (
-    <>
-      <Stack.Screen
-        options={{
-          gestureEnabled: false,
-          headerBackVisible: false,
-        }}
-      />
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            gestureEnabled: false,
+            headerBackVisible: false,
+          }}
+        />
 
-      <SafeAreaView className="flex-1 bg-surface justify-center items-center">
-        <ActivityIndicator size="large" />
+        <SafeAreaView className="flex-1 bg-surface justify-center items-center">
+          <ActivityIndicator size="large" />
 
-        <Text className="mt-[14px] text-sm text-tertiary">
-          로미가 열심히 적고 있어요.
-        </Text>
-      </SafeAreaView>
-    </>
-  );
-}
+          <View className="mt-[14px]">
+            <RotatingMessage messages={loadingMessages} />
+          </View>
+        </SafeAreaView>
+      </>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-surface">
@@ -211,55 +261,55 @@ useEffect(() => {
         </View>
 
         <ScrollView className="flex-1 px-[22px] pt-[18px]">
-         <Text className="mb-2 text-sm font-semibold text-primary">
-  오늘 간 장소는 어디인가요?
-</Text>
+          <Text className="mb-2 text-sm font-semibold text-primary">
+            오늘 간 장소는 어디인가요?
+          </Text>
 
-<TextInput
-  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
-  value={place}
-  onChangeText={setPlace}
-  placeholder="예) 서울숲, 성수동, 부산 해운대"
-  placeholderTextColor={tc.tertiary}
-/>
+          <TextInput
+            className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+            value={place}
+            onChangeText={setPlace}
+            placeholder="예) 서울숲, 성수동, 부산 해운대"
+            placeholderTextColor={tc.tertiary}
+          />
 
-<Text className="mb-2 text-sm font-semibold text-primary">
-  누구와 함께하셨나요?
-</Text>
+          <Text className="mb-2 text-sm font-semibold text-primary">
+            누구와 함께하셨나요?
+          </Text>
 
-<TextInput
-  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
-  value={companion}
-  onChangeText={setCompanion}
-  placeholder="예) 친구, 가족, 연인, 혼자"
-  placeholderTextColor={tc.tertiary}
-/>
+          <TextInput
+            className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+            value={companion}
+            onChangeText={setCompanion}
+            placeholder="예) 친구, 가족, 연인, 혼자"
+            placeholderTextColor={tc.tertiary}
+          />
 
-<Text className="mb-2 text-sm font-semibold text-primary">
-  오늘의 감정은 어떠셨나요?
-</Text>
+          <Text className="mb-2 text-sm font-semibold text-primary">
+            오늘의 감정은 어떠셨나요?
+          </Text>
 
-<TextInput
-  className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
-  style={{minHeight: 90, textAlignVertical: 'top'}}
-  value={feeling}
-  onChangeText={setFeeling}
-  multiline
-  placeholder="오늘의 기분이나 인상 깊었던 감정을 적어주세요."
-  placeholderTextColor={tc.tertiary}
-/>
-<Text className="mb-2 text-sm font-semibold text-primary">
-  추가로 남기고 싶은 내용이 있나요?
-</Text>
-<TextInput
-  className="mb-6 rounded-md border border-line px-4 py-3 text-sm text-primary"
-  style={{minHeight: 120, textAlignVertical: 'top'}}
-  value={prompt}
-  onChangeText={setPrompt}
-  multiline
-  placeholder="AI가 글을 작성할 때 참고할 내용을 자유롭게 적어주세요. (선택)"
-  placeholderTextColor={tc.tertiary}
-/>
+          <TextInput
+            className="mb-5 rounded-md border border-line px-4 py-3 text-sm text-primary"
+            style={{minHeight: 90, textAlignVertical: 'top'}}
+            value={feeling}
+            onChangeText={setFeeling}
+            multiline
+            placeholder="오늘의 기분이나 인상 깊었던 감정을 적어주세요."
+            placeholderTextColor={tc.tertiary}
+          />
+          <Text className="mb-2 text-sm font-semibold text-primary">
+            추가로 남기고 싶은 내용이 있나요?
+          </Text>
+          <TextInput
+            className="mb-6 rounded-md border border-line px-4 py-3 text-sm text-primary"
+            style={{minHeight: 120, textAlignVertical: 'top'}}
+            value={prompt}
+            onChangeText={setPrompt}
+            multiline
+            placeholder="AI가 글을 작성할 때 참고할 내용을 자유롭게 적어주세요. (선택)"
+            placeholderTextColor={tc.tertiary}
+          />
         </ScrollView>
 
         <View className="h-[72px] border-t border-line bg-surface px-[22px] items-end justify-center">

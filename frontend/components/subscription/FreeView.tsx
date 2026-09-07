@@ -156,7 +156,10 @@ export default function FreeView({
       </Text>
 
       <View className="flex-row justify-center items-center gap-x-3 mt-4 mb-2">
-        <TouchableOpacity activeOpacity={0.6} onPress={() => openLink(TERMS_URL)}>
+        <TouchableOpacity
+          activeOpacity={0.6}
+          onPress={() => openLink(TERMS_URL)}
+        >
           <Text className="text-[12px] text-secondary underline">이용약관</Text>
         </TouchableOpacity>
 

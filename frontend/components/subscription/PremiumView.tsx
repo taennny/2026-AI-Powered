@@ -7,6 +7,7 @@ import {
   type SubscriptionStatus,
 } from '@/services/subscriptionApi';
 import {useThemeColors} from '@/hooks/useThemeColors';
+import SettingsActions from '@/components/settings/SettingsActions';
 
 type Props = {subscription: SubscriptionStatus; onCancel: () => void};
 
@@ -68,22 +69,28 @@ export default function PremiumView({subscription, onCancel}: Props) {
         <Text className="text-sm text-secondary">우리 오래봐요!</Text>
       </View>
 
-      <View className="gap-y-2 mt-auto pb-20">
-        {/* 결제 수단도 우리가 못 바꾼다 — 앱스토어 구독 관리로 보낸다 */}
-        <TouchableOpacity
-          onPress={() => {
-            void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
-          }}
-        >
-          <Text className="text-[15px] text-primary">결제 수단 변경</Text>
-        </TouchableOpacity>
-        {/* 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다 */}
-        {subscription.will_renew && (
-          <TouchableOpacity onPress={onCancel}>
-            <Text className="text-[15px] text-tertiary">구독 해지</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <SettingsActions
+        className="mt-auto pb-20"
+        actions={[
+          // 결제 수단도 우리가 못 바꾼다 — 앱스토어 구독 관리로 보낸다
+          {
+            label: '결제 수단 변경',
+            onPress: () => {
+              void Linking.openURL(APP_STORE_SUBSCRIPTIONS_URL);
+            },
+          },
+          // 이미 해지를 예약했으면 또 누를 이유가 없다 — 상단에 만료일이 떠 있다
+          ...(subscription.will_renew
+            ? [
+                {
+                  label: '구독 해지',
+                  onPress: onCancel,
+                  tone: 'muted' as const,
+                },
+              ]
+            : []),
+        ]}
+      />
     </View>
   );
 }

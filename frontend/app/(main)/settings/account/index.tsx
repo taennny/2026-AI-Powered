@@ -20,6 +20,8 @@ import {
   fetchKakaoLinkUrl,
   type UserMe,
 } from '@/services/authApi';
+import {logError} from '@/utils/logError';
+import SettingsActions from '@/components/settings/SettingsActions';
 
 export default function AccountScreen() {
   const logout = useAuthStore(s => s.logout);
@@ -112,7 +114,7 @@ export default function AccountScreen() {
       setUser(await fetchMe());
       Alert.alert('연동 완료', '카카오 계정이 연동됐어요.');
     } catch (error) {
-      console.log('kakao link error', error);
+      logError('kakao link', error);
       Alert.alert('오류', '카카오 연동에 실패했어요. 다시 시도해주세요.');
     } finally {
       setLinking(false);
@@ -183,14 +185,17 @@ export default function AccountScreen() {
           </View>
         </View>
 
-        <View className="absolute bottom-20 left-6 gap-y-2">
-          <TouchableOpacity onPress={handleLogout} activeOpacity={0.6}>
-            <Text className="text-[15px] text-primary">로그아웃</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDeleteAccount} activeOpacity={0.6}>
-            <Text className="text-[15px] text-tertiary">회원탈퇴</Text>
-          </TouchableOpacity>
-        </View>
+        <SettingsActions
+          className="absolute bottom-20 left-6"
+          actions={[
+            {label: '로그아웃', onPress: handleLogout},
+            {
+              label: '회원탈퇴',
+              onPress: handleDeleteAccount,
+              tone: 'muted',
+            },
+          ]}
+        />
       </View>
     </SafeAreaView>
   );

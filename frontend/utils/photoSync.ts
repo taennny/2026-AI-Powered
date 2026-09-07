@@ -68,7 +68,9 @@ async function writeUploadedIds(ids: Set<string>): Promise<void> {
 }
 
 /** 셀룰러로 수백 MB를 올리면 안 된다. 확인이 안 되면 올리지 않는다 */
-async function isOnWifi(Network: typeof import('expo-network')): Promise<boolean> {
+async function isOnWifi(
+  Network: typeof import('expo-network'),
+): Promise<boolean> {
   try {
     const state = await Network.getNetworkStateAsync();
     return state.type === Network.NetworkStateType.WIFI;
@@ -96,7 +98,12 @@ function hasCaptureTime(info: MediaLibraryTypes.AssetInfo): boolean {
   const exif = info.exif as Record<string, unknown> | undefined;
   if (!exif) return false;
 
-  const nested = exif.Exif as Record<string, unknown> | undefined;
+  // iOS는 CGImage 속성 딕셔너리를 그대로 넘겨 키가 '{Exif}'다(중괄호 포함).
+  // 안드로이드는 평탄한 구조. 둘 다 못 찾으면 사진이 통째로 안 올라간다
+  const nested = (exif['{Exif}'] ?? exif.Exif) as
+    | Record<string, unknown>
+    | undefined;
+
   return Boolean(exif.DateTimeOriginal ?? nested?.DateTimeOriginal);
 }
 
@@ -108,11 +115,13 @@ function hasCaptureTime(info: MediaLibraryTypes.AssetInfo): boolean {
 export async function syncPhotosForDate(
   dateKey: string,
   now = Date.now(),
+  /** 새로고침 버튼용 — 사용자가 직접 눌렀으면 간격 가드를 건너뛴다 */
+  force = false,
 ): Promise<number> {
   if (isSyncing) return 0;
 
   const last = lastSyncedAt.get(dateKey) ?? 0;
-  if (now - last < SYNC_MIN_INTERVAL_MS) return 0;
+  if (!force && now - last < SYNC_MIN_INTERVAL_MS) return 0;
 
   const range = logicalDayRange(dateKey);
   if (!range) return 0;
@@ -143,8 +152,8 @@ export async function syncPhotosForDate(
       mediaType: 'photo',
       createdAfter: range.start,
       createdBefore: range.end,
-      // 오름차순 — 상한에 걸리면 늦게 찍은 것이 잘린다 (첫 사진이 더 자연스럽다)
-      sortBy: [['creationTime', true]],
+      // 내림차순 — 방금 찍은 사진이 먼저 올라가고, MAX_SCAN 밖으로 밀리지 않는다
+      sortBy: [['creationTime', false]],
       first: MAX_SCAN,
     });
 

@@ -15,18 +15,6 @@ export function clearJournalCache(): void {
   cachedFirstPage = null;
 }
 
-/**
- * 저널 목록 — 서버 검색(`q`) + 페이지네이션.
- * 클라 검색은 받아온 페이지 안에서만 찾게 된다. 늦게 온 응답은 요청 번호로 거른다.
- *
- * 검색은 **제출식**이다 — 타이핑만으로는 조회하지 않고 `search()`를 불러야 나간다.
- * 글자마다 조회하면 입력 중인 검색어와 화면의 목록이 계속 어긋난다. 그 상태로
- * 하이라이트를 칠하면 "없는 검색어가 옛 글에 파랗게 칠해졌다가 뒤늦게 사라지는" 화면이 된다.
- *
- * 그래서 `query`(입력 중)와 `appliedQuery`(지금 목록을 만들어낸 검색어)를 나눠 둔다.
- * **하이라이트와 빈 목록 문구는 반드시 `appliedQuery`를 쓴다** — 제출 후 응답까지의
- * 짧은 구간에도 둘이 어긋나면 안 된다.
- */
 export function useJournalList() {
   const [query, setQuery] = useState('');
   // 캐시로 되살린 목록은 검색 없는 첫 페이지뿐이라 빈 문자열이 맞다
@@ -117,7 +105,12 @@ export function useJournalList() {
   const hasMore = journals.length < total;
 
   const loadMore = useCallback(() => {
-    if (isLoading || isLoadingMore || isFirstPageLoadingRef.current || !hasMore) {
+    if (
+      isLoading ||
+      isLoadingMore ||
+      isFirstPageLoadingRef.current ||
+      !hasMore
+    ) {
       return;
     }
     // 입력 중인 `query`가 아니라 이 목록을 만들어낸 검색어로 이어받는다
