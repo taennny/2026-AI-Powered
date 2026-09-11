@@ -36,7 +36,9 @@ ns = Namespace(
 # 한 체류로 합쳐지고, 좁히면 실내 GPS 튐에 취약해진다. 장소 구분을 우선해 50m로 둔다.
 # (드리프트 조각화는 촘촘한 수집(distanceInterval=0) + accuracy 필터로 완화)
 STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
-MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
+MIN_STAY_MINUTES = (
+    10  # 최소 체류 시간 (분). 미만은 지나가다 잠깐 멈춘 것으로 보고 버린다
+)
 # 수집 간격이 불규칙(백그라운드 스로틀 등)해도 같은 자리면 이어붙이도록 여유를 둔다.
 # 이 값 이하 끊김은 하나의 체류로 잇고, 초과 시엔 경계로 본다.
 GAP_BRIDGE_MINUTES = 5
@@ -184,17 +186,26 @@ def _merge_adjacent(segments: list) -> list:
 # ──────────────────────────────────────────
 # 카카오 장소 매칭
 # ──────────────────────────────────────────
-# 라이프로그 "체류형" 장소 카테고리. 순서에 의존하지 않고(아래 _nearest_place)
-# 전부 조회해 최단거리를 고른다. (카테고리 수 = 체류당 카카오 호출 수 → 쿼터 고려)
-KAKAO_STAY_CATEGORIES = [
+# 라이프로그 장소 카테고리를 단계(tier)로 나눈다(순서 아닌 tier).
+#   랜드마크: 관광명소·문화시설 같은 "큰 명소" — 그 안에 있으면 옆 카페·마트보다
+#             명소 자체를 잡는다(롯데월드 안에서 롯데마트로 뜨는 문제 방지).
+#   Tier1(체험형): 실제로 "가서 시간을 보낸" 목적지 — 그다음.
+#   Tier2(기능형): 편의점·은행처럼 옆에 있으면 중심을 뺏어가는 노이즈 — 폴백.
+# 이렇게 나눠야 밀집 지역에서 "옆 편의점/은행"이 식당·카페를, 또 "몰 안 마트"가
+# 명소를 이기지 않는다. (각 tier는 tier 안에서만 거리 최소 우선 → _nearest_place)
+KAKAO_LANDMARK = [
+    "AT4",  # 관광명소 (테마파크·명소)
+    "CT1",  # 문화시설 (박물관·공연장 등)
+]
+KAKAO_STAY_TIER1 = [
     "FD6",  # 음식점
     "CE7",  # 카페
-    "AT4",  # 관광명소
-    "CT1",  # 문화시설
     "AD5",  # 숙박
     "MT1",  # 대형마트
-    "CS2",  # 편의점
+]
+KAKAO_STAY_TIER2 = [
     "SC4",  # 학교
+    "CS2",  # 편의점
     "AC5",  # 학원
     "HP8",  # 병원
     "BK9",  # 은행
@@ -205,7 +216,18 @@ KAKAO_TRANSIT_CATEGORIES = ["SW8"]
 
 PRIMARY_RADIUS_M = 80  # 체류 반경(50m)에 가깝게: 실제 머문 자리 우선
 FALLBACK_RADIUS_M = 200  # 1차에서 못 찾으면 넓혀서 재시도
+# 대형 명소(롯데월드 등)는 부지가 넓어 체류 중심이 마커에서 꽤 떨어질 수 있어
+# PRIMARY(80)보다 넉넉히 준다. 너무 넓히면 옆 동네 작은 명소가 오매칭되므로 150m.
+LANDMARK_RADIUS_M = 150
 _UNKNOWN_PLACE = {"place_name": "알 수 없음", "category": ""}
+
+# ── 캠퍼스 건물(학교부속시설) 매칭 ──────────
+# 대학 강의동 등은 카카오에 POI로 있어도 category_group_code가 비어(예: "학교부속시설")
+# 카테고리 검색으로는 안 잡힌다. 그래서 코드 있는 "옆 은행/ATM"이 이겨버린다.
+# 근처에 학교(SC4)가 있으면 그 학교명으로 "키워드 검색+거리순"해 가장 가까운
+# 캠퍼스 건물(강의동 등)을 찾아, 코드 없는 건물명까지 매칭한다.
+CAMPUS_SCHOOL_RADIUS_M = 300  # 캠퍼스 마커(정문·본부)가 멀 수 있어 넉넉히
+CAMPUS_BUILDING_MATCH_M = 60  # 키워드로 찾은 건물이 이보다 멀면 "여기 아님"으로 무시
 
 # ── 국내/해외 하이브리드 라우팅 ────────────
 # 카카오는 국내 전용이라 해외 좌표는 결과가 비어 "알 수 없음"이 된다.
@@ -314,10 +336,13 @@ def get_place_info(lat: float, lng: float) -> dict:
       - 국내(bbox 안): 카카오 로컬 (아래 흐름)
       - 해외(bbox 밖): 구글 Places (카카오는 국내 전용이라 결과 없음)
 
-    국내 카카오 흐름 — 카테고리 순서가 아니라 실제 거리로 선택한다:
-      1) 체류형 카테고리 전역 최단거리 (좁은 반경 → 없으면 넓혀서)
-      2) 그래도 없으면 이동 지점(지하철 등)까지 포함
-      3) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
+    국내 카카오 흐름 — 카테고리 순서가 아니라 tier + 실제 거리로 선택한다:
+      1) 랜드마크(관광명소·문화시설) — 그 명소 위(≤80m)면 옆 카페·마트보다 우선
+      2) 체험형(Tier1) 최단거리 (좁은 반경 → 없으면 넓혀서)
+      3) 캠퍼스 건물(학교부속시설) — 학교 안이면 옆 은행보다 강의동을 우선
+      4) 기능형(Tier2) 최단거리 (편의점·은행 등)
+      5) 그래도 없으면 이동 지점(지하철 등)까지 포함
+      6) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
     """
     if not _in_korea(lat, lng):
         return _google_place_info(lat, lng) or dict(_UNKNOWN_PLACE)
@@ -326,14 +351,86 @@ def get_place_info(lat: float, lng: float) -> dict:
         logger.warning("KAKAO_API_KEY가 설정되지 않았습니다.")
         return dict(_UNKNOWN_PLACE)
 
-    best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, PRIMARY_RADIUS_M)
+    # 1) 랜드마크 우선 — 큰 명소 안에선 옆 카페·마트가 아니라 명소 자체를
+    best = _nearest_place(lat, lng, KAKAO_LANDMARK, LANDMARK_RADIUS_M)
+    # 2) 체험형 (캠퍼스 안 식당·카페도 여기서 잡힌다)
     if best is None:
-        best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, FALLBACK_RADIUS_M)
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER1, PRIMARY_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER1, FALLBACK_RADIUS_M)
+    # 3) 캠퍼스 건물 — 기능형(은행 등)보다 먼저 시도 (강의동이 은행보다 의미있다)
+    if best is None:
+        best = _campus_building(lat, lng)
+    # 4) 기능형 (편의점·은행 등)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER2, PRIMARY_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER2, FALLBACK_RADIUS_M)
+    # 5) 이동 지점(지하철 등)
     if best is None:
         best = _nearest_place(lat, lng, KAKAO_TRANSIT_CATEGORIES, FALLBACK_RADIUS_M)
+    # 6) POI 없으면 동네 이름이라도
     if best is None:
-        best = _reverse_geocode(lat, lng)  # POI 없으면 동네 이름이라도
+        best = _reverse_geocode(lat, lng)
     return best or dict(_UNKNOWN_PLACE)
+
+
+def _campus_building(lat: float, lng: float) -> dict | None:
+    """학교 안이면 카테고리 코드 없는 캠퍼스 건물(강의동 등)까지 매칭. 없으면 None.
+
+    카카오 카테고리 검색은 category_group_code 있는 POI만 준다. 대학 강의동은
+    코드가 비어("학교부속시설") 카테고리로는 안 잡히고, 코드 있는 옆 은행/ATM이
+    이겨버린다. 그래서:
+      1) 근처에 학교(SC4)가 있는지 확인 → 있으면 그 학교명을 얻는다
+      2) 학교명으로 키워드 검색(좌표 거리순) → 가장 가까운 캠퍼스 건물
+      3) 그 건물이 충분히 가까우면(≤CAMPUS_BUILDING_MATCH_M) 건물명으로 매칭
+    가까운 건물이 없으면(그 학교에 붙어있지 않으면) None을 돌려 다음 단계로 넘긴다.
+    """
+    school = _nearest_place(lat, lng, ["SC4"], CAMPUS_SCHOOL_RADIUS_M)
+    if school is None:
+        return None
+    # 학교명으로 키워드 검색 — "경기대학교"가 "경기대학교 …종합강의동"을 토큰 매칭한다
+    docs = _keyword_nearest(lat, lng, school["place_name"], CAMPUS_SCHOOL_RADIUS_M)
+    if not docs:
+        return None
+    nearest = docs[0]  # sort=distance → 우리 중심에서 가장 가까운 캠퍼스 POI
+    distance_m = int(nearest.get("distance") or 0)
+    if distance_m > CAMPUS_BUILDING_MATCH_M:
+        return None  # 그 학교 건물이 곁에 없음 → 여기가 캠퍼스 안이 아니다
+    return {
+        "place_name": nearest["place_name"],
+        "category": nearest.get("category_name", ""),
+    }
+
+
+def _keyword_nearest(lat: float, lng: float, query: str, radius_m: int) -> list:
+    """카카오 키워드 검색을 좌표 거리순으로 조회해 documents 리스트 반환. 실패 시 [].
+
+    category_group_code 없는 POI(학교부속시설 등)도 잡히는 유일한 경로다.
+    x,y를 주면 각 결과에 중심으로부터의 distance(m)가 채워진다.
+    """
+    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    try:
+        res = requests.get(
+            "https://dapi.kakao.com/v2/local/search/keyword.json",
+            headers=headers,
+            params={
+                "query": query,
+                "x": lng,
+                "y": lat,
+                "radius": radius_m,
+                "sort": "distance",
+            },
+            timeout=5,
+        )
+        res.raise_for_status()
+        return res.json().get("documents", [])
+    except requests.exceptions.Timeout:
+        logger.warning("카카오 키워드 검색 타임아웃 (query: %s)", query)
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error("카카오 키워드 검색 오류 (query: %s): %s", query, e)
+        return []
 
 
 def _nearest_place(
