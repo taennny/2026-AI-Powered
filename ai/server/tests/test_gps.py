@@ -204,6 +204,36 @@ def test_all_bad_accuracy_falls_back_to_unfiltered():
     assert len(stays) == 1
 
 
+def test_centroid_weighted_by_accuracy():
+    """정확한 점(작은 accuracy)이 중심점을 더 크게 끈다 — 튄 점 영향 축소."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5000, 127.0, accuracy=5),  # 정확
+        _log(base + timedelta(minutes=5), 37.5000, 127.0, accuracy=5),  # 정확
+        # 반경 안(~33m)이지만 부정확(190) → 가중 작게 → 중심 거의 안 끎
+        _log(base + timedelta(minutes=10), 37.5003, 127.0, accuracy=190),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    # 단순 평균이면 (37.5000+37.5000+37.5003)/3 ≈ 37.50010.
+    # 가중이면 정확한 37.5000 쪽으로 크게 쏠려 훨씬 작다.
+    assert stays[0]["lat"] < 37.50003
+    assert stays[0]["lat"] == pytest.approx(37.5000, abs=1e-4)
+
+
+def test_centroid_unweighted_when_accuracy_unknown():
+    """accuracy가 전부 없으면 가중이 같아져 단순 평균과 동일하다 (하위호환)."""
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    logs = [
+        _log(base, 37.5000, 127.0),
+        _log(base + timedelta(minutes=5), 37.5002, 127.0),
+        _log(base + timedelta(minutes=10), 37.5004, 127.0),
+    ]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1
+    assert stays[0]["lat"] == pytest.approx((37.5000 + 37.5002 + 37.5004) / 3)
+
+
 # ──────────────────────────────────────────
 # 장소 매칭: 카테고리 순서 무관, 전역 최단거리
 # ──────────────────────────────────────────

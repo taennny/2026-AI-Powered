@@ -36,9 +36,7 @@ ns = Namespace(
 # 한 체류로 합쳐지고, 좁히면 실내 GPS 튐에 취약해진다. 장소 구분을 우선해 50m로 둔다.
 # (드리프트 조각화는 촘촘한 수집(distanceInterval=0) + accuracy 필터로 완화)
 STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
-MIN_STAY_MINUTES = (
-    10  # 최소 체류 시간 (분). 미만은 지나가다 잠깐 멈춘 것으로 보고 버린다
-)
+MIN_STAY_MINUTES = 10  # 최소 체류(분). 미만은 잠깐 멈춘 것으로 보고 버린다
 # 수집 간격이 불규칙(백그라운드 스로틀 등)해도 같은 자리면 이어붙이도록 여유를 둔다.
 # 이 값 이하 끊김은 하나의 체류로 잇고, 초과 시엔 경계로 본다.
 GAP_BRIDGE_MINUTES = 5
@@ -47,6 +45,25 @@ GAP_BRIDGE_MINUTES = 5
 ACCURACY_MAX_M = 200  # 이보다 나쁜(값 큰) 점만 노이즈로 제외
 # 필터가 절반 넘게 지우면 그날 GPS가 전반적으로 나쁜 것 → 왜곡 방지 위해 원본 유지
 ACCURACY_MIN_KEEP_RATIO = 0.5
+# 체류 중심점을 accuracy(오차 반경)로 가중 평균한다 — 정확한 점일수록 크게 반영해
+# 실내 드리프트로 튄 점이 중심을 끌고 가는 것을 줄인다. accuracy를 모르면(0/None)
+# 이 값으로 가정해 중립적 무게를 준다.
+DEFAULT_ACCURACY_M = 30
+
+
+def _acc_weight(acc) -> float:
+    """accuracy(오차 반경 m)를 가중치로 변환. 작을수록(정확할수록) 큰 가중치.
+
+    0/None/NaN(모름)은 DEFAULT_ACCURACY_M로 본다. 1m 미만은 1로 눌러 과도한
+    가중을 막는다(가끔 accuracy가 비현실적으로 작게 오는 경우 방지).
+    """
+    try:
+        a = float(acc)
+    except (TypeError, ValueError):
+        a = 0.0
+    if a != a or a <= 0:  # NaN 또는 0/음수 → 모름
+        a = DEFAULT_ACCURACY_M
+    return 1.0 / max(a, 1.0)
 
 
 def _filter_by_accuracy(gps_logs: list) -> list:
@@ -95,16 +112,17 @@ def detect_stays(gps_logs: list) -> list:
     current = None
     for _, row in df.iterrows():
         t, lat, lng = row["time"], float(row["lat"]), float(row["lng"])
+        acc = row.get("accuracy")  # 없으면 None (가중에서 중립 처리)
         if current is None:
-            current = _new_segment(t, lat, lng)
+            current = _new_segment(t, lat, lng, acc)
             continue
         gap_min = (t - current["last_time"]).total_seconds() / 60
         dist = geodesic((lat, lng), current["anchor"]).meters
         if gap_min <= GAP_BRIDGE_MINUTES and dist <= STAY_RADIUS_M:
-            _extend_segment(current, t, lat, lng)
+            _extend_segment(current, t, lat, lng, acc)
         else:
             segments.append(current)
-            current = _new_segment(t, lat, lng)
+            current = _new_segment(t, lat, lng, acc)
     if current is not None:
         segments.append(current)
     n_raw = len(segments)
@@ -122,8 +140,12 @@ def detect_stays(gps_logs: list) -> list:
         duration_min = (seg["end_time"] - seg["start_time"]).total_seconds() / 60
         if duration_min < MIN_STAY_MINUTES:
             continue
-        seg["lat"] = sum(seg["lats"]) / len(seg["lats"])
-        seg["lng"] = sum(seg["lngs"]) / len(seg["lngs"])
+        # accuracy 가중 중심점 — 정확한 점을 크게 반영해 튄 점의 영향을 줄인다.
+        # 모두 모름이면 가중치가 같아져 단순 평균과 동일하다.
+        weights = [_acc_weight(a) for a in seg["accs"]]
+        wsum = sum(weights)
+        seg["lat"] = sum(x * w for x, w in zip(seg["lats"], weights)) / wsum
+        seg["lng"] = sum(x * w for x, w in zip(seg["lngs"], weights)) / wsum
         stays.append(seg)
 
     logger.info(
@@ -138,22 +160,24 @@ def detect_stays(gps_logs: list) -> list:
     return stays
 
 
-def _new_segment(t, lat: float, lng: float) -> dict:
+def _new_segment(t, lat: float, lng: float, acc=None) -> dict:
     return {
         "start_time": t,
         "end_time": t,
         "last_time": t,
         "lats": [lat],
         "lngs": [lng],
+        "accs": [acc],  # 점별 accuracy — 중심점 가중 평균에 쓴다
         "anchor": (lat, lng),
     }
 
 
-def _extend_segment(seg: dict, t, lat: float, lng: float) -> None:
+def _extend_segment(seg: dict, t, lat: float, lng: float, acc=None) -> None:
     seg["end_time"] = t
     seg["last_time"] = t
     seg["lats"].append(lat)
     seg["lngs"].append(lng)
+    seg["accs"].append(acc)
     # 앵커를 running centroid로 갱신 — 점이 쌓일수록 한두 점 튐에 견고
     seg["anchor"] = (
         sum(seg["lats"]) / len(seg["lats"]),
@@ -174,6 +198,7 @@ def _merge_adjacent(segments: list) -> list:
             prev["end_time"] = seg["end_time"]
             prev["lats"] += seg["lats"]
             prev["lngs"] += seg["lngs"]
+            prev["accs"] += seg["accs"]
             prev["anchor"] = (
                 sum(prev["lats"]) / len(prev["lats"]),
                 sum(prev["lngs"]) / len(prev["lngs"]),
@@ -214,7 +239,9 @@ KAKAO_STAY_TIER2 = [
 # 이동 지점(지하철역 등) — 체류형 후보가 전혀 없을 때만 폴백으로 사용
 KAKAO_TRANSIT_CATEGORIES = ["SW8"]
 
-PRIMARY_RADIUS_M = 80  # 체류 반경(50m)에 가깝게: 실제 머문 자리 우선
+PRIMARY_RADIUS_M = (
+    50  # 체류 반경(50m)과 일치: 실제 머문 자리만 (밀집지역 옆건물 오매칭↓)
+)
 FALLBACK_RADIUS_M = 200  # 1차에서 못 찾으면 넓혀서 재시도
 # 대형 명소(롯데월드 등)는 부지가 넓어 체류 중심이 마커에서 꽤 떨어질 수 있어
 # PRIMARY(80)보다 넉넉히 준다. 너무 넓히면 옆 동네 작은 명소가 오매칭되므로 150m.
@@ -337,7 +364,7 @@ def get_place_info(lat: float, lng: float) -> dict:
       - 해외(bbox 밖): 구글 Places (카카오는 국내 전용이라 결과 없음)
 
     국내 카카오 흐름 — 카테고리 순서가 아니라 tier + 실제 거리로 선택한다:
-      1) 랜드마크(관광명소·문화시설) — 그 명소 위(≤80m)면 옆 카페·마트보다 우선
+      1) 랜드마크(관광명소·문화시설) — 그 명소 위(≤150m)면 옆 카페·마트보다 우선
       2) 체험형(Tier1) 최단거리 (좁은 반경 → 없으면 넓혀서)
       3) 캠퍼스 건물(학교부속시설) — 학교 안이면 옆 은행보다 강의동을 우선
       4) 기능형(Tier2) 최단거리 (편의점·은행 등)
