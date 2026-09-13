@@ -197,3 +197,6 @@ async def analyze_and_save(
         new_place_count += 1
 
     daily_record.place_count = visible_count + new_place_count
+
+    await db.commit()
+    return daily_record.id, len(stays)
