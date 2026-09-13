@@ -9,13 +9,14 @@ from app.schemas.frequent_place import (
     FrequentPlaceListResponse,
     FrequentPlaceResponse,
     FrequentPlaceSearchResponse,
+    ReverseGeocodeResponse,
 )
 from app.services.frequent_place import (
     create_frequent_place,
     get_frequent_places,
     to_response_dict,
 )
-from app.services.kakao import search_kakao_places
+from app.services.kakao import coord_to_address, search_kakao_places
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/places/frequent", tags=["frequent-places"])
@@ -55,3 +56,17 @@ async def search_address(
     except ValueError:
         raise HTTPException(status_code=502, detail="주소 검색에 실패했습니다")
     return FrequentPlaceSearchResponse(results=results)
+
+
+@router.get("/reverse-geocode", response_model=ReverseGeocodeResponse)
+async def reverse_geocode(
+    latitude: float,
+    longitude: float,
+    current_user: User = Depends(get_current_user),
+):
+    """현재 위치(좌표) → 주소 변환"""
+    try:
+        result = await coord_to_address(latitude, longitude)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return ReverseGeocodeResponse(**result)
