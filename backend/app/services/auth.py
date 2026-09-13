@@ -216,7 +216,7 @@ async def request_password_reset(db: AsyncSession, email: str) -> None:
     user.reset_token_expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
     await db.commit()
 
-    reset_link = f"roame://reset-password?token={raw_token}"
+    reset_link = f"roameapp://reset-password?token={raw_token}"
 
     from app.services.email import send_password_reset_email
 
