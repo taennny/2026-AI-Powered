@@ -131,7 +131,7 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/auth/kakao/link` | `fetchKakaoLinkUrl` | `settings/account/index.tsx` (연동 시작 URL) |
 | `GET /api/v1/calendar/{year}/{month}` | `fetchCalendarMonth` | `hooks/useCalendar.ts` |
 | `GET /api/v1/calendar/{date}/timeline` | `fetchTimeline` | `hooks/useCalendar.ts` |
-| `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`page`·`size` 사용) |
+| `GET /api/v1/blogs` | `fetchBlogs` | `hooks/useJournalList.ts` (`q`·`date`·`page`·`size`) |
 | `POST /api/v1/gps/logs` | `uploadGpsLogs` | `tasks/gpsTask.ts` (body에 `timezone` 동봉) |
 | `POST /api/v1/gps/logs/{date}/analyze` | `analyzeGpsLogs` | `tasks/gpsTask.ts` (`?timezone=`) |
 | `POST /api/v1/blog/generate` | `generateBlog` | `write/index.tsx` (하루는 `daily_record_id`, 모아쓰기는 `start_date`+`end_date`) |
@@ -273,6 +273,23 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 서버가 "해당 기간에 기록이 없습니다"로 거절합니다. 개수와 "선택 해제"는 `HomeFooter`
 왼쪽에 있습니다(시트가 캘린더를 가려도 보이는 유일한 자리).
 
+### 이 날의 일기
+
+홈 푸터의 글쓰기 왼쪽 버튼입니다. 누르면 저널 탭으로 가면서 그 날짜의 글만 남깁니다.
+
+| 규칙 | 이유 |
+|---|---|
+| 검색어가 아니라 `date=` 파라미터로 거른다 | 검색어 칸에 날짜를 적어 넣으면 사용자가 글자를 지우는 순간 필터가 깨집니다. 무엇보다 **모아쓰기 글은 제목·본문에 그 날짜가 없어 검색으로 못 잡습니다**(`'26.09.05 외 4일'`은 표시용 문자열입니다) |
+| 그날 글이 있을 때만 버튼을 띄운다 | 빈 목록으로 보내면 "고장났나"로 읽힙니다. 판단은 캘린더가 주는 `has_journal`이고, `timelineStore.selectedDateKey`·`hasJournal`로 전달합니다 |
+| 모아쓰기 선택 모드에서는 숨긴다 | 그 자리는 "N일 선택됨 · 선택 해제"가 씁니다 |
+| 탭 이동이라 `replace`를 쓴다 | `SectionTabs`와 같은 방식입니다. `push`면 뒤로가기 스택에 탭이 쌓입니다 |
+| 검색하면 날짜 필터가 풀린다 | 둘이 같이 걸리면 목록이 왜 그런지 알 수 없습니다 |
+| 날짜 필터 결과는 캐시하지 않는다 | 첫 페이지 캐시는 조건 없는 목록 전용입니다. 섞이면 다음 진입에 엉뚱한 목록이 뜹니다 |
+
+> **모아쓰기 글은 시작일로만 걸립니다.** 백엔드 `get_blog_list()`의 날짜 필터가
+> `Blog.target_date == date` 하나라, 8/5~8/9 글은 8/5로만 잡히고 8/7로는 안 나옵니다.
+> `period_end`(연속)와 `target_dates`(불연속)를 같이 봐야 합니다 — 백엔드 요청 대기.
+
 ### 뒤로가기
 
 `(main)`은 **iOS 스와이프 뒤로가기를 끕니다**(`gestureEnabled: false`). 글쓰기·미리보기에서
@@ -404,6 +421,8 @@ GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결�
 ```
 store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
+                        selectedDateKey, hasJournal / setSelectedDay
+                        — HomeFooter의 "이 날의 일기" 버튼용
 store/themeStore.ts     themeId, themeVars / setTheme, initialize, reset
                         reset은 로그아웃용 — 테마는 기기가 아니라 계정에 딸린 설정입니다
 store/subscriptionStore.ts  plan, billingCycle, isActive, expiresAt, willRenew,
@@ -428,7 +447,7 @@ hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
 hooks/useThemeColors.ts   현재 테마 색상 값 (prop 용)
 hooks/useSubscriptionSync.ts  구독 재조회 시점 (앱 진입 + AppState 복귀) + 만료 안내
-hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 페이지네이션
+hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 날짜 필터 + 페이지네이션
                           query(입력 중)와 appliedQuery(지금 목록의 검색어)를 나눠 둡니다.
                           하이라이트·빈 목록 문구는 appliedQuery를 씁니다
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
@@ -512,7 +531,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/analyzeError.test.ts` | `utils/analyzeError.ts` | 404·502·타임아웃·네트워크를 다른 문구로, 모르는 상태 코드는 숫자를 남김 |
 | `__tests__/blogGenerationError.test.ts` | `utils/blogGenerationError.ts` | 429는 `reset_at`까지 안내(없거나 깨져도 안내는 나감), 409는 생성 중, 폴링 타임아웃은 실패가 아니라 "아직 만드는 중" |
 | `__tests__/photoApi.test.ts` | `services/photoApi.ts` | 필드명 `photo` 고정(다르면 422), 확장자별 MIME(HEIC), 60초 타임아웃 |
-| `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
+| `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지, 날짜 필터(캐시 안 씀·더 불러오기 승계·검색하면 풀림) |
 
 `jest.setup.js`가 두 가지를 합니다:
 
