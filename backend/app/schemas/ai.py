@@ -1,8 +1,8 @@
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel
-from uuid import UUID
-from typing import Optional
 
 
 class AIGpsLogItem(BaseModel):
@@ -12,9 +12,16 @@ class AIGpsLogItem(BaseModel):
     accuracy: float | None = None
 
 
+class AISavedPlaceItem(BaseModel):
+    name: str
+    lat: float
+    lng: float
+
+
 class AIAnalyzeRequest(BaseModel):
     user_id: str
     gps_logs: list[AIGpsLogItem]
+    saved_places: list[AISavedPlaceItem] = []
 
 
 class AIStayItem(BaseModel):

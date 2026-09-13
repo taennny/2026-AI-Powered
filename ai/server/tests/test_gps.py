@@ -15,31 +15,39 @@ def _log(t: datetime, lat: float, lng: float, accuracy: float | None = None) -> 
     return log
 
 
+# 유효 체류 최소 길이(분) — MIN_STAY를 넉넉히 넘겨, 값이 바뀌어도 테스트가 안 깨지게.
+_STAY_LEN = gps.MIN_STAY_MINUTES + 5
+# 5분 간격으로 MIN_STAY를 넘기는 데 필요한 점 개수 (간격 ≤ GAP_BRIDGE라 한 체류로 이어짐)
+_N5 = gps.MIN_STAY_MINUTES // 5 + 3
+
+
 # ──────────────────────────────────────────
 # 체류 감지: 중심점(centroid)
 # ──────────────────────────────────────────
 def test_detect_stays_uses_centroid():
     """매칭 좌표는 첫 점이 아니라 체류 구간 평균(centroid)이어야 한다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    coords = [(37.5000, 127.0000), (37.5002, 127.0002), (37.5001, 127.0001)]
+    used = [coords[i % 3] for i in range(_N5)]  # 3좌표 반복, 5분 간격으로 MIN_STAY 초과
     logs = [
-        _log(base, 37.5000, 127.0000),
-        _log(base + timedelta(minutes=5), 37.5002, 127.0002),  # 간격 5분(≤GAP_BRIDGE)
-        _log(base + timedelta(minutes=10), 37.5001, 127.0001),  # 총 10분(≥MIN_STAY)
+        _log(base + timedelta(minutes=5 * i), la, ln) for i, (la, ln) in enumerate(used)
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
-    assert stays[0]["lat"] == pytest.approx((37.5000 + 37.5002 + 37.5001) / 3)
-    assert stays[0]["lng"] == pytest.approx((127.0000 + 127.0002 + 127.0001) / 3)
+    assert stays[0]["lat"] == pytest.approx(sum(la for la, _ in used) / _N5)
+    assert stays[0]["lng"] == pytest.approx(sum(ln for _, ln in used) / _N5)
 
 
 def test_detect_stays_mixed_timestamp_precision():
     """마이크로초 있는/없는 ISO8601 시각이 섞여도 파싱 실패하지 않는다 (prod 500 재현)."""
-    logs = [
-        {"time": "2026-08-24T06:24:57.123456Z", "lat": 37.5, "lng": 127.0},
-        {"time": "2026-08-24T06:29:57Z", "lat": 37.5, "lng": 127.0},  # 마이크로초 없음
-        {"time": "2026-08-24T06:34:57Z", "lat": 37.5, "lng": 127.0},  # 간격 5분씩
-        {"time": "2026-08-24T06:39:57Z", "lat": 37.5, "lng": 127.0},  # 총 ~15분(≥10)
-    ]
+    base = datetime(2026, 8, 24, 6, 24, 57, tzinfo=timezone.utc)
+    # 첫 점은 마이크로초 있음, 나머지는 없음 — 5분 간격으로 MIN_STAY 초과
+    logs = [{"time": "2026-08-24T06:24:57.123456Z", "lat": 37.5, "lng": 127.0}]
+    for i in range(1, _N5):
+        t = base + timedelta(minutes=5 * i)
+        logs.append(
+            {"time": t.strftime("%Y-%m-%dT%H:%M:%SZ"), "lat": 37.5, "lng": 127.0}
+        )
     stays = gps.detect_stays(logs)  # 예전엔 여기서 ValueError → 500
     assert len(stays) == 1
 
@@ -65,27 +73,28 @@ def _stay_run(base, start_min, end_min, lat=37.5, lng=127.0, step=1):
 def test_bridges_short_gap_same_location():
     """앱이 잠깐 죽어 GPS가 ≤5분 끊겨도, 같은 자리면 한 체류로 이어붙인다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 0,1,2분 → 3분 끊김 → 5분부터 1분 간격으로 MIN_STAY+5분까지 (한 체류로 이어짐)
     logs = [
         _log(base, 37.5, 127.0),
         _log(base + timedelta(minutes=1), 37.5, 127.0),
         _log(base + timedelta(minutes=2), 37.5, 127.0),
-        # 여기서 3분 끊김(앱 종료) — base+2 → base+5
-        _log(base + timedelta(minutes=5), 37.5, 127.0),
-        _log(base + timedelta(minutes=6), 37.5, 127.0),
-        _log(base + timedelta(minutes=9), 37.5, 127.0),
-        _log(base + timedelta(minutes=12), 37.5, 127.0),  # 총 12분(≥10)
+    ]
+    logs += [
+        _log(base + timedelta(minutes=m), 37.5, 127.0) for m in range(5, _STAY_LEN + 1)
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
     dur = (stays[0]["end_time"] - stays[0]["start_time"]).total_seconds() / 60
-    assert dur == pytest.approx(12)  # 끊긴 구간까지 포함해 하나로
+    assert dur == pytest.approx(_STAY_LEN)  # 끊긴 구간까지 포함해 하나로
 
 
 def test_long_gap_splits():
     """GAP_BRIDGE_MINUTES 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
-    # 각 구간 12분(≥10) + 사이 12분 공백(>5분)
-    logs = _stay_run(base, 0, 12) + _stay_run(base, 24, 36)
+    # 각 구간 ≥MIN_STAY + 사이 공백(>5분)
+    logs = _stay_run(base, 0, _STAY_LEN) + _stay_run(
+        base, _STAY_LEN + 15, 2 * _STAY_LEN + 15
+    )
     stays = gps.detect_stays(logs)
     assert len(stays) == 2
 
@@ -94,14 +103,10 @@ def test_jitter_outlier_does_not_split():
     """한두 점 튐(반경 밖)이 있어도 같은 자리 체류는 쪼개지지 않는다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
-        _log(base, 37.5, 127.0),
-        _log(base + timedelta(minutes=2), 37.5, 127.0),
-        _log(base + timedelta(minutes=4), 37.5, 127.0),
-        _log(base + timedelta(minutes=6), 37.5006, 127.0),  # ~66m 튐(반경 밖, 단일)
-        _log(base + timedelta(minutes=8), 37.5, 127.0),
-        _log(base + timedelta(minutes=10), 37.5, 127.0),
-        _log(base + timedelta(minutes=12), 37.5, 127.0),  # 총 12분(≥10)
+        _log(base + timedelta(minutes=m), 37.5, 127.0) for m in range(_STAY_LEN + 1)
     ]
+    mid = _STAY_LEN // 2  # 중간 한 점을 반경 밖 튐으로 교체
+    logs[mid] = _log(base + timedelta(minutes=mid), 37.5006, 127.0)  # ~66m 튐
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
 
@@ -109,11 +114,16 @@ def test_jitter_outlier_does_not_split():
 def test_drift_within_radius_kept_as_one_stay():
     """반경 내 GPS 드리프트(~30m)로 흔들려도 한 체류로 잡는다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 반경 내 드리프트 좌표를 5분 간격으로 반복해 MIN_STAY 초과
+    drift = [
+        (37.5, 127.0),
+        (37.5003, 127.0),  # ~33m
+        (37.5, 127.0003),  # ~26m
+        (37.5002, 127.0001),  # 근처
+    ]
     logs = [
-        _log(base, 37.5, 127.0),
-        _log(base + timedelta(minutes=4), 37.5003, 127.0),  # ~33m
-        _log(base + timedelta(minutes=8), 37.5, 127.0003),  # ~26m
-        _log(base + timedelta(minutes=12), 37.5002, 127.0001),  # 근처, 총 12분(≥10)
+        _log(base + timedelta(minutes=5 * i), *drift[i % len(drift)])
+        for i in range(_N5)
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
@@ -122,9 +132,9 @@ def test_drift_within_radius_kept_as_one_stay():
 def test_moved_short_time_not_merged():
     """짧은 시간 뒤라도 다른 곳으로 이동했으면 합치지 않는다 (별도 체류)."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
-    # 카페(0~12분) → 1분 뒤 ~180m 떨어진 식당(13~25분), 각 12분(≥10)
-    logs = _stay_run(base, 0, 12, lat=37.5, lng=127.0) + _stay_run(
-        base, 13, 25, lat=37.5, lng=127.0020
+    # 카페 → 1분 뒤 ~180m 떨어진 식당, 각 ≥MIN_STAY (위치가 달라 별도 체류)
+    logs = _stay_run(base, 0, _STAY_LEN, lat=37.5, lng=127.0) + _stay_run(
+        base, _STAY_LEN + 1, 2 * _STAY_LEN + 1, lat=37.5, lng=127.0020
     )
     stays = gps.detect_stays(logs)
     assert len(stays) == 2
@@ -157,9 +167,9 @@ def test_indoor_accuracy_is_kept():
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
         _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=150)
-        for m in range(0, 13)  # 0~12분(≥10)
+        for m in range(_STAY_LEN + 1)  # MIN_STAY 초과
     ]
-    assert len(gps._filter_by_accuracy(logs)) == 13  # 150 ≤ 200 → 전부 유지
+    assert len(gps._filter_by_accuracy(logs)) == _STAY_LEN + 1  # 150 ≤ 200 → 전부 유지
     assert len(gps.detect_stays(logs)) == 1  # 실내 체류 살아있음
 
 
@@ -180,14 +190,13 @@ def test_keeps_original_when_filter_drops_too_many():
 def test_bad_accuracy_point_excluded_from_stay():
     """반경 안이라도 accuracy 나쁜 점은 체류 중심점 계산에서 빠진다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 양호한 점들(37.5)을 5분 간격으로 MIN_STAY 초과, 중간에 나쁜 점 하나(37.5003)
     logs = [
-        _log(base, 37.5, 127.0, accuracy=10),
-        _log(base + timedelta(minutes=4), 37.5, 127.0, accuracy=10),
-        # ~33m 이내라 반경엔 들지만 accuracy 250(>200) → 제외되어 중심점 안 흔듦
-        _log(base + timedelta(minutes=6), 37.5003, 127.0, accuracy=250),
-        _log(base + timedelta(minutes=8), 37.5, 127.0, accuracy=10),
-        _log(base + timedelta(minutes=12), 37.5, 127.0, accuracy=10),  # 총 12분(≥10)
+        _log(base + timedelta(minutes=5 * i), 37.5, 127.0, accuracy=10)
+        for i in range(_N5)
     ]
+    # ~33m 이내라 반경엔 들지만 accuracy 250(>200) → 제외되어 중심점 안 흔듦
+    logs.append(_log(base + timedelta(minutes=3), 37.5003, 127.0, accuracy=250))
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
     assert stays[0]["lat"] == pytest.approx(37.5)  # 37.5003 섞였으면 어긋남
@@ -198,7 +207,7 @@ def test_all_bad_accuracy_falls_back_to_unfiltered():
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     logs = [
         _log(base + timedelta(minutes=m), 37.5, 127.0, accuracy=250)
-        for m in range(0, 13)  # 0~12분(≥10)
+        for m in range(_STAY_LEN + 1)  # MIN_STAY 초과
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
@@ -207,31 +216,33 @@ def test_all_bad_accuracy_falls_back_to_unfiltered():
 def test_centroid_weighted_by_accuracy():
     """정확한 점(작은 accuracy)이 중심점을 더 크게 끈다 — 튄 점 영향 축소."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    # 정확한 점(37.5000, acc5)들 + 부정확한 점(37.5003, acc190) 하나, 5분 간격
     logs = [
-        _log(base, 37.5000, 127.0, accuracy=5),  # 정확
-        _log(base + timedelta(minutes=5), 37.5000, 127.0, accuracy=5),  # 정확
-        # 반경 안(~33m)이지만 부정확(190) → 가중 작게 → 중심 거의 안 끎
-        _log(base + timedelta(minutes=10), 37.5003, 127.0, accuracy=190),
+        _log(base + timedelta(minutes=5 * i), 37.5000, 127.0, accuracy=5)
+        for i in range(_N5 - 1)
     ]
+    logs.append(
+        _log(base + timedelta(minutes=5 * (_N5 - 1)), 37.5003, 127.0, accuracy=190)
+    )
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
-    # 단순 평균이면 (37.5000+37.5000+37.5003)/3 ≈ 37.50010.
-    # 가중이면 정확한 37.5000 쪽으로 크게 쏠려 훨씬 작다.
-    assert stays[0]["lat"] < 37.50003
+    # 단순 평균보다, 가중 평균이 정확한 37.5000 쪽으로 더 쏠려 작아야 한다.
+    simple_mean = (37.5000 * (_N5 - 1) + 37.5003) / _N5
+    assert stays[0]["lat"] < simple_mean
     assert stays[0]["lat"] == pytest.approx(37.5000, abs=1e-4)
 
 
 def test_centroid_unweighted_when_accuracy_unknown():
     """accuracy가 전부 없으면 가중이 같아져 단순 평균과 동일하다 (하위호환)."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    coords = [(37.5000, 127.0), (37.5002, 127.0), (37.5004, 127.0)]
+    used = [coords[i % 3] for i in range(_N5)]
     logs = [
-        _log(base, 37.5000, 127.0),
-        _log(base + timedelta(minutes=5), 37.5002, 127.0),
-        _log(base + timedelta(minutes=10), 37.5004, 127.0),
+        _log(base + timedelta(minutes=5 * i), la, ln) for i, (la, ln) in enumerate(used)
     ]
     stays = gps.detect_stays(logs)
     assert len(stays) == 1
-    assert stays[0]["lat"] == pytest.approx((37.5000 + 37.5002 + 37.5004) / 3)
+    assert stays[0]["lat"] == pytest.approx(sum(la for la, _ in used) / _N5)
 
 
 # ──────────────────────────────────────────
