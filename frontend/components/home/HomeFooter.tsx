@@ -13,6 +13,8 @@ import {
 export default function HomeFooter() {
   const placesCount = useTimelineStore(s => s.placesCount);
   const dailyRecordId = useTimelineStore(s => s.dailyRecordId);
+  const selectedDateKey = useTimelineStore(s => s.selectedDateKey);
+  const hasJournal = useTimelineStore(s => s.hasJournal);
 
   const selected = useDateSelectionStore(s => s.selected);
   const clearSelection = useDateSelectionStore(s => s.clear);
@@ -40,6 +42,16 @@ export default function HomeFooter() {
     });
   };
 
+  // 탭 이동이라 push가 아니라 replace다 — SectionTabs와 같은 방식
+  const handleOpenJournals = () => {
+    if (!selectedDateKey) return;
+
+    router.replace({
+      pathname: '/(main)/(tabs)/journal-list',
+      params: {date: selectedDateKey},
+    });
+  };
+
   return (
     <SafeAreaView edges={['bottom']} className="bg-footer">
       <View className="flex-row items-center justify-between px-5 py-3 bg-footer">
@@ -61,15 +73,29 @@ export default function HomeFooter() {
           <View />
         )}
 
-        <TouchableOpacity
-          onPress={handleWrite}
-          disabled={!canWrite}
-          className={`px-5 py-[10px] rounded-[20px] ${canWrite ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
-        >
-          <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
-            글쓰기
-          </Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-x-2">
+          {!selecting && hasJournal && (
+            <TouchableOpacity
+              onPress={handleOpenJournals}
+              className="px-4 py-[10px] rounded-[20px] border border-line"
+              activeOpacity={0.6}
+            >
+              <Text className="text-[13px] text-primary tracking-[0.5px]">
+                이 날의 일기
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            onPress={handleWrite}
+            disabled={!canWrite}
+            className={`px-5 py-[10px] rounded-[20px] ${canWrite ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
+          >
+            <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
+              글쓰기
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );

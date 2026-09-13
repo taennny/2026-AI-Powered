@@ -25,6 +25,8 @@ module.exports = {
         // 버튼 전용 (primary와 분리 — dark 테마에서 bg-primary가 흰색이 되는 문제 해결)
         'btn-bg': 'var(--color-btn-bg)', // bg-btn-bg     버튼 배경(홈 글쓰기·구독 CTA)
         'btn-text': 'var(--color-btn-text)', // text-btn-text 버튼 텍스트(홈 글쓰기·구독 CTA)
+        // 되돌릴 수 없는 동작
+        danger: 'var(--color-danger)', // bg-danger     삭제 버튼
         // ─── 정적 토큰 (테마와 무관) ──────────────────────────────────
         muted: '#CCCCCC', // text-muted    비활성 아이콘·화살표
       },

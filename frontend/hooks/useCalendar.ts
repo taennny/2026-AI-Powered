@@ -43,6 +43,7 @@ export function useCalendar() {
       ? cachedTimeline.places
       : [],
   );
+  const setSelectedDay = useTimelineStore(s => s.setSelectedDay);
   const setTimeline = useTimelineStore(s => s.setTimeline);
   const setDailyRecordId = useTimelineStore(s => s.setDailyRecordId);
   const refreshKey = useTimelineStore(s => s.refreshKey);
@@ -91,6 +92,13 @@ export function useCalendar() {
   useEffect(() => {
     loadTimeline();
   }, [loadTimeline, refreshKey]);
+
+  // 달을 다시 받아오면 has_journal이 바뀔 수 있어 calendarDays도 같이 본다
+  useEffect(() => {
+    const dateKey = toDateKey(selectedDate);
+    const day = calendarDays.find(d => d.date === dateKey);
+    setSelectedDay(dateKey, day?.has_journal ?? false);
+  }, [selectedDate, calendarDays, setSelectedDay]);
 
   useEffect(() => {
     const dateKey = toDateKey(selectedDate);

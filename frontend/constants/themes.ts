@@ -24,6 +24,8 @@ export type ThemeColors = {
   line: string;
   btnBg: string;
   btnText: string;
+  /** 되돌릴 수 없는 동작(장소 삭제 등). 테마마다 배경 대비가 달라 따로 둔다 */
+  danger: string;
 };
 
 export const THEME_VALUES: Record<ThemeId, ThemeColors> = {
@@ -43,6 +45,7 @@ export const THEME_VALUES: Record<ThemeId, ThemeColors> = {
     line: '#e5e7eb',
     btnBg: '#191F28',
     btnText: '#FFFFFF',
+    danger: '#E5544B',
   },
   dark: {
     tealBg: '#1a2628',
@@ -60,6 +63,7 @@ export const THEME_VALUES: Record<ThemeId, ThemeColors> = {
     line: '#374151',
     btnBg: '#4a9eba',
     btnText: '#FFFFFF',
+    danger: '#F06A60',
   },
   strawberry: {
     tealBg: '#FFEDFB',
@@ -77,6 +81,7 @@ export const THEME_VALUES: Record<ThemeId, ThemeColors> = {
     line: '#FBCFE8',
     btnBg: '#FFD6FF',
     btnText: '#3D1A24',
+    danger: '#D9365E',
   },
   aqua: {
     tealBg: '#A3FFFA',
@@ -94,6 +99,7 @@ export const THEME_VALUES: Record<ThemeId, ThemeColors> = {
     line: '#BAE6FD',
     btnBg: '#79F3FF',
     btnText: '#0C3547',
+    danger: '#E14B4B',
   },
 };
 
@@ -114,6 +120,7 @@ export const THEMES: Record<ThemeId, ReturnType<typeof vars>> = {
     '--color-line': '#e5e7eb',
     '--color-btn-bg': '#191F28',
     '--color-btn-text': '#FFFFFF',
+    '--color-danger': '#E5544B',
   }),
   dark: vars({
     '--color-teal-bg': '#1a2628',
@@ -131,6 +138,7 @@ export const THEMES: Record<ThemeId, ReturnType<typeof vars>> = {
     '--color-line': '#374151',
     '--color-btn-bg': '#4a9eba',
     '--color-btn-text': '#FFFFFF',
+    '--color-danger': '#F06A60',
   }),
   strawberry: vars({
     '--color-teal-bg': '#FFEDFB',
@@ -148,6 +156,7 @@ export const THEMES: Record<ThemeId, ReturnType<typeof vars>> = {
     '--color-line': '#FBCFE8',
     '--color-btn-bg': '#FFD6FF',
     '--color-btn-text': '#3D1A24',
+    '--color-danger': '#D9365E',
   }),
   aqua: vars({
     '--color-teal-bg': '#A3FFFA',
@@ -165,5 +174,6 @@ export const THEMES: Record<ThemeId, ReturnType<typeof vars>> = {
     '--color-line': '#BAE6FD',
     '--color-btn-bg': '#79F3FF',
     '--color-btn-text': '#0C3547',
+    '--color-danger': '#E14B4B',
   }),
 };

@@ -5,6 +5,9 @@ process.env.TZ = 'Asia/Seoul';
 
 // AsyncStorage는 네이티브 모듈이라 JS 테스트 환경에 없다. 패키지가 제공하는
 // 인메모리 목으로 갈아끼운다 (테스트마다 AsyncStorage.clear()로 비울 것).
+// 주의: 이 목의 setItem에 jest.spyOn(...).mockRestore()를 쓰지 말 것.
+// 복구할 원본 구현이 없어 그 뒤의 모든 쓰기가 조용히 사라진다 —
+// 한 번 실패시키고 싶으면 mockImplementationOnce를 쓴다.
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );

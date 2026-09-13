@@ -344,4 +344,93 @@ describe('useJournalList', () => {
       await flush();
     });
   });
+
+  // 홈의 "이 날의 일기" 버튼 — 검색어가 아니라 date 파라미터로 거른다.
+  // 모아쓰기 글은 제목·본문에 그 날짜가 없어 검색으로는 잡히지 않는다
+  describe('날짜 필터', () => {
+    it('날짜를 받으면 그 날짜로 첫 조회를 건다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const {result} = renderHook(() => useJournalList('2026-08-05'));
+      await flush();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({date: '2026-08-05', page: 1}),
+      );
+      expect(result.current.dateFilter).toBe('2026-08-05');
+    });
+
+    it('날짜로 들어오면 캐시된 전체 목록을 보여주지 않는다', async () => {
+      clearJournalCache();
+      mockFetch.mockResolvedValue(page(['a', 'b'], 2));
+      const first = renderHook(() => useJournalList());
+      await flush();
+      first.unmount();
+
+      const {result} = renderHook(() => useJournalList('2026-08-05'));
+
+      // 캐시는 검색·날짜 없는 목록이라 이 화면의 답이 아니다
+      expect(result.current.journals).toEqual([]);
+      expect(result.current.isLoading).toBe(true);
+
+      await flush();
+    });
+
+    it('더 불러오기는 날짜를 이어받는다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 5));
+      const {result} = renderHook(() => useJournalList('2026-08-05'));
+      await flush();
+
+      mockFetch.mockClear();
+      act(() => result.current.loadMore());
+      await flush();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({date: '2026-08-05', page: 2}),
+      );
+    });
+
+    it('칩을 지우면 날짜 없이 전체를 다시 받는다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const {result} = renderHook(() => useJournalList('2026-08-05'));
+      await flush();
+
+      mockFetch.mockClear();
+      act(() => result.current.clearDateFilter());
+      await flush();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({date: undefined, page: 1}),
+      );
+      expect(result.current.dateFilter).toBeUndefined();
+    });
+
+    // 날짜 칩을 단 채로 검색하면 둘 중 뭐가 걸린 건지 알 수 없다
+    it('검색하면 날짜 필터가 풀린다', async () => {
+      mockFetch.mockResolvedValue(page(['a'], 1));
+      const {result} = renderHook(() => useJournalList('2026-08-05'));
+      await flush();
+
+      act(() => result.current.setQuery('카페'));
+      act(() => result.current.search());
+      await flush();
+
+      expect(mockFetch).toHaveBeenLastCalledWith(
+        expect.objectContaining({q: '카페', date: undefined}),
+      );
+      expect(result.current.dateFilter).toBeUndefined();
+    });
+
+    it('날짜 결과는 캐시하지 않는다 — 다음 전체 목록에 새지 않게', async () => {
+      clearJournalCache();
+      mockFetch.mockResolvedValue(page(['x'], 1));
+      const first = renderHook(() => useJournalList('2026-08-05'));
+      await flush();
+      first.unmount();
+
+      const {result} = renderHook(() => useJournalList());
+      expect(result.current.journals).toEqual([]);
+
+      await flush();
+    });
+  });
 });

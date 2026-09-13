@@ -23,6 +23,24 @@ export const KAKAO_APP_REDIRECT = 'roameapp://kakao-login';
  */
 export const KAKAO_LINK_APP_REDIRECT = 'roameapp://kakao-link';
 
+/**
+ * 백엔드 콜백이 딥링크에 실어주는 `isNewUser`를 읽는다.
+ * (`backend/app/api/v1/auth.py`의 `roameapp://kakao-login?...&isNewUser={is_new_user}`)
+ *
+ * **값이 파이썬 bool을 f-string에 넣은 `'True'`/`'False'`다.** 소문자 `'true'`와만
+ * 비교하면 신규 가입자가 영영 안 잡힌다. 대소문자를 무시하고, 배열(같은 키가
+ * 여러 번 오면 expo-linking이 배열로 준다)과 없는 경우도 받아낸다.
+ *
+ * 판단이 안 서면 **false**다 — 확신이 없을 때 동의 시트를 띄우면
+ * 이미 동의한 기존 사용자가 로그인할 때마다 다시 보게 된다.
+ */
+export function parseIsNewUser(value: unknown): boolean {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== 'string') return false;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1';
+}
+
 export function buildKakaoAuthUrl(): string {
   return (
     'https://kauth.kakao.com/oauth/authorize' +

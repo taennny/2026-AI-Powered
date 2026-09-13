@@ -2,6 +2,7 @@ import {useEffect} from 'react';
 import {useLocalSearchParams, useRouter} from 'expo-router';
 import {ActivityIndicator, Alert, View} from 'react-native';
 
+import {parseIsNewUser} from '@/constants/kakao';
 import {useAuthStore} from '@/store/authStore';
 import {saveTokens} from '@/utils/tokenStorage';
 import {logError} from '@/utils/logError';
@@ -9,10 +10,11 @@ import {logError} from '@/utils/logError';
 export default function KakaoLoginScreen() {
   const router = useRouter();
 
-  const {accessToken, refreshToken, source} = useLocalSearchParams<{
+  const {accessToken, refreshToken, source, isNewUser} = useLocalSearchParams<{
     accessToken?: string;
     refreshToken?: string;
     source?: string;
+    isNewUser?: string;
   }>();
 
   const setAuthenticated = useAuthStore(state => state.setAuthenticated);
@@ -39,6 +41,14 @@ export default function KakaoLoginScreen() {
         }
 
         await saveTokens(accessToken, refreshToken);
+
+        // 신규 가입자는 여기서 들여보내지 않는다 — 동의를 아직 안 받았다.
+        // 로그인 화면이 같은 시트를 띄우고, 거부하면 만들어진 계정을 지운다.
+        if (parseIsNewUser(isNewUser)) {
+          router.replace('/(auth)/login?consent=1');
+          return;
+        }
+
         setAuthenticated();
 
         if (source === 'account-link') {
@@ -64,7 +74,7 @@ export default function KakaoLoginScreen() {
     };
 
     void handleKakaoLogin();
-  }, [accessToken, refreshToken, router, setAuthenticated, source]);
+  }, [accessToken, refreshToken, isNewUser, router, setAuthenticated, source]);
 
   return (
     <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
