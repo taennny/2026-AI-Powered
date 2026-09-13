@@ -238,7 +238,7 @@ export default function BottomSheet({
               style={{borderLeftWidth: 8, borderLeftColor: tc.teal}}
             >
               <Text className="text-sm text-secondary leading-[22px]">
-                기록된 동선이 없습니다.{'\n'}한 장소에 10분 이상 머물면 기록이
+                기록된 동선이 없습니다.{'\n'}한 장소에 30분 이상 머물면 기록이
                 생겨요.
               </Text>
             </View>

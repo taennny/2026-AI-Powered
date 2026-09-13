@@ -92,14 +92,12 @@ export default function BottomActionSheet({
         />
 
         <Animated.View
-          className="rounded-t-[20px] bg-card px-6 pt-3 pb-8"
+          className="rounded-t-[20px] bg-card px-6 pt-6 pb-8"
           style={[
             heightRatio ? {height: `${heightRatio * 100}%`} : null,
             {transform: [{translateY}]},
           ]}
         >
-          <View className="w-10 h-1 rounded-full bg-line self-center mb-4" />
-
           {title && (
             <Text className="text-[15px] font-semibold text-primary">
               {title}
