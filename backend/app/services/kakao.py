@@ -1,4 +1,5 @@
 import httpx
+
 from app.config import settings
 
 
@@ -43,3 +44,26 @@ async def get_kakao_user_info(kakao_access_token: str) -> dict:
     if response.status_code != 200:
         raise ValueError("유저 정보를 가져올 수 없습니다")
     return response.json()
+
+
+async def search_kakao_places(query: str) -> list[dict]:
+    """카카오 로컬 키워드 검색 (주소/건물명/장소명 통합 검색)"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://dapi.kakao.com/v2/local/search/keyword.json",
+            params={"query": query},
+            headers={"Authorization": f"KakaoAK {settings.KAKAO_REST_API_KEY}"},
+        )
+    if response.status_code != 200:
+        raise ValueError("주소 검색에 실패했습니다")
+
+    data = response.json()
+    return [
+        {
+            "place_name": doc["place_name"],
+            "address": doc["road_address_name"] or doc["address_name"],
+            "latitude": float(doc["y"]),
+            "longitude": float(doc["x"]),
+        }
+        for doc in data.get("documents", [])
+    ]
