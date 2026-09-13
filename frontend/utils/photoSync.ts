@@ -10,6 +10,7 @@ import type * as MediaLibraryTypes from 'expo-media-library';
 
 import {uploadPhoto} from '@/services/photoApi';
 import {DAY_BOUNDARY_HOUR} from '@/utils/formatDate';
+import {readCellularUpload} from '@/utils/photoUploadStorage';
 
 /**
  * 네이티브 모듈은 함수 안에서 늦게 가져온다 — 최상단 import는 모듈이 없을 때
@@ -67,13 +68,21 @@ async function writeUploadedIds(ids: Set<string>): Promise<void> {
   }
 }
 
-/** 셀룰러로 수백 MB를 올리면 안 된다. 확인이 안 되면 올리지 않는다 */
-async function isOnWifi(
+/**
+ * 와이파이는 항상, 셀룰러는 사용자가 켰을 때만. 확인이 안 되면 올리지 않는다 —
+ * 모르는 채로 올리면 요금이 사용자 돈으로 나간다.
+ */
+async function canUploadNow(
   Network: typeof import('expo-network'),
 ): Promise<boolean> {
   try {
     const state = await Network.getNetworkStateAsync();
-    return state.type === Network.NetworkStateType.WIFI;
+
+    if (state.type === Network.NetworkStateType.WIFI) return true;
+    if (state.type === Network.NetworkStateType.CELLULAR) {
+      return await readCellularUpload();
+    }
+    return false;
   } catch {
     return false;
   }
@@ -143,7 +152,7 @@ export async function syncPhotosForDate(
       return 0;
     }
 
-    if (!(await isOnWifi(Network))) {
+    if (!(await canUploadNow(Network))) {
       lastSyncedAt.delete(dateKey);
       return 0;
     }

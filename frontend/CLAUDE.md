@@ -49,7 +49,7 @@ app/
     └── settings/
         ├── _layout.tsx              # 설정 전용 스택 (아래 "뒤로가기" 참고)
         └── index, account, subscription, theme, records
-            # records: 위치 기록 토글 + 온보딩 다시 보기
+            # records: 위치 기록 토글 + 셀룰러 사진 업로드 토글 + 온보딩 다시 보기
 ```
 
 ### 인증 플로우
@@ -222,8 +222,15 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 **로그아웃 시 `(main)/_layout`이 비웁니다** — 다음 계정이 물려받으면 안 됩니다.
 
 **사진 자동 업로드**(`utils/photoSync.ts`) — 앱 진입·복귀 시 오늘, 캘린더에서 날짜를 고르면
-그 날짜. 와이파이일 때만, 날짜별 5분 간격, 회당 20장, 스크린샷 제외.
+그 날짜. 날짜별 5분 간격, 회당 20장, 스크린샷 제외.
 과거를 한꺼번에 훑지 않습니다 — 사진 한 장이 3~5MB라 한 달치면 수 GB입니다.
+
+네트워크는 **와이파이면 항상, 셀룰러면 사용자가 켰을 때만**입니다
+(설정 > 기록의 '셀룰러 환경에서 사진 업로드', 기본 끔). 연결 상태를 확인하지 못하면
+올리지 않습니다 — 모르는 채로 올리면 요금이 사용자 돈으로 나갑니다.
+값은 `utils/photoUploadStorage.ts`에 있습니다. `settingsStore`를 거치지 않고 디스크에서
+직접 읽는 이유는 `photoSync`가 백그라운드에서도 도는 순수 유틸이라, 스토어를 끌어오면
+`expo-location`까지 딸려와 테스트가 네이티브 모듈에 묶이기 때문입니다.
 
 **analyze 호출 시점**(`utils/analyzeSchedule.ts`): GPS 배치마다가 아니라 **1시간 주기 + 논리 날짜가
 넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
@@ -406,9 +413,10 @@ store/subscriptionStore.ts  plan, billingCycle, isActive, expiresAt, willRenew,
 store/dateSelectionStore.ts  selected('YYYY-MM-DD' → has_timeline) / toggle, clear
                         모아쓰기 날짜 선택. 선택 모드 플래그는 두지 않습니다 —
                         고른 게 있으면 선택 모드입니다
-store/settingsStore.ts  isTrackingEnabled, hasLoaded / initialize, setTrackingEnabled
-                        위치 기록 토글. 기본 켬, AsyncStorage 저장.
-                        끄면 stopGpsTracking(), 켜면 startGpsTracking()
+store/settingsStore.ts  isTrackingEnabled, isCellularUploadEnabled, hasLoaded
+                        / initialize, setTrackingEnabled, setCellularUploadEnabled
+                        위치 기록 토글은 기본 켬 — 끄면 stopGpsTracking(), 켜면 startGpsTracking().
+                        셀룰러 사진 업로드는 기본 끔 (요금이 사용자 돈이라)
 ```
 
 ### 훅
@@ -437,6 +445,7 @@ utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
+utils/photoUploadStorage.ts  셀룰러 업로드 허용 여부 — settingsStore와 photoSync가 함께 읽습니다
 constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리방침 URL (둘 다 실주소)
 constants/consent.ts      가입 동의 항목 — 조 번호가 처리방침 문서와 짝입니다.
                           **문서를 고치면 여기도 같이 봅니다.** 이메일·카카오가 같은 목록을 씁니다
@@ -486,7 +495,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/timezone.test.ts` | `utils/timezone.ts` | expo-localization → Intl → Asia/Seoul 폴백, `UTC` 오탐 처리 |
 | `__tests__/pricing.test.ts` | `constants/pricing.ts` | 할인율을 손으로 적지 않고 두 가격에서 계산, 레이블에 그 값이 들어감 |
 | `__tests__/kakao.test.ts` | `constants/kakao.ts` | base URL 끝 슬래시 제거(카카오는 redirect_uri를 문자 단위로 비교), 앱 딥링크와 백엔드 콜백 구분, 로그인·연동 딥링크 분리 |
-| `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
+| `__tests__/photoSync.test.ts` | `utils/photoSync.ts` | 논리적 하루 범위, 스크린샷 제외, ph:// → localUri, 중복 방지, 실패 시 재시도, 와이파이 게이트, **셀룰러는 설정을 켰을 때만**(연결 없으면 켜도 안 올림), 날짜별 간격 가드, 로그아웃 시 기록 삭제 |
 | `__tests__/gpsTask.test.ts` | `tasks/gpsTask.ts` | 좌표 변환, 업로드 실패 시 분석으로 안 넘어감, 분석은 스케줄러에 위임 |
 | `__tests__/analyzeSchedule.test.ts` | `utils/analyzeSchedule.ts` | 1시간 주기 가드, 날짜 넘어감 감지, 실패 시 기준 날짜 미갱신(재시도), 백그라운드·포그라운드가 시각 공유, 연속 실패 백오프 |
 | `__tests__/loadingSequence.test.ts` | `utils/loadingSequence.ts` | 진행↔튜토리얼 교대, 진행 안내는 안 섞음, 튜토리얼 누락 없음, 원본 불변, 개수가 달라도 이어 붙임 |
@@ -496,7 +505,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도, 결제 주기 반영, 만료 안내(앱 재시작 후에도 감지·조회 실패는 만료 아님·로그아웃 시 기록 삭제) |
 | `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
-| `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
+| `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영, 셀룰러 업로드 기본 끔·복원·위치 토글과 독립 |
 | `__tests__/currentUser.test.ts` | `utils/currentUser.ts` | 토큰의 `sub`를 읽음, 없거나 깨진 토큰은 null(던지지 않음), 토큰이 바뀌면 주인도 바뀜 |
 | `__tests__/timelineGrouping.test.ts` | `groupPlaces` | 같은 시끼리 묶음, **시가 같아도 시간대가 다르면 다른 묶음**, 서버 순서 유지(자정 넘김), 오프셋 없으면 기기 시간대(구버전 서버) |
 | `__tests__/themeStore.test.ts` | `themeStore` | 디스크 저장·복원, 알 수 없는 값 무시, 로그아웃 시 basic 복귀 + 디스크 삭제, reset 후 initialize가 되살리지 않음 |

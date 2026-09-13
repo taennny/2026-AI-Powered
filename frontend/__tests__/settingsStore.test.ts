@@ -12,11 +12,16 @@ const mockStart = startGpsTracking as jest.Mock;
 const mockStop = stopGpsTracking as jest.Mock;
 
 const KEY = 'settings:locationTracking';
+const CELLULAR_KEY = 'settings:cellularPhotoUpload';
 
 describe('settingsStore', () => {
   beforeEach(async () => {
     await AsyncStorage.clear();
-    useSettingsStore.setState({isTrackingEnabled: true, hasLoaded: false});
+    useSettingsStore.setState({
+      isTrackingEnabled: true,
+      isCellularUploadEnabled: false,
+      hasLoaded: false,
+    });
     mockStart.mockReset().mockResolvedValue(undefined);
     mockStop.mockReset().mockResolvedValue(undefined);
   });
@@ -70,16 +75,43 @@ describe('settingsStore', () => {
       expect(mockStop).not.toHaveBeenCalled();
     });
 
+    // spyOn + mockRestore는 쓰지 않는다 — async-storage 목에는 복구할 원본이 없어
+    // 그 뒤의 모든 쓰기가 조용히 사라진다(뒤 테스트가 통째로 거짓 통과한다)
     it('저장에 실패해도 이번 세션에는 반영된다', async () => {
-      const spy = jest
-        .spyOn(AsyncStorage, 'setItem')
-        .mockRejectedValueOnce(new Error('disk full'));
+      (AsyncStorage.setItem as jest.Mock).mockImplementationOnce(() =>
+        Promise.reject(new Error('disk full')),
+      );
 
       await useSettingsStore.getState().setTrackingEnabled(false);
 
       expect(useSettingsStore.getState().isTrackingEnabled).toBe(false);
       expect(mockStop).toHaveBeenCalled();
-      spy.mockRestore();
+    });
+  });
+
+  // 사진 한 장이 3~5MB라, 사용자가 직접 켜기 전에는 요금이 나가면 안 된다
+  describe('셀룰러 사진 업로드', () => {
+    it('설정한 적이 없으면 꺼진 상태다', async () => {
+      await useSettingsStore.getState().initialize();
+
+      expect(useSettingsStore.getState().isCellularUploadEnabled).toBe(false);
+    });
+
+    it('켜면 디스크에 남고 다음 실행에 복원된다', async () => {
+      await useSettingsStore.getState().setCellularUploadEnabled(true);
+      expect(await AsyncStorage.getItem(CELLULAR_KEY)).toBe('true');
+
+      useSettingsStore.setState({isCellularUploadEnabled: false});
+      await useSettingsStore.getState().initialize();
+      expect(useSettingsStore.getState().isCellularUploadEnabled).toBe(true);
+    });
+
+    // 위치 기록 토글과 서로 영향을 주면 안 된다
+    it('위치 기록을 꺼도 셀룰러 설정은 그대로다', async () => {
+      await useSettingsStore.getState().setCellularUploadEnabled(true);
+      await useSettingsStore.getState().setTrackingEnabled(false);
+
+      expect(useSettingsStore.getState().isCellularUploadEnabled).toBe(true);
     });
   });
 });

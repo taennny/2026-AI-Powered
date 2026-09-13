@@ -2,6 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {create} from 'zustand';
 
 import {startGpsTracking, stopGpsTracking} from '@/hooks/useGpsTracking';
+import {
+  readCellularUpload,
+  writeCellularUpload,
+} from '@/utils/photoUploadStorage';
 
 const TRACKING_KEY = 'settings:locationTracking';
 
@@ -11,22 +15,32 @@ type SettingsStore = {
    * 처음 설치한 사용자가 아무 설정 없이도 기록이 남아야 한다.
    */
   isTrackingEnabled: boolean;
+  /** 셀룰러에서도 사진을 올릴지. 기본값은 끔 — 요금이 사용자 돈이다 */
+  isCellularUploadEnabled: boolean;
   /** 디스크에서 복원하기 전인지. 복원 전에 배너를 띄우면 잠깐 잘못 뜬다 */
   hasLoaded: boolean;
 
   initialize: () => Promise<void>;
   setTrackingEnabled: (enabled: boolean) => Promise<void>;
+  setCellularUploadEnabled: (enabled: boolean) => Promise<void>;
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   isTrackingEnabled: true,
+  isCellularUploadEnabled: false,
   hasLoaded: false,
 
   initialize: async () => {
     try {
-      const raw = await AsyncStorage.getItem(TRACKING_KEY);
+      const [raw, cellular] = await Promise.all([
+        AsyncStorage.getItem(TRACKING_KEY),
+        readCellularUpload(),
+      ]);
       // 저장된 적이 없으면(null) 기본값 유지
-      set({isTrackingEnabled: raw === null ? true : raw === 'true'});
+      set({
+        isTrackingEnabled: raw === null ? true : raw === 'true',
+        isCellularUploadEnabled: cellular,
+      });
     } catch {
       // 읽지 못하면 켠 것으로 본다 — 사용자가 끈 적 없는데 꺼두면
       // 기록이 조용히 사라진다
@@ -53,5 +67,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     } else {
       await stopGpsTracking();
     }
+  },
+
+  setCellularUploadEnabled: async enabled => {
+    if (get().isCellularUploadEnabled === enabled) return;
+
+    set({isCellularUploadEnabled: enabled});
+    await writeCellularUpload(enabled);
   },
 }));

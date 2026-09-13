@@ -9,6 +9,12 @@ export default function RecordsSettingsScreen() {
   const tc = useThemeColors();
   const isTrackingEnabled = useSettingsStore(s => s.isTrackingEnabled);
   const setTrackingEnabled = useSettingsStore(s => s.setTrackingEnabled);
+  const isCellularUploadEnabled = useSettingsStore(
+    s => s.isCellularUploadEnabled,
+  );
+  const setCellularUploadEnabled = useSettingsStore(
+    s => s.setCellularUploadEnabled,
+  );
 
   return (
     <SafeAreaView edges={['top']} className="flex-1 bg-surface">
@@ -44,6 +50,25 @@ export default function RecordsSettingsScreen() {
               {isTrackingEnabled
                 ? '걸어다닌 곳을 자동으로 기록해 하루 타임라인을 만들어요.'
                 : '지금은 위치를 기록하지 않아요. 꺼둔 동안 타임라인은 비게 됩니다.'}
+            </Text>
+          </View>
+
+          <View className="gap-y-2">
+            <View className="flex-row items-center justify-between pr-[34%]">
+              <Text className="text-[15px] text-primary">
+                셀룰러 환경에서 사진 업로드
+              </Text>
+              <Switch
+                value={isCellularUploadEnabled}
+                onValueChange={value => void setCellularUploadEnabled(value)}
+                trackColor={{true: tc.tealAccent}}
+              />
+            </View>
+
+            <Text className="text-[13px] leading-[19px] text-secondary pr-[32%]">
+              {isCellularUploadEnabled
+                ? '데이터를 켜고 있을 때도 사진이 올라가요. 데이터 요금이 부과될 수 있어요.'
+                : '와이파이에 연결됐을 때만 사진이 올라가요.'}
             </Text>
           </View>
 
