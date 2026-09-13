@@ -5,8 +5,14 @@
  * 가로 이동이 세로보다 분명할 때만 제스처를 가져온다.
  */
 
-import {useCallback, useEffect, useRef} from 'react';
-import {Animated, PanResponder, View} from 'react-native';
+import {useCallback, useEffect, useRef, useState} from 'react';
+import {
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 /** 제스처를 가져오는 최소 가로 이동량. 탭이 스와이프로 오인되지 않을 정도 */
 const CLAIM_THRESHOLD = 8;
@@ -40,6 +46,7 @@ type Props = {
 export default function SwipeableRow({actions, actionsWidth, children}: Props) {
   const translateX = useRef(new Animated.Value(0)).current;
   const offset = useRef(0);
+  const [isOpen, setIsOpen] = useState(false);
 
   const animateTo = useCallback(
     (to: number) => {
@@ -56,12 +63,14 @@ export default function SwipeableRow({actions, actionsWidth, children}: Props) {
 
   const close = useCallback(() => {
     if (closeOpenRow === close) closeOpenRow = null;
+    setIsOpen(false);
     animateTo(0);
   }, [animateTo]);
 
   const open = useCallback(() => {
     if (closeOpenRow && closeOpenRow !== close) closeOpenRow();
     closeOpenRow = close;
+    setIsOpen(true);
     animateTo(-actionsWidth);
   }, [actionsWidth, animateTo, close]);
 
@@ -126,6 +135,14 @@ export default function SwipeableRow({actions, actionsWidth, children}: Props) {
         style={{transform: [{translateX}]}}
       >
         {children}
+
+        {isOpen && (
+          <Pressable
+            onPress={close}
+            style={StyleSheet.absoluteFill}
+            accessibilityLabel="메뉴 닫기"
+          />
+        )}
       </Animated.View>
     </View>
   );
