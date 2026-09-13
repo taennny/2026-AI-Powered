@@ -20,6 +20,7 @@ import BottomActionSheet from '@/components/common/BottomActionSheet';
 import {PLACE_CATEGORY_CHIPS} from '@/constants/placeCategories';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {
+  categoryLeaf,
   fetchPlaceCandidates,
   searchPlaceCandidates,
   type PlaceCandidate,
@@ -53,9 +54,12 @@ function CandidateRow({
       activeOpacity={0.6}
       className="py-3 border-b border-line"
     >
-      <Text className="text-[14px] text-primary">{candidate.name}</Text>
+      <Text className="text-[14px] text-primary">{candidate.place_name}</Text>
       <Text className="text-[12px] text-tertiary mt-[2px]">
-        {[candidate.category, `${Math.round(candidate.distance_m)}m`]
+        {[
+          categoryLeaf(candidate.category),
+          `${Math.round(candidate.distance_m)}m`,
+        ]
           .filter(Boolean)
           .join(' · ')}
       </Text>
@@ -137,9 +141,9 @@ export default function PlaceEditSheet({
   const choose = useCallback(
     (candidate: PlaceCandidate) => {
       onSubmit({
-        name: candidate.name,
+        name: candidate.place_name,
         category: candidate.category,
-        kakaoPlaceId: candidate.kakao_place_id,
+        kakaoPlaceId: candidate.place_id,
       });
     },
     [onSubmit],
@@ -176,7 +180,7 @@ export default function PlaceEditSheet({
 
               {candidates.map(candidate => (
                 <CandidateRow
-                  key={`${candidate.name}-${candidate.distance_m}`}
+                  key={`${candidate.place_id ?? candidate.place_name}-${candidate.distance_m}`}
                   candidate={candidate}
                   onPress={() => choose(candidate)}
                 />
@@ -208,7 +212,7 @@ export default function PlaceEditSheet({
             <View className="mt-2">
               {matches.map(candidate => (
                 <CandidateRow
-                  key={`${candidate.name}-${candidate.distance_m}`}
+                  key={`${candidate.place_id ?? candidate.place_name}-${candidate.distance_m}`}
                   candidate={candidate}
                   onPress={() => choose(candidate)}
                 />

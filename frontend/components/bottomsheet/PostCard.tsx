@@ -107,7 +107,7 @@ export default function PostCard({data, onChanged}: Props) {
       <TouchableOpacity
         onPress={handleDeletePress}
         activeOpacity={0.7}
-        className="flex-1 items-center justify-center bg-[#E5544B] rounded-r-[14px] mb-[10px]"
+        className="flex-1 items-center justify-center bg-danger rounded-r-[14px] mb-[10px]"
       >
         <Text className="text-[13px] font-semibold text-white">삭제</Text>
       </TouchableOpacity>

@@ -181,6 +181,7 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 | `text-secondary` | `#6b7280` | 보조 텍스트 |
 | `text-tertiary` | `#9ca3af` | 힌트·레이블 |
 | `bg-surface` | `#F6F6F6` | 헤더·푸터·화면 배경 |
+| `bg-danger` | `#E5544B` | 되돌릴 수 없는 동작(장소 삭제). 테마마다 배경 대비가 달라 토큰으로 둡니다 |
 | `border-line` | `#e5e7eb` | 구분선·테두리 |
 | `text-muted` | `#CCCCCC` (정적) | 비활성 텍스트 |
 
@@ -312,14 +313,25 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 |---|---|
 | 후보를 고르면 카테고리를 묻지 않는다 | 후보에 카테고리가 딸려옵니다. 대부분 탭 한 번으로 끝납니다 |
 | 직접 입력은 단순 텍스트 교체가 아니다 | 친 글자로 지도를 다시 검색합니다. "없어요"까지 온 경우는 대개 "반경 밖이지만 등록은 된 곳"입니다 |
-| 카테고리 칩은 마지막 폴백 | 카테고리는 **닫힌 목록이 아닙니다** — 카카오 원문 문자열과 구글 type 매핑값이 섞여 들어옵니다. 칩은 미등록 장소용 몇 개일 뿐입니다 |
+| 카테고리 칩은 마지막 폴백 | 카테고리는 **닫힌 목록이 아닙니다** — 카카오에 "카테고리 목록" API가 없고, 값도 `'음식점 > 카페 > 커피전문점'` 같은 계층 문자열입니다. 저장은 원문 그대로 하고 목록 표시만 `categoryLeaf()`로 마지막 조각을 씁니다. 칩은 미등록 장소용 몇 개일 뿐입니다 |
 | 좌표는 건드리지 않는다 | 핀은 GPS 체류 중심점을 유지합니다. 지도는 Static Maps 이미지라 저장된 좌표를 바꾸지 않는 한 그대로입니다 |
 | 시간도 건드리지 않는다 | 사진이 `arrived_at ≤ taken_at ≤ left_at`로 붙습니다. 시간을 줄이면 붙어 있던 사진이 떨어지고 늘리면 옆 장소 것을 빨아들입니다 |
 | 시트는 `Modal`이다 | RN이 별도 레이어에 그려서 홈 바텀시트의 `PanResponder`와 안 부딪힙니다 |
 
-> **`services/placeApi.ts`의 엔드포인트는 아직 백엔드에 없습니다.** 경로·형식은 합의된 스펙이고,
+**후보·검색은 백엔드가 AI 서버를 중계합니다.** 앱이 AI를 직접 부르지 않는 건 지도 API 키가
+그쪽에 있어서입니다. 응답은 AI 형식 그대로 받습니다 — 중간에서 필드명을 바꾸면 어긋납니다.
+
+| 앱 → 백엔드 | 백엔드 → AI | 응답 키 |
+|---|---|---|
+| `GET /api/v1/places/{id}/candidates` | `/api/ai/candidates?lat=&lng=&exclude=` | `candidates` (최대 5) |
+| `GET /api/v1/places/{id}/search?q=` | `/api/ai/search?lat=&lng=&query=` | `results` (최대 10) |
+
+두 응답의 키가 다릅니다(`candidates` / `results`) — AI 스펙 그대로라 맞춰뒀습니다.
+좌표와 `exclude`(현재 장소명)는 백엔드가 붙입니다. 앱은 `place_id`만 보냅니다.
+
+> **`services/placeApi.ts`의 엔드포인트는 아직 백엔드에 없습니다**(AI 쪽은 완료).
 > 붙기 전까지 호출하면 404라 시트가 "주변 장소를 불러오지 못했어요"로 떨어집니다.
-> 백엔드에 남은 일: 후보 조회 중계, `PATCH`/`DELETE /places/{id}`,
+> 백엔드에 남은 일: 위 두 중계, `PATCH`/`DELETE /places/{id}`,
 > 수정 시 `is_corrected=True`, **재분석 때 수정본과 같은 시간대의 stay를 건너뛰기**
 > (안 하면 같은 시각에 장소가 두 개 남습니다), 삭제한 장소가 재분석에 되살아나지 않게,
 > `place_count` 재계산.
@@ -562,7 +574,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도, 결제 주기 반영, 만료 안내(앱 재시작 후에도 감지·조회 실패는 만료 아님·로그아웃 시 기록 삭제) |
 | `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
-| `__tests__/swipeableRow.test.ts` | `shouldOpen` | 거리·속도로 열림 판정, 스치듯 민 건 안 열림, 반대로 튕기면 취소, 버튼이 넓으면 더 밀어야 함 |
+| `__tests__/swipeableRow.test.ts` | `shouldOpen` + `categoryLeaf` | 거리·속도로 열림 판정, 스치듯 민 건 안 열림, 반대로 튕기면 취소, 버튼이 넓으면 더 밀어야 함 / 계층 카테고리의 마지막 조각 |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영, 셀룰러 업로드 기본 끔·복원·위치 토글과 독립 |
 | `__tests__/currentUser.test.ts` | `utils/currentUser.ts` | 토큰의 `sub`를 읽음, 없거나 깨진 토큰은 null(던지지 않음), 토큰이 바뀌면 주인도 바뀜 |
 | `__tests__/timelineGrouping.test.ts` | `groupPlaces` | 같은 시끼리 묶음, **시가 같아도 시간대가 다르면 다른 묶음**, 서버 순서 유지(자정 넘김), 오프셋 없으면 기기 시간대(구버전 서버) |
