@@ -10,27 +10,33 @@ import {
   Dimensions,
 } from 'react-native';
 import {Ionicons} from '@expo/vector-icons';
+import {useLocalSearchParams} from 'expo-router';
 
 import {useJournalList} from '@/hooks/useJournalList';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import JournalCard from '@/components/journal/JournalCard';
+import {formatDateStr} from '@/utils/formatDate';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const BAR_COLLAPSED = 40;
 const BAR_EXPANDED = SCREEN_WIDTH - 32;
 
 export default function JournalListScreen() {
+  // 홈의 "이 날의 일기"가 넘겨준다
+  const {date} = useLocalSearchParams<{date?: string}>();
   const {
     query,
     setQuery,
     appliedQuery,
+    dateFilter,
+    clearDateFilter,
     search,
     clearSearch,
     journals,
     isLoading,
     isLoadingMore,
     loadMore,
-  } = useJournalList();
+  } = useJournalList(date);
   const [isFocused, setIsFocused] = useState(false);
   const widthAnim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
@@ -121,6 +127,26 @@ export default function JournalListScreen() {
         </Animated.View>
       </View>
 
+      {dateFilter && (
+        <View className="px-4 pb-3">
+          <TouchableOpacity
+            onPress={clearDateFilter}
+            activeOpacity={0.7}
+            className="self-start flex-row items-center bg-card rounded-[16px] pl-3 pr-2 py-[6px]"
+          >
+            <Text className="text-[13px] text-primary">
+              {formatDateStr(dateFilter)} 기록이 담긴 글
+            </Text>
+            <Ionicons
+              name="close"
+              size={14}
+              color={tc.tertiary}
+              style={{marginLeft: 6}}
+            />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="small" />
@@ -140,9 +166,11 @@ export default function JournalListScreen() {
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <Text className="text-center text-sm text-secondary mt-10">
-              {appliedQuery
-                ? '검색 결과가 없어요.'
-                : '아직 작성한 글이 없어요.'}
+              {dateFilter
+                ? '이 날의 기록으로 쓴 글이 없어요.'
+                : appliedQuery
+                  ? '검색 결과가 없어요.'
+                  : '아직 작성한 글이 없어요.'}
             </Text>
           }
           ListFooterComponent={

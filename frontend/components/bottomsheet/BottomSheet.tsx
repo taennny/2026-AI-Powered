@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
+import {useTimelineStore} from '@/store/timelineStore';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate, hourFromISO} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
@@ -188,6 +189,8 @@ export default function BottomSheet({
   ).current;
 
   const tc = useThemeColors();
+  // 장소를 고치거나 지우면 타임라인을 다시 받아야 한다
+  const requestRefresh = useTimelineStore(s => s.requestRefresh);
   const hourGroups = groupPlaces(places);
   const hasPlaces = hourGroups.length > 0;
   hasPlacesRef.current = hasPlaces;
@@ -235,8 +238,8 @@ export default function BottomSheet({
               style={{borderLeftWidth: 8, borderLeftColor: tc.teal}}
             >
               <Text className="text-sm text-secondary leading-[22px]">
-                기록된 동선이 없습니다.{'\n'}원활한 기록을 위해 위치 권한을
-                허용해주세요.
+                기록된 동선이 없습니다.{'\n'}한 장소에 15분 이상 머물렀을 때
+                기록이 생겨요.
               </Text>
             </View>
           ) : (
@@ -266,7 +269,11 @@ export default function BottomSheet({
                     <View className="w-6" />
                     <View className="flex-1">
                       {group.places.map(place => (
-                        <PostCard key={place.place_id} data={place} />
+                        <PostCard
+                          key={place.place_id}
+                          data={place}
+                          onChanged={requestRefresh}
+                        />
                       ))}
                     </View>
                   </View>
