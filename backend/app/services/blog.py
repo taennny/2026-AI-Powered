@@ -2,7 +2,7 @@ import uuid
 import logging
 from datetime import date, datetime, timezone
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import Text, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
@@ -397,6 +397,45 @@ def build_summary(content: str | None, q: str | None = None) -> str | None:
     return f"{prefix}{snippet}{suffix}"
 
 
+def _has_no_target_dates():
+    """날짜 목록이 비어 있는 글(= target_dates 도입 전 모아쓰기).
+
+    컬럼을 빼고 저장하면 SQL NULL이지만, 파이썬 None을 명시하면 JSON null로
+    들어가 IS NULL에 걸리지 않는다. 둘 다 같은 뜻이므로 함께 본다.
+    """
+    return or_(
+        Blog.target_dates.is_(None),
+        cast(Blog.target_dates, Text) == "null",
+    )
+
+
+def _date_match(target: date):
+    """그 날짜의 글을 찾는 조건. 하루짜리와 모아쓰기를 함께 본다.
+
+    모아쓰기 글은 target_date가 시작일이라 그것만 보면 중간 날짜로는 찾지 못한다.
+    실제로 글에 담긴 날짜는 target_dates가 기준이다 — 구간으로 요청해도 기록이
+    없는 날은 빠지므로, 캘린더 점 표시와 같은 기준을 쓴다.
+
+    target_dates가 없는 글은 그 컬럼 도입 전에 만들어진 모아쓰기라 period_end
+    범위로 해석한다.
+
+    JSON 컬럼에 .contains()를 쓰면 LIKE로 컴파일되는데 PostgreSQL의 json 타입에는
+    LIKE 연산자가 없어 쿼리가 실패한다. 텍스트로 캐스팅하면 두 DB 모두 동작하고,
+    날짜를 따옴표까지 포함해 찾으므로 다른 값에 잘못 걸리지 않는다.
+    """
+    key = f'"{target.isoformat()}"'
+    return or_(
+        Blog.target_date == target,
+        cast(Blog.target_dates, Text).like(f"%{key}%"),
+        and_(
+            _has_no_target_dates(),
+            Blog.period_end.isnot(None),
+            Blog.target_date <= target,
+            Blog.period_end >= target,
+        ),
+    )
+
+
 async def get_blog_list(
     db: AsyncSession,
     user_id: uuid.UUID,
@@ -421,7 +460,7 @@ async def get_blog_list(
             )
         )
     if target_date is not None:
-        filters.append(Blog.target_date == target_date)
+        filters.append(_date_match(target_date))
 
     count_result = await db.execute(
         select(func.count()).select_from(Blog).where(*filters)
