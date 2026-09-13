@@ -36,6 +36,7 @@ class Place(Base):
         DateTime(timezone=True), nullable=True
     )
     is_corrected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

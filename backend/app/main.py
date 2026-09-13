@@ -11,6 +11,7 @@ from app.api.v1.photos import router as photos_router
 from app.api.v1.subscription import router as subscription_router
 from app.api.v1.calendar import router as calendar_router
 from app.api.v1.webhooks import router as webhooks_router
+from app.api.v1.places import router as places_router
 from app.config import settings
 from app.services.storage import ensure_bucket_exists
 
@@ -66,6 +67,7 @@ app.include_router(photos_router)
 app.include_router(subscription_router)
 app.include_router(calendar_router)
 app.include_router(webhooks_router)
+app.include_router(places_router)
 
 
 @app.get("/health")

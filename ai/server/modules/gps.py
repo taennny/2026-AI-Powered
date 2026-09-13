@@ -36,7 +36,7 @@ ns = Namespace(
 # 한 체류로 합쳐지고, 좁히면 실내 GPS 튐에 취약해진다. 장소 구분을 우선해 50m로 둔다.
 # (드리프트 조각화는 촘촘한 수집(distanceInterval=0) + accuracy 필터로 완화)
 STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
-MIN_STAY_MINUTES = 3  # 최소 체류 시간 (분)
+MIN_STAY_MINUTES = 10  # 최소 체류(분). 미만은 잠깐 멈춘 것으로 보고 버린다
 # 수집 간격이 불규칙(백그라운드 스로틀 등)해도 같은 자리면 이어붙이도록 여유를 둔다.
 # 이 값 이하 끊김은 하나의 체류로 잇고, 초과 시엔 경계로 본다.
 GAP_BRIDGE_MINUTES = 5
@@ -45,6 +45,25 @@ GAP_BRIDGE_MINUTES = 5
 ACCURACY_MAX_M = 200  # 이보다 나쁜(값 큰) 점만 노이즈로 제외
 # 필터가 절반 넘게 지우면 그날 GPS가 전반적으로 나쁜 것 → 왜곡 방지 위해 원본 유지
 ACCURACY_MIN_KEEP_RATIO = 0.5
+# 체류 중심점을 accuracy(오차 반경)로 가중 평균한다 — 정확한 점일수록 크게 반영해
+# 실내 드리프트로 튄 점이 중심을 끌고 가는 것을 줄인다. accuracy를 모르면(0/None)
+# 이 값으로 가정해 중립적 무게를 준다.
+DEFAULT_ACCURACY_M = 30
+
+
+def _acc_weight(acc) -> float:
+    """accuracy(오차 반경 m)를 가중치로 변환. 작을수록(정확할수록) 큰 가중치.
+
+    0/None/NaN(모름)은 DEFAULT_ACCURACY_M로 본다. 1m 미만은 1로 눌러 과도한
+    가중을 막는다(가끔 accuracy가 비현실적으로 작게 오는 경우 방지).
+    """
+    try:
+        a = float(acc)
+    except (TypeError, ValueError):
+        a = 0.0
+    if a != a or a <= 0:  # NaN 또는 0/음수 → 모름
+        a = DEFAULT_ACCURACY_M
+    return 1.0 / max(a, 1.0)
 
 
 def _filter_by_accuracy(gps_logs: list) -> list:
@@ -93,16 +112,17 @@ def detect_stays(gps_logs: list) -> list:
     current = None
     for _, row in df.iterrows():
         t, lat, lng = row["time"], float(row["lat"]), float(row["lng"])
+        acc = row.get("accuracy")  # 없으면 None (가중에서 중립 처리)
         if current is None:
-            current = _new_segment(t, lat, lng)
+            current = _new_segment(t, lat, lng, acc)
             continue
         gap_min = (t - current["last_time"]).total_seconds() / 60
         dist = geodesic((lat, lng), current["anchor"]).meters
         if gap_min <= GAP_BRIDGE_MINUTES and dist <= STAY_RADIUS_M:
-            _extend_segment(current, t, lat, lng)
+            _extend_segment(current, t, lat, lng, acc)
         else:
             segments.append(current)
-            current = _new_segment(t, lat, lng)
+            current = _new_segment(t, lat, lng, acc)
     if current is not None:
         segments.append(current)
     n_raw = len(segments)
@@ -120,8 +140,12 @@ def detect_stays(gps_logs: list) -> list:
         duration_min = (seg["end_time"] - seg["start_time"]).total_seconds() / 60
         if duration_min < MIN_STAY_MINUTES:
             continue
-        seg["lat"] = sum(seg["lats"]) / len(seg["lats"])
-        seg["lng"] = sum(seg["lngs"]) / len(seg["lngs"])
+        # accuracy 가중 중심점 — 정확한 점을 크게 반영해 튄 점의 영향을 줄인다.
+        # 모두 모름이면 가중치가 같아져 단순 평균과 동일하다.
+        weights = [_acc_weight(a) for a in seg["accs"]]
+        wsum = sum(weights)
+        seg["lat"] = sum(x * w for x, w in zip(seg["lats"], weights)) / wsum
+        seg["lng"] = sum(x * w for x, w in zip(seg["lngs"], weights)) / wsum
         stays.append(seg)
 
     logger.info(
@@ -136,22 +160,24 @@ def detect_stays(gps_logs: list) -> list:
     return stays
 
 
-def _new_segment(t, lat: float, lng: float) -> dict:
+def _new_segment(t, lat: float, lng: float, acc=None) -> dict:
     return {
         "start_time": t,
         "end_time": t,
         "last_time": t,
         "lats": [lat],
         "lngs": [lng],
+        "accs": [acc],  # 점별 accuracy — 중심점 가중 평균에 쓴다
         "anchor": (lat, lng),
     }
 
 
-def _extend_segment(seg: dict, t, lat: float, lng: float) -> None:
+def _extend_segment(seg: dict, t, lat: float, lng: float, acc=None) -> None:
     seg["end_time"] = t
     seg["last_time"] = t
     seg["lats"].append(lat)
     seg["lngs"].append(lng)
+    seg["accs"].append(acc)
     # 앵커를 running centroid로 갱신 — 점이 쌓일수록 한두 점 튐에 견고
     seg["anchor"] = (
         sum(seg["lats"]) / len(seg["lats"]),
@@ -172,6 +198,7 @@ def _merge_adjacent(segments: list) -> list:
             prev["end_time"] = seg["end_time"]
             prev["lats"] += seg["lats"]
             prev["lngs"] += seg["lngs"]
+            prev["accs"] += seg["accs"]
             prev["anchor"] = (
                 sum(prev["lats"]) / len(prev["lats"]),
                 sum(prev["lngs"]) / len(prev["lngs"]),
@@ -184,17 +211,26 @@ def _merge_adjacent(segments: list) -> list:
 # ──────────────────────────────────────────
 # 카카오 장소 매칭
 # ──────────────────────────────────────────
-# 라이프로그 "체류형" 장소 카테고리. 순서에 의존하지 않고(아래 _nearest_place)
-# 전부 조회해 최단거리를 고른다. (카테고리 수 = 체류당 카카오 호출 수 → 쿼터 고려)
-KAKAO_STAY_CATEGORIES = [
+# 라이프로그 장소 카테고리를 단계(tier)로 나눈다(순서 아닌 tier).
+#   랜드마크: 관광명소·문화시설 같은 "큰 명소" — 그 안에 있으면 옆 카페·마트보다
+#             명소 자체를 잡는다(롯데월드 안에서 롯데마트로 뜨는 문제 방지).
+#   Tier1(체험형): 실제로 "가서 시간을 보낸" 목적지 — 그다음.
+#   Tier2(기능형): 편의점·은행처럼 옆에 있으면 중심을 뺏어가는 노이즈 — 폴백.
+# 이렇게 나눠야 밀집 지역에서 "옆 편의점/은행"이 식당·카페를, 또 "몰 안 마트"가
+# 명소를 이기지 않는다. (각 tier는 tier 안에서만 거리 최소 우선 → _nearest_place)
+KAKAO_LANDMARK = [
+    "AT4",  # 관광명소 (테마파크·명소)
+    "CT1",  # 문화시설 (박물관·공연장 등)
+]
+KAKAO_STAY_TIER1 = [
     "FD6",  # 음식점
     "CE7",  # 카페
-    "AT4",  # 관광명소
-    "CT1",  # 문화시설
     "AD5",  # 숙박
     "MT1",  # 대형마트
-    "CS2",  # 편의점
+]
+KAKAO_STAY_TIER2 = [
     "SC4",  # 학교
+    "CS2",  # 편의점
     "AC5",  # 학원
     "HP8",  # 병원
     "BK9",  # 은행
@@ -203,9 +239,22 @@ KAKAO_STAY_CATEGORIES = [
 # 이동 지점(지하철역 등) — 체류형 후보가 전혀 없을 때만 폴백으로 사용
 KAKAO_TRANSIT_CATEGORIES = ["SW8"]
 
-PRIMARY_RADIUS_M = 80  # 체류 반경(50m)에 가깝게: 실제 머문 자리 우선
+PRIMARY_RADIUS_M = (
+    50  # 체류 반경(50m)과 일치: 실제 머문 자리만 (밀집지역 옆건물 오매칭↓)
+)
 FALLBACK_RADIUS_M = 200  # 1차에서 못 찾으면 넓혀서 재시도
+# 대형 명소(롯데월드 등)는 부지가 넓어 체류 중심이 마커에서 꽤 떨어질 수 있어
+# PRIMARY(80)보다 넉넉히 준다. 너무 넓히면 옆 동네 작은 명소가 오매칭되므로 150m.
+LANDMARK_RADIUS_M = 150
 _UNKNOWN_PLACE = {"place_name": "알 수 없음", "category": ""}
+
+# ── 캠퍼스 건물(학교부속시설) 매칭 ──────────
+# 대학 강의동 등은 카카오에 POI로 있어도 category_group_code가 비어(예: "학교부속시설")
+# 카테고리 검색으로는 안 잡힌다. 그래서 코드 있는 "옆 은행/ATM"이 이겨버린다.
+# 근처에 학교(SC4)가 있으면 그 학교명으로 "키워드 검색+거리순"해 가장 가까운
+# 캠퍼스 건물(강의동 등)을 찾아, 코드 없는 건물명까지 매칭한다.
+CAMPUS_SCHOOL_RADIUS_M = 300  # 캠퍼스 마커(정문·본부)가 멀 수 있어 넉넉히
+CAMPUS_BUILDING_MATCH_M = 60  # 키워드로 찾은 건물이 이보다 멀면 "여기 아님"으로 무시
 
 # ── 국내/해외 하이브리드 라우팅 ────────────
 # 카카오는 국내 전용이라 해외 좌표는 결과가 비어 "알 수 없음"이 된다.
@@ -314,10 +363,13 @@ def get_place_info(lat: float, lng: float) -> dict:
       - 국내(bbox 안): 카카오 로컬 (아래 흐름)
       - 해외(bbox 밖): 구글 Places (카카오는 국내 전용이라 결과 없음)
 
-    국내 카카오 흐름 — 카테고리 순서가 아니라 실제 거리로 선택한다:
-      1) 체류형 카테고리 전역 최단거리 (좁은 반경 → 없으면 넓혀서)
-      2) 그래도 없으면 이동 지점(지하철 등)까지 포함
-      3) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
+    국내 카카오 흐름 — 카테고리 순서가 아니라 tier + 실제 거리로 선택한다:
+      1) 랜드마크(관광명소·문화시설) — 그 명소 위(≤150m)면 옆 카페·마트보다 우선
+      2) 체험형(Tier1) 최단거리 (좁은 반경 → 없으면 넓혀서)
+      3) 캠퍼스 건물(학교부속시설) — 학교 안이면 옆 은행보다 강의동을 우선
+      4) 기능형(Tier2) 최단거리 (편의점·은행 등)
+      5) 그래도 없으면 이동 지점(지하철 등)까지 포함
+      6) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
     """
     if not _in_korea(lat, lng):
         return _google_place_info(lat, lng) or dict(_UNKNOWN_PLACE)
@@ -326,14 +378,86 @@ def get_place_info(lat: float, lng: float) -> dict:
         logger.warning("KAKAO_API_KEY가 설정되지 않았습니다.")
         return dict(_UNKNOWN_PLACE)
 
-    best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, PRIMARY_RADIUS_M)
+    # 1) 랜드마크 우선 — 큰 명소 안에선 옆 카페·마트가 아니라 명소 자체를
+    best = _nearest_place(lat, lng, KAKAO_LANDMARK, LANDMARK_RADIUS_M)
+    # 2) 체험형 (캠퍼스 안 식당·카페도 여기서 잡힌다)
     if best is None:
-        best = _nearest_place(lat, lng, KAKAO_STAY_CATEGORIES, FALLBACK_RADIUS_M)
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER1, PRIMARY_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER1, FALLBACK_RADIUS_M)
+    # 3) 캠퍼스 건물 — 기능형(은행 등)보다 먼저 시도 (강의동이 은행보다 의미있다)
+    if best is None:
+        best = _campus_building(lat, lng)
+    # 4) 기능형 (편의점·은행 등)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER2, PRIMARY_RADIUS_M)
+    if best is None:
+        best = _nearest_place(lat, lng, KAKAO_STAY_TIER2, FALLBACK_RADIUS_M)
+    # 5) 이동 지점(지하철 등)
     if best is None:
         best = _nearest_place(lat, lng, KAKAO_TRANSIT_CATEGORIES, FALLBACK_RADIUS_M)
+    # 6) POI 없으면 동네 이름이라도
     if best is None:
-        best = _reverse_geocode(lat, lng)  # POI 없으면 동네 이름이라도
+        best = _reverse_geocode(lat, lng)
     return best or dict(_UNKNOWN_PLACE)
+
+
+def _campus_building(lat: float, lng: float) -> dict | None:
+    """학교 안이면 카테고리 코드 없는 캠퍼스 건물(강의동 등)까지 매칭. 없으면 None.
+
+    카카오 카테고리 검색은 category_group_code 있는 POI만 준다. 대학 강의동은
+    코드가 비어("학교부속시설") 카테고리로는 안 잡히고, 코드 있는 옆 은행/ATM이
+    이겨버린다. 그래서:
+      1) 근처에 학교(SC4)가 있는지 확인 → 있으면 그 학교명을 얻는다
+      2) 학교명으로 키워드 검색(좌표 거리순) → 가장 가까운 캠퍼스 건물
+      3) 그 건물이 충분히 가까우면(≤CAMPUS_BUILDING_MATCH_M) 건물명으로 매칭
+    가까운 건물이 없으면(그 학교에 붙어있지 않으면) None을 돌려 다음 단계로 넘긴다.
+    """
+    school = _nearest_place(lat, lng, ["SC4"], CAMPUS_SCHOOL_RADIUS_M)
+    if school is None:
+        return None
+    # 학교명으로 키워드 검색 — "경기대학교"가 "경기대학교 …종합강의동"을 토큰 매칭한다
+    docs = _keyword_nearest(lat, lng, school["place_name"], CAMPUS_SCHOOL_RADIUS_M)
+    if not docs:
+        return None
+    nearest = docs[0]  # sort=distance → 우리 중심에서 가장 가까운 캠퍼스 POI
+    distance_m = int(nearest.get("distance") or 0)
+    if distance_m > CAMPUS_BUILDING_MATCH_M:
+        return None  # 그 학교 건물이 곁에 없음 → 여기가 캠퍼스 안이 아니다
+    return {
+        "place_name": nearest["place_name"],
+        "category": nearest.get("category_name", ""),
+    }
+
+
+def _keyword_nearest(lat: float, lng: float, query: str, radius_m: int) -> list:
+    """카카오 키워드 검색을 좌표 거리순으로 조회해 documents 리스트 반환. 실패 시 [].
+
+    category_group_code 없는 POI(학교부속시설 등)도 잡히는 유일한 경로다.
+    x,y를 주면 각 결과에 중심으로부터의 distance(m)가 채워진다.
+    """
+    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    try:
+        res = requests.get(
+            "https://dapi.kakao.com/v2/local/search/keyword.json",
+            headers=headers,
+            params={
+                "query": query,
+                "x": lng,
+                "y": lat,
+                "radius": radius_m,
+                "sort": "distance",
+            },
+            timeout=5,
+        )
+        res.raise_for_status()
+        return res.json().get("documents", [])
+    except requests.exceptions.Timeout:
+        logger.warning("카카오 키워드 검색 타임아웃 (query: %s)", query)
+        return []
+    except requests.exceptions.RequestException as e:
+        logger.error("카카오 키워드 검색 오류 (query: %s): %s", query, e)
+        return []
 
 
 def _nearest_place(
