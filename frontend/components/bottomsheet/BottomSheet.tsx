@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 
 import {type TimelinePlace} from '@/services/calendarApi';
+import {useTimelineStore} from '@/store/timelineStore';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatDate, hourFromISO} from '@/utils/formatDate';
 import MapPreview from '@/components/bottomsheet/MapPreview';
@@ -188,6 +189,8 @@ export default function BottomSheet({
   ).current;
 
   const tc = useThemeColors();
+  // 장소를 고치거나 지우면 타임라인을 다시 받아야 한다
+  const requestRefresh = useTimelineStore(s => s.requestRefresh);
   const hourGroups = groupPlaces(places);
   const hasPlaces = hourGroups.length > 0;
   hasPlacesRef.current = hasPlaces;
@@ -266,7 +269,11 @@ export default function BottomSheet({
                     <View className="w-6" />
                     <View className="flex-1">
                       {group.places.map(place => (
-                        <PostCard key={place.place_id} data={place} />
+                        <PostCard
+                          key={place.place_id}
+                          data={place}
+                          onChanged={requestRefresh}
+                        />
                       ))}
                     </View>
                   </View>

@@ -290,6 +290,40 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 > `Blog.target_date == date` 하나라, 8/5~8/9 글은 8/5로만 잡히고 8/7로는 안 나옵니다.
 > `period_end`(연속)와 `target_dates`(불연속)를 같이 봐야 합니다 — 백엔드 요청 대기.
 
+### 장소 수정·삭제
+
+타임라인 카드를 **왼쪽으로 밀면** 수정·삭제가 드러납니다(`components/common/SwipeableRow.tsx`).
+
+| 규칙 | 이유 |
+|---|---|
+| 가로가 세로보다 클 때만 제스처를 가져온다 | 카드가 시트 안 `ScrollView`에 있습니다. 조건 없이 잡으면 세로 스크롤을 뺏습니다. `BottomSheet`의 `panHandlers`는 핸들·날짜 헤더·지도에만 붙어 있어 그쪽과는 원래 안 부딪힙니다 |
+| 열린 행은 항상 하나 | 여러 개가 열려 있으면 어느 걸 지우는지 헷갈립니다. 모듈 변수로 직전 행을 닫습니다 |
+| 거리뿐 아니라 속도도 본다 (`shouldOpen`) | 짧게 튕기는 동작이 흔한데 거리만 보면 안 열립니다 |
+| 삭제는 확인 팝업을 거친다 | 되돌릴 수 없습니다 |
+
+수정은 아래에서 시트가 올라옵니다(`PlaceEditSheet` → `components/common/BottomActionSheet.tsx`).
+
+```
+근처 후보 5개 → '없어요' → 이름 입력(치는 동안 그 키워드로 재검색)
+                              → 그래도 없으면 카테고리 칩
+```
+
+| 규칙 | 이유 |
+|---|---|
+| 후보를 고르면 카테고리를 묻지 않는다 | 후보에 카테고리가 딸려옵니다. 대부분 탭 한 번으로 끝납니다 |
+| 직접 입력은 단순 텍스트 교체가 아니다 | 친 글자로 지도를 다시 검색합니다. "없어요"까지 온 경우는 대개 "반경 밖이지만 등록은 된 곳"입니다 |
+| 카테고리 칩은 마지막 폴백 | 카테고리는 **닫힌 목록이 아닙니다** — 카카오 원문 문자열과 구글 type 매핑값이 섞여 들어옵니다. 칩은 미등록 장소용 몇 개일 뿐입니다 |
+| 좌표는 건드리지 않는다 | 핀은 GPS 체류 중심점을 유지합니다. 지도는 Static Maps 이미지라 저장된 좌표를 바꾸지 않는 한 그대로입니다 |
+| 시간도 건드리지 않는다 | 사진이 `arrived_at ≤ taken_at ≤ left_at`로 붙습니다. 시간을 줄이면 붙어 있던 사진이 떨어지고 늘리면 옆 장소 것을 빨아들입니다 |
+| 시트는 `Modal`이다 | RN이 별도 레이어에 그려서 홈 바텀시트의 `PanResponder`와 안 부딪힙니다 |
+
+> **`services/placeApi.ts`의 엔드포인트는 아직 백엔드에 없습니다.** 경로·형식은 합의된 스펙이고,
+> 붙기 전까지 호출하면 404라 시트가 "주변 장소를 불러오지 못했어요"로 떨어집니다.
+> 백엔드에 남은 일: 후보 조회 중계, `PATCH`/`DELETE /places/{id}`,
+> 수정 시 `is_corrected=True`, **재분석 때 수정본과 같은 시간대의 stay를 건너뛰기**
+> (안 하면 같은 시각에 장소가 두 개 남습니다), 삭제한 장소가 재분석에 되살아나지 않게,
+> `place_count` 재계산.
+
 ### 뒤로가기
 
 `(main)`은 **iOS 스와이프 뒤로가기를 끕니다**(`gestureEnabled: false`). 글쓰기·미리보기에서
@@ -474,6 +508,10 @@ utils/loadingSequence.ts  글 생성 대기 문구 순서 — 진행 안내↔�
 constants/loadingMessages.ts  그 문구 목록과 교체 간격
 components/write/RotatingMessage.tsx  문구 표시 — 점이 차오르다(`.`→`...`) 페이드로 교체
 components/common/PhotoViewer.tsx  사진 전체 화면 보기 (아무 데나 누르면 닫힘)
+components/common/SwipeableRow.tsx  왼쪽으로 밀면 동작 버튼이 드러나는 행
+components/common/BottomActionSheet.tsx  아래에서 올라오는 시트 (배경 딤 + 손잡이)
+components/bottomsheet/PlaceEditSheet.tsx  장소 수정 — 후보 고르기 → 직접 입력
+constants/placeCategories.ts  직접 입력용 카테고리 칩 (전체를 덮지 않습니다)
 components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(hour)로 묶습니다.
                           같은 시라도 시간대가 다르면 다른 묶음입니다 (위 "타임존" 참고)
 ```
@@ -524,6 +562,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/subscriptionStore.test.ts` | `subscriptionStore` | 조회 실패 시 free 강등, 만료 판정, 프리미엄 테마 basic 복귀, 해지 예약(`willRenew`)은 판정에 넣지 않음, 결제 후 재조회 재시도, 결제 주기 반영, 만료 안내(앱 재시작 후에도 감지·조회 실패는 만료 아님·로그아웃 시 기록 삭제) |
 | `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
+| `__tests__/swipeableRow.test.ts` | `shouldOpen` | 거리·속도로 열림 판정, 스치듯 민 건 안 열림, 반대로 튕기면 취소, 버튼이 넓으면 더 밀어야 함 |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영, 셀룰러 업로드 기본 끔·복원·위치 토글과 독립 |
 | `__tests__/currentUser.test.ts` | `utils/currentUser.ts` | 토큰의 `sub`를 읽음, 없거나 깨진 토큰은 null(던지지 않음), 토큰이 바뀌면 주인도 바뀜 |
 | `__tests__/timelineGrouping.test.ts` | `groupPlaces` | 같은 시끼리 묶음, **시가 같아도 시간대가 다르면 다른 묶음**, 서버 순서 유지(자정 넘김), 오프셋 없으면 기기 시간대(구버전 서버) |
@@ -653,7 +692,7 @@ EXIF에 `OffsetTimeOriginal`이 있으면 그 tz를 쓰고, **없으면 KST로 �
 | 크래시 리포팅 | — | Sentry 등이 없어 출시 후 사용자 크래시를 알 방법이 없습니다. **RN의 JS 에러는 App Store Connect 크래시 리포트에 안 잡힙니다** |
 | 남은 생성 횟수 표시 | 글쓰기 | 지금은 429가 떠야만 `used/limit`을 알 수 있습니다. `GET /subscriptions/me`에 넣어주면 "이번 주 1/3" 안내가 가능합니다 |
 | 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:107` | 백엔드는 카카오 `properties.nickname`을 받아 쓰고 **못 받을 때만** `카카오유저1234`로 폴백합니다(`services/auth.py:88`) — 고정이 아닙니다. 먼저 볼 것은 **카카오 콘솔의 프로필 정보 동의항목**. 화면을 만들려면 닉네임 수정 API(`PATCH /me` 부재)가 전제이고, 지금은 닉네임이 앱 어디에도 안 보여 우선순위가 낮습니다 |
-| PostCard 탭 동작 미정 | `PostCard.tsx` | `TimelinePlace`에 `blogId`가 없어 저널로 못 보냅니다. 사진 뷰어 / 장소 상세 / 장소명 수정 중 결정 필요 |
+| 장소 수정·삭제 API | `services/placeApi.ts` | 프론트는 끝났습니다. 백엔드 엔드포인트 대기 — 위 "장소 수정·삭제" 참고 |
 
 ## 백엔드·AI 협의 중
 
