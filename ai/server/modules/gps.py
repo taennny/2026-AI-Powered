@@ -239,6 +239,16 @@ KAKAO_STAY_TIER2 = [
 # 이동 지점(지하철역 등) — 체류형 후보가 전혀 없을 때만 폴백으로 사용
 KAKAO_TRANSIT_CATEGORIES = ["SW8"]
 
+# ── 후보 목록 (타임라인 장소 수정용) ────────
+# 자동 매칭과 달리 "사용자가 직접 고르게" 근처 장소를 여러 개 준다. tier 편향 없이
+# 전 카테고리를 모아 거리순 정렬 → 상위 N개. (사람이 고르니 노이즈성 카테고리도 포함)
+CANDIDATE_RADIUS_M = 150  # 후보는 넉넉히(드리프트 감안)
+CANDIDATE_COUNT = 5  # 프론트에 줄 후보 개수
+CANDIDATE_PER_CATEGORY = 5  # 카테고리당 수집 개수(합쳐 거리순 정렬)
+CANDIDATE_CATEGORIES = (
+    KAKAO_LANDMARK + KAKAO_STAY_TIER1 + KAKAO_STAY_TIER2 + KAKAO_TRANSIT_CATEGORIES
+)
+
 PRIMARY_RADIUS_M = (
     50  # 체류 반경(50m)과 일치: 실제 머문 자리만 (밀집지역 옆건물 오매칭↓)
 )
@@ -299,15 +309,15 @@ def _in_korea(lat: float, lng: float) -> bool:
     return lat_min <= lat <= lat_max and lng_min <= lng <= lng_max
 
 
-def _google_place_info(lat: float, lng: float) -> dict | None:
-    """해외 좌표를 구글 Places(Nearby Search)로 매칭. 실패/미설정 시 None.
+def _google_nearby(lat: float, lng: float) -> list:
+    """해외 좌표 주변 장소를 구글 Places(Nearby Search)로 조회. 실패/미설정 시 [].
 
-    카카오와 달리 한 번의 호출로 주변 여러 장소를 받아 최단거리 1곳을 고른다.
-    language=ko 로 가능한 경우 한글 장소명을 받는다(예: '에펠탑').
+    한 번의 호출로 주변 여러 장소를 받는다. language=ko 로 가능하면 한글 장소명.
+    매칭(최근접 1곳)과 후보 목록이 공유하는 조회 부분.
     """
     if not settings.GOOGLE_MAPS_API_KEY:
         logger.warning("GOOGLE_MAPS_API_KEY 미설정 — 해외 좌표 매칭 생략")
-        return None
+        return []
     try:
         res = requests.get(
             GOOGLE_NEARBY_URL,
@@ -329,31 +339,66 @@ def _google_place_info(lat: float, lng: float) -> dict | None:
                 status_code,
                 body.get("error_message", ""),
             )
-            return None
-        results = body.get("results", [])
-        if not results:
-            return None
-
-        def _dist(r: dict) -> float:
-            loc = r.get("geometry", {}).get("location", {})
-            rlat, rlng = loc.get("lat"), loc.get("lng")
-            if rlat is None or rlng is None:
-                return float("inf")
-            return geodesic((lat, lng), (rlat, rlng)).meters
-
-        nearest = min(results, key=_dist)
-        name = nearest.get("name")
-        if not name:
-            return None
-        types = nearest.get("types", [])
-        category = next((_GOOGLE_TYPE_KO[t] for t in types if t in _GOOGLE_TYPE_KO), "")
-        return {"place_name": name, "category": category}
+            return []
+        return body.get("results", [])
     except requests.exceptions.Timeout:
         logger.warning("구글 Places 타임아웃")
-        return None
+        return []
     except requests.exceptions.RequestException as e:
         logger.error("구글 Places 요청 실패: %s", e)
+        return []
+
+
+def _google_dist(lat: float, lng: float, r: dict) -> float:
+    loc = r.get("geometry", {}).get("location", {})
+    rlat, rlng = loc.get("lat"), loc.get("lng")
+    if rlat is None or rlng is None:
+        return float("inf")
+    return geodesic((lat, lng), (rlat, rlng)).meters
+
+
+def _google_category(r: dict) -> str:
+    types = r.get("types", [])
+    return next((_GOOGLE_TYPE_KO[t] for t in types if t in _GOOGLE_TYPE_KO), "")
+
+
+def _google_place_info(lat: float, lng: float) -> dict | None:
+    """해외 좌표를 구글 Places로 매칭해 최근접 1곳 반환. 실패/미설정 시 None."""
+    results = _google_nearby(lat, lng)
+    if not results:
         return None
+    nearest = min(results, key=lambda r: _google_dist(lat, lng, r))
+    name = nearest.get("name")
+    if not name:
+        return None
+    return {"place_name": name, "category": _google_category(nearest)}
+
+
+def _google_candidates(lat: float, lng: float) -> list:
+    """해외 좌표 주변 장소 후보를 거리순 최대 CANDIDATE_COUNT개 반환."""
+    scored = []
+    for r in _google_nearby(lat, lng):
+        name = r.get("name")
+        if not name:
+            continue
+        loc = r.get("geometry", {}).get("location", {})
+        dist = _google_dist(lat, lng, r)
+        scored.append(
+            (
+                dist,
+                {
+                    "place_name": name,
+                    "category": _google_category(r),
+                    "address": r.get("vicinity", ""),
+                    "distance_m": int(dist) if dist != float("inf") else None,
+                    "lat": loc.get("lat"),
+                    "lng": loc.get("lng"),
+                    "place_id": r.get("place_id"),
+                },
+            )
+        )
+    scored.sort(key=lambda x: x[0])
+    return [c for _, c in scored[:CANDIDATE_COUNT]]
 
 
 def get_place_info(lat: float, lng: float) -> dict:
@@ -400,6 +445,85 @@ def get_place_info(lat: float, lng: float) -> dict:
     if best is None:
         best = _reverse_geocode(lat, lng)
     return best or dict(_UNKNOWN_PLACE)
+
+
+def get_place_candidates(lat: float, lng: float) -> list:
+    """좌표 근처 장소 후보를 거리순 최대 CANDIDATE_COUNT개 반환 (타임라인 수정용).
+
+    자동 매칭(get_place_info)은 tier로 1곳을 고르지만, 후보 목록은 사용자가 직접
+    고르므로 tier 편향 없이 전 카테고리를 모아 거리순으로 준다. 국내는 카카오,
+    해외는 구글. 각 후보: place_name/category/address/distance_m/lat/lng/place_id.
+    """
+    if not _in_korea(lat, lng):
+        return _google_candidates(lat, lng)
+
+    if not settings.KAKAO_API_KEY:
+        logger.warning("KAKAO_API_KEY 미설정 — 후보 없음")
+        return []
+
+    seen = set()
+    scored = []  # (distance_m, candidate)
+    for code in CANDIDATE_CATEGORIES:
+        for d in _category_search_docs(
+            lat, lng, code, CANDIDATE_RADIUS_M, CANDIDATE_PER_CATEGORY
+        ):
+            pid = d.get("id")
+            if pid and pid in seen:
+                continue
+            if pid:
+                seen.add(pid)
+            try:
+                clat, clng = float(d["y"]), float(d["x"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            dist = int(d.get("distance") or 0)
+            scored.append(
+                (
+                    dist,
+                    {
+                        "place_name": d.get("place_name", ""),
+                        "category": d.get("category_name", ""),
+                        "address": d.get("road_address_name")
+                        or d.get("address_name")
+                        or "",
+                        "distance_m": dist,
+                        "lat": clat,
+                        "lng": clng,
+                        "place_id": pid,
+                    },
+                )
+            )
+    scored.sort(key=lambda x: x[0])
+    return [c for _, c in scored[:CANDIDATE_COUNT]]
+
+
+def _category_search_docs(
+    lat: float, lng: float, code: str, radius_m: int, size: int
+) -> list:
+    """한 카테고리의 근처 장소 documents를 거리순으로 최대 size개 반환. 실패 시 [].
+
+    _nearest_place는 최근접 1개만 쓰지만, 후보 목록은 카테고리당 여러 개가 필요하다.
+    """
+    headers = {"Authorization": f"KakaoAK {settings.KAKAO_API_KEY}"}
+    try:
+        res = requests.get(
+            "https://dapi.kakao.com/v2/local/search/category.json",
+            headers=headers,
+            params={
+                "x": lng,
+                "y": lat,
+                "radius": radius_m,
+                "sort": "distance",
+                "category_group_code": code,
+                "size": size,
+            },
+            timeout=5,
+        )
+        res.raise_for_status()
+        return res.json().get("documents", [])
+    except requests.exceptions.RequestException as e:
+        logger.warning("카카오 카테고리 검색 실패 (%s): %s", code, e)
+        return []
 
 
 def _campus_building(lat: float, lng: float) -> dict | None:
@@ -578,6 +702,24 @@ analyze_output = ns.model(
     {"stays": fields.List(fields.Nested(stay_model))},
 )
 
+candidate_model = ns.model(
+    "Candidate",
+    {
+        "place_name": fields.String,
+        "category": fields.String,
+        "address": fields.String,
+        "distance_m": fields.Integer(description="체류 중심에서의 거리(m)"),
+        "lat": fields.Float,
+        "lng": fields.Float,
+        "place_id": fields.String(description="카카오/구글 장소 ID (저장 참고용)"),
+    },
+)
+
+candidates_output = ns.model(
+    "CandidatesOutput",
+    {"candidates": fields.List(fields.Nested(candidate_model))},
+)
+
 
 @ns.route("/analyze")
 class Analyze(Resource):
@@ -625,3 +767,24 @@ class Analyze(Resource):
             logger.error("분석 오류: %s", e)
             # 내부 예외 메시지는 로그에만, 응답은 일반 메시지 (내부정보 노출 방지)
             return {"error": "분석 중 오류가 발생했습니다."}, 500
+
+
+@ns.route("/candidates")
+class Candidates(Resource):
+    @ns.doc(params={"lat": "위도", "lng": "경도"})
+    @ns.response(200, "성공", candidates_output)
+    @ns.response(400, "잘못된 요청")
+    @ns.response(500, "서버 오류")
+    def get(self):
+        """좌표 근처 장소 후보(거리순, 최대 5개). 타임라인 장소 수정 UI용."""
+        try:
+            lat = float(request.args.get("lat", ""))
+            lng = float(request.args.get("lng", ""))
+        except (TypeError, ValueError):
+            return {"error": "lat, lng 쿼리 파라미터(숫자)가 필요합니다."}, 400
+        try:
+            candidates = get_place_candidates(lat, lng)
+            return {"candidates": candidates}, 200
+        except Exception as e:
+            logger.error("후보 조회 오류: %s", e)
+            return {"error": "후보 조회 중 오류가 발생했습니다."}, 500

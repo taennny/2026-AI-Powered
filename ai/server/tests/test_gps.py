@@ -583,3 +583,99 @@ def test_domestic_never_calls_google(monkeypatch):
 
     info = gps.get_place_info(37.5, 127.0)
     assert info["place_name"] == "서울 카페"
+
+
+# ── 후보 목록 (타임라인 장소 수정용) ─────────
+def _cand_doc(name, category, distance, pid, x="127.0", y="37.5"):
+    return {
+        "place_name": name,
+        "category_name": category,
+        "distance": str(distance),
+        "id": pid,
+        "x": x,
+        "y": y,
+        "road_address_name": f"서울 강남구 {name}로",
+        "address_name": f"서울 강남구 {name}동",
+    }
+
+
+def test_candidates_distance_sorted(monkeypatch):
+    """후보는 tier 무관하게 근처 전부 모아 거리순으로 준다."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        code = params["category_group_code"]
+        if code == "CE7":  # 카페 10m, 90m
+            return _FakeResp(
+                [
+                    _cand_doc("가까운카페", "카페", 10, "c1"),
+                    _cand_doc("먼카페", "카페", 90, "c2"),
+                ]
+            )
+        if code == "HP8":  # 병원 30m (기능형이어도 후보엔 포함)
+            return _FakeResp([_cand_doc("병원", "병원", 30, "h1")])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    cands = gps.get_place_candidates(37.5, 127.0)
+    assert [c["place_name"] for c in cands] == ["가까운카페", "병원", "먼카페"]
+    assert cands[0]["distance_m"] == 10
+    assert cands[0]["place_id"] == "c1"
+    assert cands[0]["address"]  # 주소 포함(동명 구분용)
+    assert cands[0]["lat"] == 37.5 and cands[0]["lng"] == 127.0
+
+
+def test_candidates_dedup_across_categories(monkeypatch):
+    """같은 장소가 여러 카테고리에 잡혀도 한 번만 (id 기준 중복 제거)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if params["category_group_code"] in ("CE7", "FD6"):
+            return _FakeResp([_cand_doc("중복장소", "카페", 10, "dup1")])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    cands = gps.get_place_candidates(37.5, 127.0)
+    assert len([c for c in cands if c["place_id"] == "dup1"]) == 1
+
+
+def test_candidates_capped_at_5(monkeypatch):
+    """후보가 많아도 가장 가까운 5개만."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if params["category_group_code"] == "CE7":
+            return _FakeResp(
+                [_cand_doc(f"카페{i}", "카페", i * 5, f"c{i}") for i in range(8)]
+            )
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    cands = gps.get_place_candidates(37.5, 127.0)
+    assert len(cands) == 5
+    assert cands[0]["place_name"] == "카페0"  # 가장 가까운 것부터
+
+
+def test_candidates_empty_when_no_kakao_key(monkeypatch):
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "")
+    assert gps.get_place_candidates(37.5, 127.0) == []
+
+
+def test_candidates_overseas_uses_google(monkeypatch):
+    """해외 좌표는 구글 후보를 거리순으로 준다."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "gkey")
+
+    def fake_get(url, params=None, timeout=None, **kw):
+        assert "googleapis.com" in url
+        return _FakeGoogleResp(
+            [
+                _gplace("근처카페", ["cafe"], 48.8585, 2.2946),  # ~13m
+                _gplace("에펠탑", ["tourist_attraction"], 48.8584, 2.2945),  # 0m
+            ]
+        )
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    cands = gps.get_place_candidates(48.8584, 2.2945)  # 파리
+    assert cands[0]["place_name"] == "에펠탑"  # 가장 가까운 것
+    assert cands[0]["category"] == "관광명소"
+    assert len(cands) == 2
