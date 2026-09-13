@@ -13,6 +13,11 @@ type Props = {
   onClose: () => void;
   title?: string;
   description?: string;
+  /**
+   * 화면 높이 대비 시트 높이(0~1). 주면 그 높이로 고정되고 내용이 남은 자리를 채운다 —
+   * 목록이 길어 안에서 스크롤해야 할 때 쓴다. 없으면 내용만큼만 올라온다.
+   */
+  heightRatio?: number;
   children: React.ReactNode;
 };
 
@@ -21,6 +26,7 @@ export default function BottomActionSheet({
   onClose,
   title,
   description,
+  heightRatio,
   children,
 }: Props) {
   return (
@@ -44,7 +50,10 @@ export default function BottomActionSheet({
           }}
         />
 
-        <View className="rounded-t-[20px] bg-card px-6 pt-3 pb-8">
+        <View
+          className="rounded-t-[20px] bg-card px-6 pt-3 pb-8"
+          style={heightRatio ? {height: `${heightRatio * 100}%`} : undefined}
+        >
           <View className="w-10 h-1 rounded-full bg-line self-center mb-4" />
 
           {title && (
@@ -58,7 +67,10 @@ export default function BottomActionSheet({
             </Text>
           )}
 
-          <View className={title || description ? 'mt-4' : undefined}>
+          <View
+            className={title || description ? 'mt-4' : undefined}
+            style={heightRatio ? {flex: 1} : undefined}
+          >
             {children}
           </View>
         </View>

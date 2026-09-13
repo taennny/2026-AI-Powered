@@ -3,7 +3,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Network from 'expo-network';
 
 import {uploadPhoto} from '@/services/photoApi';
-import {writeCellularUpload} from '@/utils/photoUploadStorage';
+import {writeCellularUpload} from '@/utils/settingsStorage';
 import {
   syncPhotosForDate,
   clearPhotoSyncState,

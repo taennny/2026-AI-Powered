@@ -229,9 +229,11 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 네트워크는 **와이파이면 항상, 셀룰러면 사용자가 켰을 때만**입니다
 (설정 > 기록의 '셀룰러 환경에서 사진 업로드', 기본 끔). 연결 상태를 확인하지 못하면
 올리지 않습니다 — 모르는 채로 올리면 요금이 사용자 돈으로 나갑니다.
-값은 `utils/photoUploadStorage.ts`에 있습니다. `settingsStore`를 거치지 않고 디스크에서
-직접 읽는 이유는 `photoSync`가 백그라운드에서도 도는 순수 유틸이라, 스토어를 끌어오면
-`expo-location`까지 딸려와 테스트가 네이티브 모듈에 묶이기 때문입니다.
+값은 `utils/settingsStorage.ts`에 있습니다. `photoSync`가 `settingsStore`를 거치지 않고
+디스크에서 직접 읽는 이유는 백그라운드에서도 도는 순수 유틸이라, 스토어를 import하면
+`useGpsTracking`을 거쳐 `expo-location`까지 딸려오기 때문입니다.
+**설정 값의 디스크 저장은 전부 이 파일을 지납니다** — 스토어가 직접 `AsyncStorage`를
+부르면 기본값 규칙이 두 곳에 흩어집니다.
 
 **analyze 호출 시점**(`utils/analyzeSchedule.ts`): GPS 배치마다가 아니라 **1시간 주기 + 논리 날짜가
 넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
@@ -510,7 +512,8 @@ utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
-utils/photoUploadStorage.ts  셀룰러 업로드 허용 여부 — settingsStore와 photoSync가 함께 읽습니다
+utils/settingsStorage.ts  설정 값 저장(위치 기록·셀룰러 업로드) — settingsStore와,
+                          스토어를 끌어올 수 없는 photoSync가 함께 씁니다
 constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리방침 URL (둘 다 실주소)
 constants/consent.ts      가입 동의 항목 — 조 번호가 처리방침 문서와 짝입니다.
                           **문서를 고치면 여기도 같이 봅니다.** 이메일·카카오가 같은 목록을 씁니다
@@ -522,6 +525,9 @@ components/write/RotatingMessage.tsx  문구 표시 — 점이 차오르다(`.`�
 components/common/PhotoViewer.tsx  사진 전체 화면 보기 (아무 데나 누르면 닫힘)
 components/common/SwipeableRow.tsx  왼쪽으로 밀면 동작 버튼이 드러나는 행
 components/common/BottomActionSheet.tsx  아래에서 올라오는 시트 (배경 딤 + 손잡이)
+                          카카오 가입 동의 시트와 장소 수정 시트가 함께 씁니다.
+                          `heightRatio`를 주면 높이를 고정해 안에서 스크롤합니다
+components/settings/SettingToggle.tsx  설정 스위치 한 줄 + 켬/끔에 따라 바뀌는 설명
 components/bottomsheet/PlaceEditSheet.tsx  장소 수정 — 후보 고르기 → 직접 입력
 constants/placeCategories.ts  직접 입력용 카테고리 칩 (전체를 덮지 않습니다)
 components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(hour)로 묶습니다.

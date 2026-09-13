@@ -1,13 +1,12 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {create} from 'zustand';
 
 import {startGpsTracking, stopGpsTracking} from '@/hooks/useGpsTracking';
 import {
   readCellularUpload,
+  readTracking,
   writeCellularUpload,
-} from '@/utils/photoUploadStorage';
-
-const TRACKING_KEY = 'settings:locationTracking';
+  writeTracking,
+} from '@/utils/settingsStorage';
 
 type SettingsStore = {
   /**
@@ -31,34 +30,25 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   hasLoaded: false,
 
   initialize: async () => {
-    try {
-      const [raw, cellular] = await Promise.all([
-        AsyncStorage.getItem(TRACKING_KEY),
-        readCellularUpload(),
-      ]);
-      // 저장된 적이 없으면(null) 기본값 유지
-      set({
-        isTrackingEnabled: raw === null ? true : raw === 'true',
-        isCellularUploadEnabled: cellular,
-      });
-    } catch {
-      // 읽지 못하면 켠 것으로 본다 — 사용자가 끈 적 없는데 꺼두면
-      // 기록이 조용히 사라진다
-    } finally {
-      set({hasLoaded: true});
-    }
+    // 읽기 실패는 settingsStorage가 기본값으로 흡수한다 —
+    // 사용자가 끈 적 없는데 꺼두면 기록이 조용히 사라진다
+    const [tracking, cellular] = await Promise.all([
+      readTracking(),
+      readCellularUpload(),
+    ]);
+
+    set({
+      isTrackingEnabled: tracking,
+      isCellularUploadEnabled: cellular,
+      hasLoaded: true,
+    });
   },
 
   setTrackingEnabled: async enabled => {
     if (get().isTrackingEnabled === enabled) return;
 
     set({isTrackingEnabled: enabled});
-
-    try {
-      await AsyncStorage.setItem(TRACKING_KEY, String(enabled));
-    } catch {
-      // 저장에 실패해도 이번 세션에는 반영된다
-    }
+    await writeTracking(enabled);
 
     // 백그라운드 태스크는 화면과 무관하게 살아 있으므로 즉시 손대야 한다.
     // 켤 때는 권한이 없으면 startGpsTracking이 조용히 return한다.

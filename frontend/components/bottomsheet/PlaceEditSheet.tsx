@@ -230,7 +230,7 @@ export default function PlaceEditSheet({
                   onPress={() => setCategory(selected ? null : chip)}
                   activeOpacity={0.7}
                   className={`px-3 py-[7px] rounded-[14px] border ${
-                    selected ? 'bg-primary border-primary' : 'border-line'
+                    selected ? 'bg-btn-bg border-btn-bg' : 'border-line'
                   }`}
                 >
                   <Text
@@ -251,7 +251,7 @@ export default function PlaceEditSheet({
             <TouchableOpacity
               onPress={() => onSubmit({name: name.trim(), category})}
               disabled={!canSave}
-              className={`ml-1 px-5 py-3 rounded-[8px] ${canSave ? 'bg-primary' : 'bg-line'}`}
+              className={`ml-1 px-5 py-3 rounded-[8px] ${canSave ? 'bg-btn-bg' : 'bg-line'}`}
             >
               <Text
                 className={`text-[13px] ${canSave ? 'text-btn-text' : 'text-tertiary'}`}

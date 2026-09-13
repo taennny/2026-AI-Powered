@@ -47,71 +47,67 @@ export function useJournalList(initialDate?: string) {
   const journalsRef = useRef(journals);
   journalsRef.current = journals;
 
-  const load = useCallback(
-    async (q: string, page: number, date?: string) => {
-      const requestId = ++requestIdRef.current;
+  const load = useCallback(async (q: string, page: number, date?: string) => {
+    const requestId = ++requestIdRef.current;
 
-      if (page === 1) {
-        isFirstPageLoadingRef.current = true;
-        // 보여줄 목록이 있으면 스피너로 덮지 않는다
-        if (journalsRef.current.length === 0) setIsLoading(true);
-      } else {
-        setIsLoadingMore(true);
+    if (page === 1) {
+      isFirstPageLoadingRef.current = true;
+      // 보여줄 목록이 있으면 스피너로 덮지 않는다
+      if (journalsRef.current.length === 0) setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    const isPlain = !q.trim() && !date;
+
+    try {
+      const data = await fetchBlogs({
+        q: q.trim() || undefined,
+        date,
+        page,
+        size: PAGE_SIZE,
+      });
+
+      if (requestId !== requestIdRef.current) return; // 조건이 바뀌었다
+
+      setTotal(data.total);
+      setJournals(prev => (page === 1 ? data.blogs : [...prev, ...data.blogs]));
+      // 목록과 같은 순간에 바꾼다 — 하이라이트가 짝을 잃지 않는다
+      setAppliedQuery(q);
+      setDateFilter(date);
+      pageRef.current = page;
+
+      if (page === 1 && isPlain) {
+        cachedFirstPage = {journals: data.blogs, total: data.total};
       }
+    } catch {
+      if (requestId !== requestIdRef.current) return;
 
-      const isPlain = !q.trim() && !date;
-
-      try {
-        const data = await fetchBlogs({
-          q: q.trim() || undefined,
-          date,
-          page,
-          size: PAGE_SIZE,
-        });
-
-        if (requestId !== requestIdRef.current) return; // 조건이 바뀌었다
-
-        setTotal(data.total);
-        setJournals(prev =>
-          page === 1 ? data.blogs : [...prev, ...data.blogs],
-        );
-        // 목록과 같은 순간에 바꾼다 — 하이라이트가 짝을 잃지 않는다
+      // 첫 페이지 실패는 빈 목록, 더 불러오기 실패는 기존 목록 유지
+      if (page === 1) {
+        if (isPlain) cachedFirstPage = null;
+        setJournals([]);
+        setTotal(0);
+        // 실패해도 빈 목록은 이 조건의 결과다 — 빈 목록 문구가 옛 조건을 가리키면 안 된다
         setAppliedQuery(q);
         setDateFilter(date);
-        pageRef.current = page;
-
-        if (page === 1 && isPlain) {
-          cachedFirstPage = {journals: data.blogs, total: data.total};
-        }
-      } catch {
-        if (requestId !== requestIdRef.current) return;
-
-        // 첫 페이지 실패는 빈 목록, 더 불러오기 실패는 기존 목록 유지
-        if (page === 1) {
-          if (isPlain) cachedFirstPage = null;
-          setJournals([]);
-          setTotal(0);
-          // 실패해도 빈 목록은 이 조건의 결과다 — 빈 목록 문구가 옛 조건을 가리키면 안 된다
-          setAppliedQuery(q);
-          setDateFilter(date);
-        }
-      } finally {
-        if (requestId === requestIdRef.current) {
-          setIsLoading(false);
-          setIsLoadingMore(false);
-          if (page === 1) isFirstPageLoadingRef.current = false;
-        }
       }
-    },
-    [],
-  );
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+        setIsLoadingMore(false);
+        if (page === 1) isFirstPageLoadingRef.current = false;
+      }
+    }
+  }, []);
 
   // 첫 진입에 한 번. 이후 조회는 search()/clearSearch()/loadMore()가 시작한다
+  // 날짜가 바뀌면 다시 받는다 — 지금은 매번 새로 마운트되지만,
+  // 나중에 같은 화면에 다른 날짜를 넘기게 되면 이게 없으면 옛 목록이 남는다.
+  // clearDateFilter로 푼 건 initialDate가 그대로라 여기서 되살아나지 않는다
   useEffect(() => {
     void load('', 1, initialDate);
-    // 파라미터로 들어온 날짜는 진입 시점의 값이다 — 이후 해제는 clearDateFilter가 맡는다
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load]);
+  }, [load, initialDate]);
 
   /** 검색 버튼·키보드 Search 키 — 날짜 필터와 같이 걸리면 헷갈리므로 검색이 이긴다 */
   const search = useCallback(() => {

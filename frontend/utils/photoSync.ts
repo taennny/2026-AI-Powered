@@ -10,7 +10,7 @@ import type * as MediaLibraryTypes from 'expo-media-library';
 
 import {uploadPhoto} from '@/services/photoApi';
 import {DAY_BOUNDARY_HOUR} from '@/utils/formatDate';
-import {readCellularUpload} from '@/utils/photoUploadStorage';
+import {readCellularUpload} from '@/utils/settingsStorage';
 
 /**
  * 네이티브 모듈은 함수 안에서 늦게 가져온다 — 최상단 import는 모듈이 없을 때
