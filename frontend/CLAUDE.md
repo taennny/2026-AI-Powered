@@ -490,6 +490,8 @@ store/settingsStore.ts  isTrackingEnabled, isCellularUploadEnabled, hasLoaded
 
 ```
 hooks/useBootstrap.ts     앱 시작 준비 — 토큰 복원 → 진입 화면 결정
+hooks/useEmailLogin.ts    이메일 로그인 — 입력값·5회 실패 잠금·상태 코드별 문구
+hooks/useKakaoLogin.ts    카카오 로그인 + 신규 가입자 동의 (아래 "카카오 신규 가입자 동의")
 hooks/usePermissions.ts   권한 확인·요청·거부 안내 (아래 "권한 정책" 참고)
 hooks/useCalendar.ts      selectedDate, viewDate, calendarDays, places + fetch
 hooks/useGpsTracking.ts   start() / stop()
@@ -528,6 +530,7 @@ components/common/BottomActionSheet.tsx  아래에서 올라오는 시트 (배�
                           카카오 가입 동의 시트와 장소 수정 시트가 함께 씁니다.
                           `heightRatio`를 주면 높이를 고정해 안에서 스크롤합니다
 components/settings/SettingToggle.tsx  설정 스위치 한 줄 + 켬/끔에 따라 바뀌는 설명
+components/auth/KakaoConsentSheet.tsx  가입 동의 시트 — 흐름은 useKakaoLogin이 들고 있습니다
 components/bottomsheet/PlaceEditSheet.tsx  장소 수정 — 후보 고르기 → 직접 입력
 constants/placeCategories.ts  직접 입력용 카테고리 칩 (전체를 덮지 않습니다)
 components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(hour)로 묶습니다.
@@ -588,6 +591,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/analyzeError.test.ts` | `utils/analyzeError.ts` | 404·502·타임아웃·네트워크를 다른 문구로, 모르는 상태 코드는 숫자를 남김 |
 | `__tests__/blogGenerationError.test.ts` | `utils/blogGenerationError.ts` | 429는 `reset_at`까지 안내(없거나 깨져도 안내는 나감), 409는 생성 중, 폴링 타임아웃은 실패가 아니라 "아직 만드는 중" |
 | `__tests__/photoApi.test.ts` | `services/photoApi.ts` | 필드명 `photo` 고정(다르면 422), 확장자별 MIME(HEIC), 60초 타임아웃 |
+| `__tests__/useEmailLogin.test.ts` | `useEmailLogin` | 성공 시 인증 플래그, 빈 입력은 요청 안 함, **401 5회면 잠금**, 네트워크 오류는 횟수에 안 넣음(비행기 모드로 잠기면 안 됨), isLoading |
 | `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지, 날짜 필터(캐시 안 씀·더 불러오기 승계·검색하면 풀림) |
 
 `jest.setup.js`가 두 가지를 합니다:
