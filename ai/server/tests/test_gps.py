@@ -357,6 +357,72 @@ def test_no_api_key_returns_unknown(monkeypatch):
     assert gps.get_place_info(37.5, 127.0)["place_name"] == "알 수 없음"
 
 
+# ── 저장 장소(집·회사) 매칭 ─────────────────
+def test_saved_place_matched_skips_kakao(monkeypatch):
+    """체류가 저장 장소 반경 안이면 카카오 안 거치고 그 이름으로."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+    monkeypatch.setattr(
+        gps.requests,
+        "get",
+        lambda *a, **k: (_ for _ in ()).throw(
+            AssertionError("저장 장소면 카카오 호출 금지")
+        ),
+    )
+    saved = [{"name": "집", "lat": 37.5, "lng": 127.0}]
+    info = gps.get_place_info(37.5, 127.0, saved)
+    assert info["place_name"] == "집"
+    assert info["category"] == "내 장소"
+
+
+def test_saved_place_beats_kakao_poi(monkeypatch):
+    """근처에 카카오 카페가 있어도 저장 장소가 우선."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+    monkeypatch.setattr(
+        gps.requests, "get", lambda *a, **k: _FakeResp([_doc("스타벅스", "카페", 10)])
+    )
+    saved = [{"name": "회사", "lat": 37.5, "lng": 127.0}]
+    assert gps.get_place_info(37.5, 127.0, saved)["place_name"] == "회사"
+
+
+def test_saved_place_nearest_wins(monkeypatch):
+    """저장 장소가 여러 개 반경에 겹치면 가장 가까운 것."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+    saved = [
+        {"name": "회사", "lat": 37.5005, "lng": 127.0},  # ~55m
+        {"name": "집", "lat": 37.5, "lng": 127.0},  # 0m
+    ]
+    assert gps.get_place_info(37.5, 127.0, saved)["place_name"] == "집"
+
+
+def test_saved_place_ignored_when_far(monkeypatch):
+    """저장 장소가 반경 밖이면 무시하고 일반(카카오) 매칭."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if params["category_group_code"] == "CE7":
+            return _FakeResp([_doc("스타벅스", "카페", 10)])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    saved = [{"name": "집", "lat": 37.6, "lng": 127.0}]  # ~11km 떨어짐
+    assert gps.get_place_info(37.5, 127.0, saved)["place_name"] == "스타벅스"
+
+
+def test_no_saved_places_unaffected(monkeypatch):
+    """saved_places 없으면([]/None/생략) 기존 매칭 그대로 (하위호환)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if params["category_group_code"] == "CE7":
+            return _FakeResp([_doc("스타벅스", "카페", 10)])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    assert gps.get_place_info(37.5, 127.0, [])["place_name"] == "스타벅스"
+    assert gps.get_place_info(37.5, 127.0, None)["place_name"] == "스타벅스"
+    assert gps.get_place_info(37.5, 127.0)["place_name"] == "스타벅스"
+
+
 # ── 랜드마크 우선 (대형 명소 > 안쪽 카페·마트) ──
 def test_landmark_beats_nearer_general(monkeypatch):
     """대형 명소(롯데월드) 안이면, 더 가까운 롯데마트가 있어도 명소를 고른다."""
