@@ -11,13 +11,14 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import {useState} from 'react';
-import {useRouter} from 'expo-router';
+import {useEffect, useState} from 'react';
+import {useLocalSearchParams, useRouter} from 'expo-router';
 
 import {
   buildKakaoAuthUrl,
   KAKAO_APP_REDIRECT,
   KAKAO_REST_API_KEY,
+  parseIsNewUser,
 } from '@/constants/kakao';
 import ConsentList from '@/components/auth/ConsentList';
 import {
@@ -25,18 +26,17 @@ import {
   hasAllRequired,
   type ConsentState,
 } from '@/constants/consent';
-import {
-  hasAgreedToKakaoConsent,
-  markKakaoConsentAgreed,
-} from '@/utils/consentStorage';
-import {saveTokens} from '@/utils/tokenStorage';
-import {login} from '@/services/authApi';
+import {removeTokens, saveTokens} from '@/utils/tokenStorage';
+import {deleteAccount, login} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 import {logError} from '@/utils/logError';
 
 export default function LoginScreen() {
   const router = useRouter();
   const setAuthenticated = useAuthStore(s => s.setAuthenticated);
+  // 폴백 딥링크(`(auth)/kakao-login.tsx`)가 신규 가입자를 여기로 보낼 때 붙인다 —
+  // 토큰은 이미 저장돼 있고 동의만 남은 상태다
+  const {consent} = useLocalSearchParams<{consent?: string}>();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,10 +88,17 @@ export default function LoginScreen() {
   const [isConsentOpen, setIsConsentOpen] = useState(false);
   const [consents, setConsents] = useState<ConsentState>(emptyConsents);
 
+  useEffect(() => {
+    if (consent === '1') setIsConsentOpen(true);
+  }, [consent]);
+
   /**
-   * 카카오로 처음 들어오면 서버가 바로 계정을 만든다 — 회원가입 화면을 안 거치므로
-   * 여기서 동의를 받지 않으면 위치 상시 수집 동의 없이 가입이 끝난다.
-   * 한 번 받으면 기기에 남겨 다시 묻지 않는다(로그아웃해도 유지).
+   * 카카오로 처음 들어오면 **서버가 콜백에서 바로 계정을 만든다** — 회원가입 화면을
+   * 안 거치므로 여기서 동의를 받지 않으면 위치 상시 수집 동의 없이 가입이 끝난다.
+   *
+   * 신규인지는 백엔드가 딥링크에 실어주는 `isNewUser`로 판단한다.
+   * 기기에 "동의했음"을 남겨두는 방식이 아니다 — 그러면 재설치한 기존 사용자에게
+   * 또 묻고, 같은 기기에서 다른 계정으로 새로 가입하면 안 물어본다.
    */
   const handleKakaoPress = async () => {
     if (!KAKAO_REST_API_KEY) {
@@ -99,20 +106,6 @@ export default function LoginScreen() {
       return;
     }
 
-    if (await hasAgreedToKakaoConsent()) {
-      void startKakaoLogin();
-      return;
-    }
-    setIsConsentOpen(true);
-  };
-
-  const handleConsentAgree = async () => {
-    setIsConsentOpen(false);
-    await markKakaoConsentAgreed();
-    void startKakaoLogin();
-  };
-
-  const startKakaoLogin = async () => {
     try {
       // returnUrl은 앱 딥링크다. 백엔드 콜백을 주면
       // 토큰이 만들어지기 전에 세션이 닫힐 수 있다.
@@ -137,13 +130,48 @@ export default function LoginScreen() {
         throw new Error('토큰을 받지 못했습니다.');
       }
 
+      // 동의 시트에서 '취소'를 누르면 탈퇴 요청을 보내야 한다 —
+      // 그 요청에 토큰이 필요하므로 동의 전에 저장한다.
       await saveTokens(accessToken, refreshToken);
-      setAuthenticated();
 
+      if (parseIsNewUser(queryParams?.isNewUser)) {
+        // 아직 setAuthenticated()를 부르지 않는다 — 인증 플래그가 켜지는 순간
+        // (main)이 마운트되면서 위치 권한부터 물어, 동의 시트가 가려진다
+        setConsents(emptyConsents());
+        setIsConsentOpen(true);
+        return;
+      }
+
+      setAuthenticated();
       router.replace('/');
     } catch (error) {
       logError('kakao login', error);
       setErrorMessage('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const handleConsentAgree = () => {
+    setIsConsentOpen(false);
+    setAuthenticated();
+    router.replace('/');
+  };
+
+  /**
+   * 계정은 이미 만들어졌다. 그냥 시트만 닫으면 **동의 없이 가입된 계정**이 남으므로
+   * 되돌린다 — 탈퇴가 실패하면 로그인시키지 않고 다시 시도하게 둔다.
+   */
+  const handleConsentCancel = async () => {
+    setIsConsentOpen(false);
+
+    try {
+      await deleteAccount();
+    } catch (error) {
+      logError('kakao consent cancel', error);
+      setErrorMessage(
+        '가입을 취소하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.',
+      );
+    } finally {
+      await removeTokens();
     }
   };
 
@@ -223,7 +251,8 @@ export default function LoginScreen() {
           transparent
           // 아래에서 올라온다 — 가입 흐름을 끊지 않고 이어지는 느낌을 준다
           animationType="slide"
-          onRequestClose={() => setIsConsentOpen(false)}
+          // 안드로이드 뒤로가기로 닫아도 '동의 안 함'이다 — 계정이 남으면 안 된다
+          onRequestClose={() => void handleConsentCancel()}
         >
           <View
             className="flex-1 justify-end"
@@ -234,10 +263,11 @@ export default function LoginScreen() {
               <View className="w-10 h-1 rounded-full bg-[#E5E5EA] self-center mb-4" />
 
               <Text className="text-[15px] font-semibold text-[#1C1C1E]">
-                가입 전 동의가 필요해요
+                가입을 마치려면 동의가 필요해요
               </Text>
               <Text className="mt-1 mb-4 text-[11px] leading-[15px] text-[#8E8E93]">
-                카카오로 시작하면 계정이 만들어집니다. 아래 항목을 확인해주세요.
+                처음 오셨네요. 아래 항목을 확인해주세요. 동의하지 않으면
+                만들어진 계정은 삭제됩니다.
               </Text>
 
               {/* 남는 높이를 다 쓰고, 넘치면 스크롤한다 */}
@@ -250,7 +280,7 @@ export default function LoginScreen() {
 
               <View className="flex-row justify-end mt-4">
                 <TouchableOpacity
-                  onPress={() => setIsConsentOpen(false)}
+                  onPress={() => void handleConsentCancel()}
                   className="px-5 py-3"
                 >
                   <Text className="text-[13px] text-[#8E8E93]">취소</Text>

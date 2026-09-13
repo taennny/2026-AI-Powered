@@ -30,8 +30,10 @@ cd ios && bundle exec pod install && cd ..
 app/
 ├── _layout.tsx                      # 루트 레이아웃: 폰트 로드, 스플래시, ThemeRoot
 ├── index.tsx                        # 진입점: useBootstrap이 정한 곳으로 replace
+├── onboarding.tsx                   # 이미지 8장 탭 넘김 → markOnboardingDone → 홈
+│                                    # ((main) 바깥이라 권한 요청보다 먼저 끝난다)
 ├── (auth)/
-│   ├── login.tsx / signup.tsx
+│   ├── login.tsx / signup.tsx       # signup은 ConsentList로 동의 6항목을 받는다
 │   ├── find-password.tsx            # 비밀번호 찾기 (이메일 발송)
 │   ├── reset-password.tsx           # 비밀번호 재설정 (token 쿼리 파라미터)
 │   └── kakao-login.tsx              # 카카오 OAuth 딥링크 콜백
@@ -47,6 +49,7 @@ app/
     └── settings/
         ├── _layout.tsx              # 설정 전용 스택 (아래 "뒤로가기" 참고)
         └── index, account, subscription, theme, records
+            # records: 위치 기록 토글 + 온보딩 다시 보기
 ```
 
 ### 인증 플로우
@@ -57,13 +60,31 @@ app/
     ├── 미인증 → /(auth)/login
     └── 인증   → 온보딩 여부에 따라 /onboarding 또는 홈
 
+회원가입 → 동의 6항목(`constants/consent.ts`) 필수 5개 체크 → authApi.signup()
 로그인   → authApi.login() → saveTokens() + authStore.setAuthenticated()
 로그아웃 → authStore.logout() → removeTokens() + isAuthenticated=false
           → (main)/_layout이 stopGpsTracking() 후 /(auth)/login
-카카오   → WebBrowser.openAuthSessionAsync() → roameapp://kakao-login?accessToken=...
-          → login.tsx가 반환 URL을 파싱해 저장 후 홈
-          (kakao-login.tsx는 딥링크가 라우터로 흘러들어올 때의 폴백)
+카카오   → WebBrowser.openAuthSessionAsync()
+          → roameapp://kakao-login?accessToken=...&refreshToken=...&isNewUser=True
+          → login.tsx가 반환 URL을 파싱 → saveTokens()
+            ├── isNewUser  → 동의 시트 (아직 setAuthenticated() 안 함)
+            │                동의 → 홈 / 취소 → deleteAccount() 후 로그인 화면
+            └── 기존 사용자 → 바로 홈
+          (kakao-login.tsx는 딥링크가 라우터로 흘러들어올 때의 폴백.
+           여기도 신규면 들여보내지 않고 /(auth)/login?consent=1로 보냅니다)
 ```
+
+**카카오 신규 가입자 동의** — 카카오는 회원가입 화면을 거치지 않고 **백엔드 콜백에서
+바로 계정이 만들어집니다.** 그래서 동의를 따로 받아야 하는데, 누가 신규인지는
+백엔드가 딥링크에 실어주는 `isNewUser`로 판단합니다.
+
+| 규칙 | 이유 |
+|---|---|
+| 값은 `parseIsNewUser()`로 읽는다 (`constants/kakao.ts`) | 백엔드가 파이썬 bool을 f-string에 넣어 보내 **값이 대문자 `'True'`** 입니다. `=== 'true'`로 비교하면 신규가 영영 안 잡힙니다. 판단이 안 서면 false — 확신 없이 띄우면 기존 사용자가 로그인할 때마다 시트를 봅니다 |
+| 기기에 "동의함"을 남기지 않는다 | 예전 `utils/consentStorage.ts` 방식입니다. 재설치한 기존 사용자에게 또 묻고, 같은 기기에서 다른 계정으로 새로 가입하면 안 물어봅니다. 서버가 아는 것을 기기가 추측할 이유가 없습니다 |
+| 동의 **전에** 토큰을 저장한다 | 취소했을 때 보내는 탈퇴 요청에 `Authorization`이 필요합니다 |
+| 동의 전에는 `setAuthenticated()`를 부르지 않는다 | 인증 플래그가 켜지는 순간 `(main)`이 마운트되며 위치 권한을 묻기 시작해, 동의 시트가 그 다이얼로그에 가립니다 |
+| 취소하면 `deleteAccount()`로 되돌린다 | 계정은 이미 만들어졌습니다. 시트만 닫으면 **동의 없이 가입된 계정**이 남습니다. 안드로이드 뒤로가기(`onRequestClose`)도 같은 경로로 보냅니다 |
 
 ### 카카오 연동 (로그인과 다른 흐름입니다)
 
@@ -117,12 +138,12 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/blogs/{id}/status` | `fetchBlogGenerationStatus` | `waitForBlogGeneration` 폴링 |
 | `GET /api/v1/blog/{id}` | `fetchBlogDetail` | `write-preview/index.tsx` |
 | `PUT /api/v1/blog/{id}` | `updateBlog` | `write-preview/index.tsx` |
+| `DELETE /api/v1/blog/{id}` | `deleteBlog` | `write-preview/index.tsx` (삭제 + 새 글 작성 취소, 204 소프트 삭제) |
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription`, `settings/theme` |
 | `PUT /api/v1/subscriptions/me` | `subscribePremium`, `cancelSubscription` | `settings/subscription` (인앱결제 도입 시 잠길 예정) |
 | `POST /api/v1/photos/upload` | `uploadPhoto` | `utils/photoSync.ts` (타임라인 카드 사진) |
 
 백엔드에는 있으나 **프론트가 아직 안 쓰는** 엔드포인트:
-`DELETE /api/v1/blog/{id}`(글 삭제 — 204, 소프트 삭제),
 `POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
 `POST /api/v1/webhooks/revenuecat`(결제 웹훅 — 앱이 부르는 게 아니라 RevenueCat이 부릅니다).
 
@@ -173,7 +194,7 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 | 함수 | 호출부 | 시점 |
 |---|---|---|
 | `useLocationPermissionGuard()` | `app/(main)/_layout.tsx` | 앱 진입 + `AppState` `'active'` 복귀마다 |
-| `ensureMediaLibraryPermission()` | `write`, `write-preview`의 사진 버튼 | 사진 첨부 직전 |
+| `ensureMediaLibraryPermission()` | **없음** — 사진 첨부 UI를 걷어내며 비었습니다. '사진 모아보기'용으로 남겨둔 것이니 "안 쓰는 코드"로 보고 지우지 마세요 | — |
 | `ensurePhotoLibraryPermission()` | `usePermissions` 내부 | 위치 권한을 다 받은 **직후** (타임라인 사진 자동 동기화용) |
 
 - **요청 시점**: 앱 진입 직후가 아니라 `(main)` 진입 시. 온보딩은 `(main)` 바깥이라
@@ -209,6 +230,23 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 갱신해 실패한 날짜가 다음 주기에 자동 재시도됩니다.
 연속 실패는 지수 백오프로 간격을 벌립니다(1→2→4분 … 60분 상한, 첫 실패는 즉시 재시도).
 새로고침 버튼은 백오프를 무시합니다 — 사용자가 직접 누른 것입니다.
+
+### GPS 업로드 큐
+
+좌표는 `tasks/gpsTask.ts`가 받아 바로 올리지 않고 **`utils/gpsQueue.ts`의 큐를 거칩니다.**
+
+| 규칙 | 이유 |
+|---|---|
+| 업로드 실패해도 큐에 남긴다 | 예전에는 실패한 배치가 그대로 사라져 지하철·엘리베이터·서버 재배포 구간이 통째로 비었습니다. 다음 배치에서 밀린 것까지 같이 올라갑니다 |
+| 좌표마다 **주인(`ownerId`)을 적어둔다** | 좌표는 수집보다 몇 분 늦게 도착합니다. 그사이 계정을 바꾸면 이전 계정의 좌표가 새 계정에 저장됐습니다. 지금은 그 계정으로 로그인했을 때만 올립니다 |
+| 주인은 **액세스 토큰(JWT)의 `sub`** 에서 읽는다 (`utils/currentUser.ts`) | 서버가 요청에 붙은 토큰으로 주인을 정하므로 어긋날 여지가 없습니다. `fetchMe()`는 네트워크가 필요해 응답 전·실패 구간의 좌표를 버리게 됩니다. 서명은 검증하지 않습니다 — 우리 디스크의 토큰에서 라벨만 읽고, 검증은 서버가 합니다 |
+| `atob`을 쓰지 않고 base64url을 직접 푼다 | Hermes 버전에 따라 `atob`이 없습니다. 없으면 주인을 못 정해 업로드가 통째로 막힙니다 |
+| 큐 접근을 한 줄로 세운다(`serialize`) | 읽기-수정-쓰기라 겹쳐 실행되면 한쪽 결과가 덮여 좌표가 사라집니다 |
+| **로그아웃해도 큐는 비우지 않는다** | 아직 못 올린 좌표는 그 계정으로 다시 로그인할 때 올라갑니다. `(main)/_layout`이 다른 캐시를 비울 때도 여기만 남깁니다 |
+
+상한: 5000건 / 2일 / 회당 500건. 위치 이력은 AsyncStorage에 평문으로 쌓이므로
+오래 들고 있을수록 노출이 커집니다 — 재시도는 몇 시간이면 끝나고 계정 오귀속 대비도 하루면 충분합니다.
+한 요청에 밀린 것을 통째로 실으면 15초 타임아웃에 걸려 큐가 더 커지는 악순환이 됩니다.
 
 ### 모아쓰기
 
@@ -304,10 +342,10 @@ RevenueCat이 검증한 뒤 백엔드로 웹훅을 보냅니다.
 `user_id`가 없으면 웹훅이 와도 누구 결제인지 매칭되지 않습니다. 로그인 경로가 셋
 (이메일 / 카카오 버튼 / 카카오 딥링크)이라 `(main)/_layout`에서 인증 상태로 한 번만 부릅니다.
 
-SDK는 설치돼 있습니다(`react-native-purchases`). **남은 건 콘솔 설정입니다** —
-App Store Connect 상품 등록, 유료 계약(Paid Applications Agreement), RevenueCat
-대시보드 구성. 키(`EXPO_PUBLIC_REVENUECAT_IOS_KEY`)가 없으면 `isPurchaseAvailable()`이
-false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로 동작합니다.**
+SDK(`react-native-purchases`)와 콘솔 설정(상품 등록·유료 계약·RevenueCat 대시보드·웹훅)은
+**모두 끝났습니다.** 키(`EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `_ANDROID_KEY`)는 `.env`에 있고,
+키가 비면 `isPurchaseAvailable()`이 false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로
+동작합니다** — CI나 새 클론에서 결제 화면이 비어 보이면 대개 키가 없는 것입니다.
 
 | 규칙 | 이유 |
 |---|---|
@@ -323,15 +361,13 @@ false가 되어 **결제 기능만 조용히 꺼지고 앱은 그대로 동작�
 않습니다**(`@deprecated`). 앱이 그 API로 plan을 바꾸면 Apple과 우리 DB가 어긋나
 결제하지 않은 사용자가 프리미엄이 되거나 해지했는데 청구가 이어집니다.
 
-계정이 준비되면 할 콘솔 작업:
+콘솔 쪽이 어긋나면 코드가 아니라 여기를 먼저 봅니다:
 
-| | 내용 |
+| | 확인할 것 |
 |---|---|
-| App Store Connect | 자동 갱신 구독 2개를 **위 상품 ID 그대로** 등록 |
-| 유료 계약 | Paid Applications Agreement(은행·세금). **이게 없으면 상품이 계속 "준비 안 됨"이라 결제가 아예 안 됩니다** |
-| RevenueCat | 앱 연결 → App Store Connect API 키 → Entitlement/Offering 구성 |
-| 웹훅 | RevenueCat에 URL + Authorization 비밀값. 백엔드 `REVENUECAT_WEBHOOK_SECRET`과 같아야 합니다 |
-| 샌드박스 | 테스터 계정 생성 후 실기기 테스트 |
+| App Store Connect | 자동 갱신 구독 2개가 `PRODUCT_IDS`와 **글자 단위로** 같은지. 상품이 "준비 안 됨"이면 유료 계약(Paid Applications Agreement)부터 |
+| RevenueCat | Entitlement/Offering 구성. `getOfferings()`가 빈 배열이면 가격이 `constants/pricing.ts`의 국내 기준값으로 그려집니다 |
+| 웹훅 | Authorization 비밀값이 백엔드 `REVENUECAT_WEBHOOK_SECRET`과 같은지. 결제는 되는데 구독이 안 열리면 대개 여기 |
 
 ### BottomSheet
 
@@ -361,7 +397,8 @@ GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결�
 ```
 store/authStore.ts      isAuthenticated / setAuthenticated, clearAuth, initialize, logout
 store/timelineStore.ts  placesCount, dailyRecordId(글 생성에 필수), refreshKey / requestRefresh
-store/themeStore.ts     themeId, themeVars / setTheme, initialize
+store/themeStore.ts     themeId, themeVars / setTheme, initialize, reset
+                        reset은 로그아웃용 — 테마는 기기가 아니라 계정에 딸린 설정입니다
 store/subscriptionStore.ts  plan, billingCycle, isActive, expiresAt, willRenew,
                         hasLoaded, justExpired
                         / isPremium(), refresh, refreshUntilChanged,
@@ -389,18 +426,28 @@ hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 페이지
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
 hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
 utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
+utils/gpsQueue.ts         GPS 좌표 큐 — 실패 시 보관, 주인 표시 (위 "GPS 업로드 큐" 참고)
+utils/currentUser.ts      액세스 토큰(JWT)의 sub — 좌표의 주인. 서명은 검증하지 않습니다
+utils/consentStorage.ts   카카오 가입자의 동의 여부 (이메일 가입은 signup 화면에서 받습니다)
+utils/onboardingStorage.ts  온보딩 완료 여부 — useBootstrap이 진입 화면을 정할 때 봅니다
+utils/analyzeError.ts     분석 실패를 사용자 문구로 (404 기록 없음 / 502 분석 서버 / 타임아웃 구분)
+utils/logError.ts         오류를 **message만** 찍습니다 — 카카오 콜백 URL에 토큰이 실려 있어
+                          통째로 출력하면 기기 로그에 남습니다 (릴리스에도 console은 들어갑니다)
 utils/analyzeSchedule.ts  analyze 호출 시점 (위 "데이터 재조회 정책" 참고)
 utils/photoSync.ts        그 날짜 사진 스캔 → 안 올린 것만 업로드
                           (날짜별 5분 간격, 와이파이일 때만, 스크린샷 제외, 회당 20장)
 utils/subscriptionStorage.ts  직전 프리미엄 여부 (만료 안내 전용, 판정에 쓰지 않음)
-constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리방침 URL
-                          처리방침은 아직 목 주소입니다
+constants/legal.ts        이용약관(Apple 표준 EULA) · 개인정보처리방침 URL (둘 다 실주소)
+constants/consent.ts      가입 동의 항목 — 조 번호가 처리방침 문서와 짝입니다.
+                          **문서를 고치면 여기도 같이 봅니다.** 이메일·카카오가 같은 목록을 씁니다
 services/purchases.ts     결제 SDK — 초기화·사용자 식별·가격 조회·결제·복원
 utils/blogGenerationError.ts  글 생성 실패를 사용자 문구로 (429는 reset_at까지 읽음)
 utils/loadingSequence.ts  글 생성 대기 문구 순서 — 진행 안내↔튜토리얼 교대, 튜토리얼은 매번 셔플
 constants/loadingMessages.ts  그 문구 목록과 교체 간격
 components/write/RotatingMessage.tsx  문구 표시 — 점이 차오르다(`.`→`...`) 페이드로 교체
 components/common/PhotoViewer.tsx  사진 전체 화면 보기 (아무 데나 누르면 닫힘)
+components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(hour)로 묶습니다.
+                          같은 시라도 시간대가 다르면 다른 묶음입니다 (위 "타임존" 참고)
 ```
 
 ### 유틸 (`utils/formatDate.ts`)
@@ -412,7 +459,9 @@ components/common/PhotoViewer.tsx  사진 전체 화면 보기 (아무 데나 �
 | `logicalToday()` | 지금이 속한 논리적 하루의 로컬 자정 `Date` (캘린더 "오늘") |
 | `formatDate(date)` | `Date` → `'YY.MM.DD(day)'` |
 | `formatDateStr(str)` | `'YYYY-MM-DD'` → `'YY.MM.DD(day)'` |
-| `formatTimeFromISO(iso)` | ISO 8601 → `'12:00PM'` |
+| `formatTimeFromISO(iso, offset?)` | ISO 8601 → `'12:00PM'`. `offset`(분)을 주면 **그 장소의 현지 시각**, 없으면 기기 로컬 |
+| `hourFromISO(iso, offset?)` | 위와 같은 기준의 '시'(0~23) — `groupPlaces`가 묶음 키로 씁니다 |
+| `formatDateFromISO(iso)` | ISO 8601 → `'YY.MM.DD(day)'` |
 | `formatTimeAgo(iso)` | ISO 8601 → `'방금'` / `'N분 전'` 등 |
 | `formatShortDate(date)` | `Date` → `'YY.MM.DD'` (요일 없이) |
 | `formatRecordDateLabel(date, dates?)` | 위치 기록일 표기. 모아쓰기는 `'26.09.05 외 4일'`. 저널 카드와 미리보기가 함께 씁니다 |
@@ -448,6 +497,12 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/dateSelection.test.ts` | `dateSelectionStore` + `buildDateTarget` | 0개면 선택 모드 종료, 여러 개 중 하나만 해제 시 유지, 정렬, 기록 없는 날만 고르면 잠금, 달 넘긴 선택의 기록 여부 기억, 연속↔불연속 판정 |
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영 |
+| `__tests__/currentUser.test.ts` | `utils/currentUser.ts` | 토큰의 `sub`를 읽음, 없거나 깨진 토큰은 null(던지지 않음), 토큰이 바뀌면 주인도 바뀜 |
+| `__tests__/timelineGrouping.test.ts` | `groupPlaces` | 같은 시끼리 묶음, **시가 같아도 시간대가 다르면 다른 묶음**, 서버 순서 유지(자정 넘김), 오프셋 없으면 기기 시간대(구버전 서버) |
+| `__tests__/themeStore.test.ts` | `themeStore` | 디스크 저장·복원, 알 수 없는 값 무시, 로그아웃 시 basic 복귀 + 디스크 삭제, reset 후 initialize가 되살리지 않음 |
+| `__tests__/analyzeError.test.ts` | `utils/analyzeError.ts` | 404·502·타임아웃·네트워크를 다른 문구로, 모르는 상태 코드는 숫자를 남김 |
+| `__tests__/blogGenerationError.test.ts` | `utils/blogGenerationError.ts` | 429는 `reset_at`까지 안내(없거나 깨져도 안내는 나감), 409는 생성 중, 폴링 타임아웃은 실패가 아니라 "아직 만드는 중" |
+| `__tests__/photoApi.test.ts` | `services/photoApi.ts` | 필드명 `photo` 고정(다르면 422), 확장자별 MIME(HEIC), 60초 타임아웃 |
 | `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지 |
 
 `jest.setup.js`가 두 가지를 합니다:
@@ -513,23 +568,30 @@ npx jest gpsTask      # 파일 하나
 > **하루 경계 4시는 백엔드에도 반영됐습니다** — `config.DAY_BOUNDARY_HOUR=4`,
 > `utils/timezone.py`의 `day_bounds()`·`week_bounds()`. 새벽 0~4시 GPS 유실은 해소됐습니다.
 >
-> analyze의 `?timezone=`은 `daily_records.timezone`에 저장됩니다(**기록 생성 시에만**).
-> 다만 **`day_bounds()`가 KST를 하드코딩**해 그 값을 경계 계산에 쓰지 않습니다 —
-> 위 "알려진 문제"의 해외 베타 블로커가 이것입니다.
+> analyze의 `?timezone=`은 `daily_records.timezone`에 저장되고(**기록 생성 시에만**),
+> **`day_bounds(target_date, tz_name)`이 그 값을 실제로 씁니다** —
+> `services/calendar.py`는 `record.timezone`을, `services/ai.py`는 요청의 tz를 넘깁니다.
+> 알 수 없는 이름은 `resolve_tz()`가 KST로 떨어뜨립니다(기기가 보낸 문자열이라
+> 막지 않으면 오타 하나로 분석이 500이 됩니다). **해외 베타 블로커는 해소됐습니다.**
+>
+> `week_bounds()`는 여전히 KST 고정입니다 — 무료 주 3회 리셋용이라 전 사용자가
+> 같은 시점에 리셋되는 편이 맞습니다. 해외 사용자에게는 "이번 주"가 한국 월요일 04시입니다.
 
 ### tz 정책 (결정됨)
 
 | | |
 |---|---|
 | **어느 날짜에 속하나** | 그날 레코드가 **처음 만들어질 때의 tz 하나로 고정** (`daily_records.timezone`). 한 번 정해지면 안 바뀝니다 — 나중에 옮기면 이미 저장된 기록이 다른 날짜로 튑니다 |
-| **몇 시로 보이나** | 기기 tz. 현지에 있는 동안은 그게 곧 현지 시각이라 맞습니다. **귀국 후 해외 기록을 볼 때만 어긋납니다** — 고치려면 `places`에 tz를 두면 됩니다(좌표에서 유도 가능, 하루 5~10행) |
+| **몇 시로 보이나** | **그 장소의 현지 시각.** 서버가 `TimelinePlace`에 `timezone`·`utc_offset_minutes`를 실어주고, `formatTimeFromISO(iso, offset)`이 그 오프셋으로 그립니다. 오프셋이 없으면(구버전 서버) 기기 tz로 폴백합니다 |
 
 비행기 탄 날 하루는 출발지 기준으로 잘립니다. **다음 날부터는 도착지 tz로 저절로 넘어갑니다** —
 새 날의 레코드가 도착지에서 만들어지기 때문입니다. 그 하루는 감수합니다.
 
-현지 시각으로 표시하게 되면 **서쪽으로 갈 때 카드의 시각이 거꾸로 갑니다**
-(서울 10:00 출발 → LA 03:00 도착). 순서는 `arrived_at`(UTC) 기준이라 맞지만,
-tz가 바뀌는 자리에 표시가 없으면 버그로 보입니다.
+현지 시각으로 그리므로 **서쪽으로 갈 때 카드의 시각이 거꾸로 갑니다**
+(서울 10:00 출발 → LA 03:00 도착). 순서는 `arrived_at`(UTC) 기준이라 맞습니다 —
+버그로 보이지 않도록 `groupPlaces`가 **시간대가 바뀌는 자리를 따로 끊고**
+(`isTimezoneChange`), 시가 같아도 tz가 다르면 다른 묶음으로 둡니다.
+서버가 준 순서는 절대 다시 정렬하지 않습니다.
 
 GPS 업로드 body의 `timezone`은 **받지만 쓰지 않습니다.** 하루의 tz는 analyze의
 `?timezone=`으로 충분합니다. 로그별 tz는 하루 경계를 정하는 데 쓰이지 않아 두지 않습니다.
@@ -548,23 +610,18 @@ EXIF에 `OffsetTimeOriginal`이 있으면 그 tz를 쓰고, **없으면 KST로 �
 | 문제 | 위치 | 영향 | 담당 |
 |---|---|---|---|
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시. 상한을 늘리려면 `__tests__/blogApi.test.ts`도 같이 고쳐야 합니다 | 프론트(글쓰기) |
-| 타임라인 사진이 원본 | `services/photos.py` | 60px 썸네일에 원본(3~5MB)을 그대로 내려줍니다. 업로드 때 축소본을 같이 만들어달라고 요청해둔 상태 | 백엔드 |
-| **`day_bounds()`가 KST 하드코딩** | `backend/app/utils/timezone.py` | **해외 베타 블로커.** 앱은 기기 tz 4시로 "오늘"을 정하는데 서버는 KST 4시로 자릅니다. 뉴욕이면 현지 오후 3시에 날짜가 바뀌어 저녁 기록이 다음 날 칸으로 갑니다. `daily_records.timezone`은 채워지는데 경계 계산이 그 값을 안 봅니다 (아래 "타임존" 참고) | 백엔드 |
 | 로깅 설정이 없음 | `backend/app/main.py` | `basicConfig`가 없어 앱 로거의 INFO는 사라지고 ERROR는 포맷 없이 찍힙니다. 장애 때 원인 추적이 어렵습니다 | 백엔드 |
 
 ## 미구현 / TODO
 
 | 항목 | 위치 | 비고 |
 |---|---|---|
-| **인앱결제 콘솔 설정** | App Store Connect · RevenueCat | 앱 코드는 끝났습니다. 남은 건 상품 등록·유료 계약·대시보드 구성 — 위 "결제" 섹션의 표 참고 |
 | `beforeRemove` 훅으로 묶기 | `write`, `write-preview` | 뒤로가기 차단 로직이 두 화면에 복제됨. 막을 화면이 하나 더 생기면 `useConfirmBeforeLeave`로 |
 | 입력 필드 컴포넌트화 | `write/index.tsx` | 같은 모양의 `레이블 + TextInput` 4벌. `LabeledTextInput`으로 빼면 60줄쯤 줄어듦 |
-| `write-preview` 분해 | `write-preview/index.tsx` | 336줄에 조회·수정·저장·삭제·취소가 다 있음. `useBlogDraft()` 훅 분리 — 라우터 파라미터로 본문 넘기는 문제와 같이 정리 |
+| `write-preview` 분해 | `write-preview/index.tsx` | 315줄에 조회·수정·저장·삭제·취소가 다 있음. `useBlogDraft()` 훅 분리 — 라우터 파라미터로 본문 넘기는 문제와 같이 정리 |
 | `RotatingMessage` 위치 | `components/write/` | write 전용이 아닌 범용 컴포넌트. 두 번째 사용처가 생기면 `components/common/`으로 |
 | 리포트 | — | 와이어프레임 대기 |
-| 글 삭제 UI | 저널 | `DELETE /api/v1/blog/{id}` 준비됨(204, 소프트 삭제). "삭제해도 생성 횟수는 돌아오지 않습니다" 안내 필요 | 
 | 사진 모아보기 | `settings/records` | 다른 담당자 구현 중. 설정 > 기록 화면에 붙일 자리를 만들어 뒀습니다 |
-| **개인정보처리방침 문서** | `constants/legal.ts` | 링크 배선은 끝났고(설정 화면 + 구독 화면) **URL이 `example.com` 목입니다.** 문서를 쓰고 공개 URL을 만들어 `PRIVACY_POLICY_URL`만 바꾸면 됩니다. **앱스토어 심사 필수** — 위치 상시 수집·사진 업로드를 꼼꼼히 적어야 합니다. 이용약관은 Apple 표준 EULA로 해결됐습니다 |
 | 크래시 리포팅 | — | Sentry 등이 없어 출시 후 사용자 크래시를 알 방법이 없습니다. **RN의 JS 에러는 App Store Connect 크래시 리포트에 안 잡힙니다** |
 | 남은 생성 횟수 표시 | 글쓰기 | 지금은 429가 떠야만 `used/limit`을 알 수 있습니다. `GET /subscriptions/me`에 넣어주면 "이번 주 1/3" 안내가 가능합니다 |
 | 카카오 첫 가입자 닉네임 | `(auth)/login.tsx:107` | 백엔드는 카카오 `properties.nickname`을 받아 쓰고 **못 받을 때만** `카카오유저1234`로 폴백합니다(`services/auth.py:88`) — 고정이 아닙니다. 먼저 볼 것은 **카카오 콘솔의 프로필 정보 동의항목**. 화면을 만들려면 닉네임 수정 API(`PATCH /me` 부재)가 전제이고, 지금은 닉네임이 앱 어디에도 안 보여 우선순위가 낮습니다 |
@@ -576,8 +633,11 @@ EXIF에 `OffsetTimeOriginal`이 있으면 그 tz를 쓰고, **없으면 KST로 �
 `dates`(불연속) 배타, 최대 31일(`MAX_BLOG_PERIOD_DAYS`), 기록 없는 날은 백엔드가 제외,
 횟수는 1회 차감, 같은 기간 생성 **진행 중**일 때만 409.
 
-**2. 타임존** — analyze `?timezone=`은 `daily_records.timezone`에 저장됩니다.
-남은 건 `day_bounds()`의 KST 하드코딩과 GPS 업로드 body의 `timezone`입니다 (위 "알려진 문제").
+**2. 타임존** — 끝났습니다. analyze `?timezone=`이 `daily_records.timezone`에 저장되고
+`day_bounds()`가 그 값으로 하루를 자릅니다. 타임라인은 장소별 `utc_offset_minutes`로
+현지 시각을 그립니다. GPS 업로드 body의 `timezone`은 여전히 **받지만 쓰지 않습니다** —
+하루의 tz는 analyze 쪽으로 충분합니다.
 
-**3. 사진 썸네일** — 위 "알려진 문제" 참고. 업로드 때 축소본을 만들고 타임라인이 그 URL을
-주면 됩니다. `Pillow`·`pillow-heif`는 이미 들어가 있습니다.
+**3. 사진 썸네일** — 끝났습니다. `TimelinePlace.thumbnails`가 내려오고 `PostCard`가
+카드에 축소본을, 확대 보기에 원본(`photos`)을 씁니다. 썸네일이 없는 기존 사진은
+`thumbnails?.[0] ?? photos?.[0]`으로 원본에 폴백합니다.
