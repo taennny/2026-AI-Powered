@@ -6,12 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.auth import router as auth_router
 from app.api.v1.blog import router as blog_router
+from app.api.v1.calendar import router as calendar_router
+from app.api.v1.frequent_place import router as frequent_place_router
 from app.api.v1.gps import router as gps_router
 from app.api.v1.photos import router as photos_router
-from app.api.v1.subscription import router as subscription_router
-from app.api.v1.calendar import router as calendar_router
-from app.api.v1.webhooks import router as webhooks_router
 from app.api.v1.places import router as places_router
+from app.api.v1.subscription import router as subscription_router
+from app.api.v1.webhooks import router as webhooks_router
 from app.config import settings
 from app.services.storage import ensure_bucket_exists
 
@@ -68,6 +69,7 @@ app.include_router(subscription_router)
 app.include_router(calendar_router)
 app.include_router(webhooks_router)
 app.include_router(places_router)
+app.include_router(frequent_place_router)
 
 
 @app.get("/health")
