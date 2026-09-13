@@ -78,3 +78,40 @@ describe('constants/kakao', () => {
     expect(KAKAO_LINK_APP_REDIRECT).not.toBe(KAKAO_APP_REDIRECT);
   });
 });
+
+/**
+ * 신규 가입자에게만 동의 시트를 띄우는 판단이 여기 달려 있다.
+ * 백엔드가 파이썬 bool을 f-string에 넣어 보내므로 값이 **대문자 `True`** 다.
+ */
+describe('parseIsNewUser', () => {
+  const {parseIsNewUser} = load('https://api.roame.co.kr');
+
+  it("백엔드가 보내는 대문자 'True'를 신규로 읽는다", () => {
+    expect(parseIsNewUser('True')).toBe(true);
+  });
+
+  it("소문자 'true'도 신규다 — 백엔드가 표기를 바꿔도 깨지지 않는다", () => {
+    expect(parseIsNewUser('true')).toBe(true);
+  });
+
+  it("'False'는 기존 사용자다 — 빈 문자열이 아니라고 참으로 읽으면 안 된다", () => {
+    expect(parseIsNewUser('False')).toBe(false);
+    expect(parseIsNewUser('false')).toBe(false);
+  });
+
+  it('파라미터가 아예 없으면 기존 사용자로 본다', () => {
+    expect(parseIsNewUser(undefined)).toBe(false);
+    expect(parseIsNewUser(null)).toBe(false);
+  });
+
+  it('같은 키가 여러 번 와서 배열이 되어도 첫 값으로 판단한다', () => {
+    expect(parseIsNewUser(['True'])).toBe(true);
+    expect(parseIsNewUser(['False', 'True'])).toBe(false);
+  });
+
+  it('예상 못 한 값은 기존 사용자로 본다 — 확신이 없으면 안 띄운다', () => {
+    expect(parseIsNewUser('yes')).toBe(false);
+    expect(parseIsNewUser(1)).toBe(false);
+    expect(parseIsNewUser({})).toBe(false);
+  });
+});

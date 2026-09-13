@@ -262,7 +262,7 @@ export default function WriteScreen() {
 
         <ScrollView className="flex-1 px-[22px] pt-[18px]">
           <Text className="mb-2 text-sm font-semibold text-primary">
-            오늘 간 장소는 어디인가요?
+            오늘 간 장소는 어디인가요? (선택)
           </Text>
 
           <TextInput
@@ -274,7 +274,7 @@ export default function WriteScreen() {
           />
 
           <Text className="mb-2 text-sm font-semibold text-primary">
-            누구와 함께하셨나요?
+            누구와 함께하셨나요? (선택)
           </Text>
 
           <TextInput
@@ -286,7 +286,7 @@ export default function WriteScreen() {
           />
 
           <Text className="mb-2 text-sm font-semibold text-primary">
-            오늘의 감정은 어떠셨나요?
+            오늘의 감정은 어떠셨나요? (선택)
           </Text>
 
           <TextInput
@@ -299,7 +299,7 @@ export default function WriteScreen() {
             placeholderTextColor={tc.tertiary}
           />
           <Text className="mb-2 text-sm font-semibold text-primary">
-            추가로 남기고 싶은 내용이 있나요?
+            추가로 남기고 싶은 내용이 있나요? (선택)
           </Text>
           <TextInput
             className="mb-6 rounded-md border border-line px-4 py-3 text-sm text-primary"
@@ -307,7 +307,7 @@ export default function WriteScreen() {
             value={prompt}
             onChangeText={setPrompt}
             multiline
-            placeholder="AI가 글을 작성할 때 참고할 내용을 자유롭게 적어주세요. (선택)"
+            placeholder="AI가 글을 작성할 때 참고할 내용을 자유롭게 적어주세요."
             placeholderTextColor={tc.tertiary}
           />
         </ScrollView>

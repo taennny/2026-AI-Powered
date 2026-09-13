@@ -3,6 +3,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Network from 'expo-network';
 
 import {uploadPhoto} from '@/services/photoApi';
+import {writeCellularUpload} from '@/utils/settingsStorage';
 import {
   syncPhotosForDate,
   clearPhotoSyncState,
@@ -211,7 +212,7 @@ describe('photoSync', () => {
 
   // 사진 한 장이 3~5MB다. 하루치만 해도 수백 MB가 나갈 수 있다
   describe('와이파이', () => {
-    it('셀룰러면 올리지 않는다', async () => {
+    it('셀룰러면 기본적으로 올리지 않는다', async () => {
       mockNet.mockResolvedValue({type: 'CELLULAR'});
       mockAssets.mockResolvedValue({assets: [asset('a')]});
 
@@ -245,6 +246,39 @@ describe('photoSync', () => {
       // 간격 가드를 소진하지 않았어야 한다
       mockNet.mockResolvedValue({type: 'WIFI'});
       await expect(syncPhotosForDate(TODAY, NOW + 1000)).resolves.toBe(1);
+    });
+  });
+
+  describe('셀룰러 업로드 설정', () => {
+    it('켜두면 셀룰러에서도 올린다', async () => {
+      await writeCellularUpload(true);
+      mockNet.mockResolvedValue({type: 'CELLULAR'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(1);
+    });
+
+    // 설정을 켠 것과 "지금 어디에 붙어 있는지"는 다른 문제다
+    it('켜뒀어도 연결이 없으면 올리지 않는다', async () => {
+      await writeCellularUpload(true);
+      mockNet.mockResolvedValue({type: 'NONE'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+
+      await expect(syncPhotosForDate(TODAY, NOW)).resolves.toBe(0);
+      expect(mockUpload).not.toHaveBeenCalled();
+    });
+
+    it('껐다면 셀룰러에서 다시 막힌다', async () => {
+      await writeCellularUpload(true);
+      mockNet.mockResolvedValue({type: 'CELLULAR'});
+      mockAssets.mockResolvedValue({assets: [asset('a')]});
+      await syncPhotosForDate(TODAY, NOW);
+
+      await writeCellularUpload(false);
+      mockAssets.mockResolvedValue({assets: [asset('b')]});
+      await expect(
+        syncPhotosForDate(TODAY, NOW + SYNC_MIN_INTERVAL_MS),
+      ).resolves.toBe(0);
     });
   });
 
