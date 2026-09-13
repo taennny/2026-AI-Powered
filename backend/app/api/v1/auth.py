@@ -106,7 +106,6 @@ async def password_reset_confirm(
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
 
 
-
 @router.post("/kakao", response_model=KakaoLoginResponse)
 async def kakao_auth(
     request: KakaoLoginRequest,

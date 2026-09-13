@@ -165,9 +165,7 @@ async def analyze_and_save(
     preserved_result = await db.execute(
         select(Place.arrived_at, Place.left_at, Place.is_deleted)
         .where(Place.daily_record_id == daily_record.id)
-        .where(
-            (Place.is_corrected.is_(True)) | (Place.is_deleted.is_(True))
-        )
+        .where((Place.is_corrected.is_(True)) | (Place.is_deleted.is_(True)))
     )
     preserved_ranges = preserved_result.all()
 

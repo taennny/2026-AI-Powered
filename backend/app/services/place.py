@@ -38,7 +38,9 @@ async def update_place(
     return place
 
 
-async def delete_place(db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID) -> None:
+async def delete_place(
+    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
     place = await get_place_or_raise(db, place_id, user_id)
     place.is_deleted = True
 
@@ -53,7 +55,9 @@ async def delete_place(db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
     await db.commit()
 
 
-async def get_candidates(db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID) -> dict:
+async def get_candidates(
+    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
+) -> dict:
     place = await get_place_or_raise(db, place_id, user_id)
 
     result = await db.execute(

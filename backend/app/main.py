@@ -69,6 +69,7 @@ app.include_router(calendar_router)
 app.include_router(webhooks_router)
 app.include_router(places_router)
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "roame-backend"}
