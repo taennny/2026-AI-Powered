@@ -464,6 +464,40 @@ def test_landmark_ignored_beyond_radius(monkeypatch):
     assert info["place_name"] == "스타벅스"  # 200m 관광지는 랜드마크 반경 밖
 
 
+# ── 문화시설(미술관)은 랜드마크 override가 아니라 거리로 경쟁 ──
+def test_culture_competes_by_distance_not_override(monkeypatch):
+    """문화시설(미술관)은 더 이상 랜드마크가 아니라 Tier1 — 더 가까운 카페가 이긴다."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        code = params["category_group_code"]
+        if code == "CE7":  # 카페 20m (더 가까움)
+            return _FakeResp([_doc("스타벅스", "음식점 > 카페", 20)])
+        if code == "CT1":  # 미술관 70m (더 멂)
+            return _FakeResp([_doc("○○미술관", "문화,예술 > 미술관", 70)])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    # 예전엔 미술관(랜드마크)이 override로 이겼지만, 이제 거리로 → 카페
+    assert gps.get_place_info(37.5, 127.0)["place_name"] == "스타벅스"
+
+
+def test_culture_wins_when_nearest(monkeypatch):
+    """미술관에 실제로 있으면(가장 가까우면) 미술관으로 (Tier1 안에서 정상 경쟁)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        code = params["category_group_code"]
+        if code == "CT1":  # 미술관 10m
+            return _FakeResp([_doc("○○미술관", "문화,예술 > 미술관", 10)])
+        if code == "CE7":  # 카페 60m
+            return _FakeResp([_doc("스타벅스", "음식점 > 카페", 60)])
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    assert gps.get_place_info(37.5, 127.0)["place_name"] == "○○미술관"
+
+
 # ── 카테고리 tiering (체험형 > 기능형) ──────
 def test_experiential_beats_nearer_functional(monkeypatch):
     """더 가까운 편의점(기능형)이 있어도, 체험형(카페)이 있으면 카페를 고른다."""
