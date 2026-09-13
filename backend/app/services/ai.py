@@ -151,21 +151,40 @@ async def analyze_and_save(
     )
 
     # 7. places 저장 — 재분석이므로 기존 결과를 지우고 다시 쓴다.
-    # 단, is_corrected=True(사용자가 직접 수정한 장소)는 재분석해도 보존한다.
+    # 단, is_corrected=True(사용자 수정) 또는 is_deleted=True(사용자 삭제)인
+    # 장소는 재분석해도 보존한다 — 삭제된 장소는 그 시간대를 "빈 상태"로 유지하기 위함.
     await db.execute(
         delete(Place)
         .where(Place.daily_record_id == daily_record.id)
         .where(Place.is_corrected.is_(False))
+        .where(Place.is_deleted.is_(False))
     )
 
-    corrected_count_result = await db.execute(
-        select(func.count(Place.id))
+    # 보존된 장소(수정됨 또는 삭제됨)들의 시간 구간을 미리 조회 —
+    # 이 구간과 겹치는 새 stay는 만들지 않는다.
+    preserved_result = await db.execute(
+        select(Place.arrived_at, Place.left_at, Place.is_deleted)
         .where(Place.daily_record_id == daily_record.id)
-        .where(Place.is_corrected.is_(True))
+        .where(
+            (Place.is_corrected.is_(True)) | (Place.is_deleted.is_(True))
+        )
     )
-    corrected_count = corrected_count_result.scalar() or 0
+    preserved_ranges = preserved_result.all()
 
+    def _overlaps_preserved(stay_start: datetime, stay_end: datetime) -> bool:
+        for p_start, p_end, _ in preserved_ranges:
+            p_end_cmp = p_end or p_start
+            stay_end_cmp = stay_end or stay_start
+            if stay_start < p_end_cmp and p_start < stay_end_cmp:
+                return True
+        return False
+
+    visible_count = sum(1 for _, _, is_del in preserved_ranges if not is_del)
+
+    new_place_count = 0
     for stay in stays:
+        if _overlaps_preserved(stay.start, stay.end):
+            continue
         place = Place(
             user_id=user_id,
             daily_record_id=daily_record.id,
@@ -177,8 +196,6 @@ async def analyze_and_save(
             is_corrected=False,
         )
         db.add(place)
+        new_place_count += 1
 
-    daily_record.place_count = corrected_count + len(stays)
-
-    await db.commit()
-    return daily_record.id, len(stays)
+    daily_record.place_count = visible_count + new_place_count

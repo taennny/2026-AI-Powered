@@ -43,7 +43,14 @@ async def get_monthly_calendar(
     days = []
     for record in records:
         has_timeline_result = await db.execute(
-            select(exists().where(Place.daily_record_id == record.id))
+            select(
+                exists().where(
+                    and_(
+                        Place.daily_record_id == record.id,
+                        Place.is_deleted.is_(False),
+                    )
+                )
+            )
         )
         has_timeline = has_timeline_result.scalar()
 
@@ -127,6 +134,7 @@ async def get_timeline(
     places_result = await db.execute(
         select(Place)
         .where(Place.daily_record_id == record.id)
+        .where(Place.is_deleted.is_(False))
         .order_by(Place.arrived_at)
     )
     places = places_result.scalars().all()
