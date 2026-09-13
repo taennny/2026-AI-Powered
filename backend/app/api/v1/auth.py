@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
@@ -106,11 +106,17 @@ async def password_reset_confirm(
     return {"message": "비밀번호가 성공적으로 변경되었습니다"}
 
 
+
 @router.post("/kakao", response_model=KakaoLoginResponse)
-async def kakao_auth(request: KakaoLoginRequest, db: AsyncSession = Depends(get_db)):
+async def kakao_auth(
+    request: KakaoLoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     """카카오 로그인"""
     try:
         result = await kakao_login(db, request.code)
+        response.status_code = 201 if result["is_new_user"] else 200
         return KakaoLoginResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
