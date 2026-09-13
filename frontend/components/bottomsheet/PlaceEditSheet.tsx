@@ -10,6 +10,7 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -208,40 +209,47 @@ export default function PlaceEditSheet({
             className="border border-line rounded-[10px] px-4 py-3 text-[15px] text-primary"
           />
 
-          {matches.length > 0 && (
-            <View className="mt-2">
-              {matches.map(candidate => (
-                <CandidateRow
-                  key={`${candidate.place_id ?? candidate.place_name}-${candidate.distance_m}`}
-                  candidate={candidate}
-                  onPress={() => choose(candidate)}
-                />
-              ))}
-            </View>
-          )}
+          {/*
+            키보드가 올라온 채로 눌러도 한 번에 선택돼야 한다 —
+            `keyboardShouldPersistTaps`가 없으면 첫 탭이 키보드만 닫는다.
+            칩도 같은 영역에 둬야 같은 규칙을 받는다.
+          */}
+          <ScrollView
+            style={{maxHeight: 260}}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {matches.map(candidate => (
+              <CandidateRow
+                key={`${candidate.place_id ?? candidate.place_name}-${candidate.distance_m}`}
+                candidate={candidate}
+                onPress={() => choose(candidate)}
+              />
+            ))}
 
-          {/* 지도에서 못 찾은 장소용 — 고른 후보가 있으면 카테고리가 딸려오므로 안 쓴다 */}
-          <View className="flex-row flex-wrap gap-2 mt-4">
-            {PLACE_CATEGORY_CHIPS.map(chip => {
-              const selected = category === chip;
-              return (
-                <TouchableOpacity
-                  key={chip}
-                  onPress={() => setCategory(selected ? null : chip)}
-                  activeOpacity={0.7}
-                  className={`px-3 py-[7px] rounded-[14px] border ${
-                    selected ? 'bg-btn-bg border-btn-bg' : 'border-line'
-                  }`}
-                >
-                  <Text
-                    className={`text-[13px] ${selected ? 'text-btn-text' : 'text-secondary'}`}
+            {/* 지도에서 못 찾은 장소용 — 후보를 고르면 카테고리가 딸려오므로 안 쓴다 */}
+            <View className="flex-row flex-wrap gap-2 mt-4">
+              {PLACE_CATEGORY_CHIPS.map(chip => {
+                const selected = category === chip;
+                return (
+                  <TouchableOpacity
+                    key={chip}
+                    onPress={() => setCategory(selected ? null : chip)}
+                    activeOpacity={0.7}
+                    className={`px-3 py-[7px] rounded-[14px] border ${
+                      selected ? 'bg-btn-bg border-btn-bg' : 'border-line'
+                    }`}
                   >
-                    {chip}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                    <Text
+                      className={`text-[13px] ${selected ? 'text-btn-text' : 'text-secondary'}`}
+                    >
+                      {chip}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
 
           <View className="flex-row justify-end mt-5">
             <TouchableOpacity onPress={onClose} className="px-5 py-3">

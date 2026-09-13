@@ -15,11 +15,11 @@ import {
 } from 'react-native';
 
 /** 제스처를 가져오는 최소 가로 이동량. 탭이 스와이프로 오인되지 않을 정도 */
-const CLAIM_THRESHOLD = 8;
+const CLAIM_THRESHOLD = 5;
 
 /** 이만큼 밀었거나 이 속도를 넘으면 연다 */
-const OPEN_RATIO = 0.4;
-const FLING_VELOCITY = 0.3;
+const OPEN_RATIO = 0.25;
+const FLING_VELOCITY = 0.2;
 
 export function shouldOpen(dx: number, vx: number, width: number): boolean {
   if (vx < -FLING_VELOCITY) return true;

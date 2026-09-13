@@ -5,7 +5,16 @@
  * PanResponder와 부딪히지 않기 때문이다.
  */
 
-import {Modal, Pressable, Text, View} from 'react-native';
+import {useEffect, useRef} from 'react';
+import {
+  Animated,
+  Keyboard,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 
 type Props = {
   visible: boolean;
@@ -29,6 +38,38 @@ export default function BottomActionSheet({
   heightRatio,
   children,
 }: Props) {
+  /**
+   * `KeyboardAvoidingView`는 레이아웃을 거쳐 한 박자 늦는다.
+   * iOS의 `keyboardWillShow`는 키보드가 움직이기 **전에** 높이와 지속시간을 주므로,
+   * 그 값으로 네이티브 드라이버 애니메이션을 걸면 키보드와 같이 움직인다.
+   */
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const isIOS = Platform.OS === 'ios';
+
+    const slide = (to: number, duration: number) =>
+      Animated.timing(translateY, {
+        toValue: to,
+        duration: duration || 250,
+        useNativeDriver: true,
+      }).start();
+
+    const show = Keyboard.addListener(
+      isIOS ? 'keyboardWillShow' : 'keyboardDidShow',
+      e => slide(-e.endCoordinates.height, e.duration),
+    );
+    const hide = Keyboard.addListener(
+      isIOS ? 'keyboardWillHide' : 'keyboardDidHide',
+      e => slide(0, e.duration),
+    );
+
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [translateY]);
+
   return (
     <Modal
       visible={visible}
@@ -50,9 +91,12 @@ export default function BottomActionSheet({
           }}
         />
 
-        <View
+        <Animated.View
           className="rounded-t-[20px] bg-card px-6 pt-3 pb-8"
-          style={heightRatio ? {height: `${heightRatio * 100}%`} : undefined}
+          style={[
+            heightRatio ? {height: `${heightRatio * 100}%`} : null,
+            {transform: [{translateY}]},
+          ]}
         >
           <View className="w-10 h-1 rounded-full bg-line self-center mb-4" />
 
@@ -73,7 +117,7 @@ export default function BottomActionSheet({
           >
             {children}
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
