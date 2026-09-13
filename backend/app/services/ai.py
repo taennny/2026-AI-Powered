@@ -5,15 +5,22 @@ from datetime import date, datetime, timezone
 
 import httpx
 from geoalchemy2.elements import WKTElement
+from geoalchemy2.shape import to_shape
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.daily_record import DailyRecord
+from app.models.frequent_place import FrequentPlace
 from app.models.gps_log import GpsLog
 from app.models.photos import Photo
 from app.models.place import Place
-from app.schemas.ai import AIAnalyzeRequest, AIAnalyzeResponse, AIGpsLogItem
+from app.schemas.ai import (
+    AIAnalyzeRequest,
+    AIAnalyzeResponse,
+    AIGpsLogItem,
+    AISavedPlaceItem,
+)
 from app.utils.timezone import day_bounds
 
 logger = logging.getLogger(__name__)
@@ -84,6 +91,19 @@ async def analyze_and_save(
             log_rows[i].lng,
         )
 
+    # 2-1. 유저가 등록한 자주가는곳 조회 (AI 매칭 요청에 같이 실어보냄)
+    saved_places_result = await db.execute(
+        select(FrequentPlace).where(FrequentPlace.user_id == user_id)
+    )
+    saved_place_items = [
+        AISavedPlaceItem(
+            name=fp.name,
+            lat=to_shape(fp.location).y,
+            lng=to_shape(fp.location).x,
+        )
+        for fp in saved_places_result.scalars().all()
+    ]
+
     # 3. AI 서버 호출
     gps_items = [
         AIGpsLogItem(
@@ -91,7 +111,9 @@ async def analyze_and_save(
         )
         for row in log_rows
     ]
-    request_body = AIAnalyzeRequest(user_id=str(user_id), gps_logs=gps_items)
+    request_body = AIAnalyzeRequest(
+        user_id=str(user_id), gps_logs=gps_items, saved_places=saved_place_items
+    )
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:

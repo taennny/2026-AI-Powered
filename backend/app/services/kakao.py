@@ -67,3 +67,27 @@ async def search_kakao_places(query: str) -> list[dict]:
         }
         for doc in data.get("documents", [])
     ]
+
+async def coord_to_address(latitude: float, longitude: float) -> dict:
+    """좌표 → 주소 변환 (카카오 로컬 좌표-주소 변환)"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://dapi.kakao.com/v2/local/geo/coord2address.json",
+            params={"x": longitude, "y": latitude},
+            headers={"Authorization": f"KakaoAK {settings.KAKAO_REST_API_KEY}"},
+        )
+    if response.status_code != 200:
+        raise ValueError("주소 변환에 실패했습니다")
+
+    data = response.json()
+    documents = data.get("documents", [])
+    if not documents:
+        raise ValueError("해당 좌표의 주소를 찾을 수 없습니다")
+
+    address_info = documents[0]
+    road_address = address_info.get("road_address")
+    address = address_info.get("address")
+
+    return {
+        "address": (road_address or address).get("address_name"),
+    }

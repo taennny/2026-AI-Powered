@@ -39,3 +39,7 @@ class PlaceSearchResult(BaseModel):
 # 주소 검색 응답
 class FrequentPlaceSearchResponse(BaseModel):
     results: list[PlaceSearchResult]
+
+# 현재 위치 → 주소 변환 응답
+class ReverseGeocodeResponse(BaseModel):
+    address: str
