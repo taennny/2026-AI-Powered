@@ -57,16 +57,11 @@ export default function PostCard({data, onChanged}: Props) {
   const handleSubmit = async (value: {
     name: string;
     category: string | null;
-    kakaoPlaceId?: string | null;
   }) => {
     setIsEditOpen(false);
 
     try {
-      await updatePlace(data.place_id, {
-        name: value.name,
-        category: value.category,
-        kakao_place_id: value.kakaoPlaceId,
-      });
+      await updatePlace(data.place_id, value);
       onChanged?.();
     } catch (error) {
       logError('place update', error);
@@ -160,6 +155,9 @@ export default function PostCard({data, onChanged}: Props) {
         visible={isEditOpen}
         placeId={data.place_id}
         currentName={name}
+        currentCategory={category ?? null}
+        lat={data.lat}
+        lng={data.lng}
         onClose={() => setIsEditOpen(false)}
         onSubmit={handleSubmit}
       />

@@ -33,12 +33,13 @@ type Props = {
   visible: boolean;
   placeId: string;
   currentName: string;
+  /** 지금 값을 들고 있다가 그대로 돌려준다 — 안 보내면 서버가 지운다 */
+  currentCategory: string | null;
+  /** 키워드 검색은 place_id가 아니라 좌표로 건다 */
+  lat: number;
+  lng: number;
   onClose: () => void;
-  onSubmit: (value: {
-    name: string;
-    category: string | null;
-    kakaoPlaceId?: string | null;
-  }) => void;
+  onSubmit: (value: {name: string; category: string | null}) => void;
 };
 
 function CandidateRow({
@@ -71,6 +72,9 @@ export default function PlaceEditSheet({
   visible,
   placeId,
   currentName,
+  currentCategory,
+  lat,
+  lng,
   onClose,
   onSubmit,
 }: Props) {
@@ -93,7 +97,7 @@ export default function PlaceEditSheet({
 
     setStep('candidates');
     setName(currentName);
-    setCategory(null);
+    setCategory(currentCategory);
     setMatches([]);
     setFailed(false);
     setIsLoading(true);
@@ -112,7 +116,7 @@ export default function PlaceEditSheet({
       .finally(() => {
         if (requestId === requestIdRef.current) setIsLoading(false);
       });
-  }, [visible, placeId, currentName]);
+  }, [visible, placeId, currentName, currentCategory]);
 
   // 입력 단계에서만 검색한다
   useEffect(() => {
@@ -126,7 +130,7 @@ export default function PlaceEditSheet({
 
     const timer = setTimeout(() => {
       const requestId = ++requestIdRef.current;
-      searchPlaceCandidates(placeId, keyword)
+      searchPlaceCandidates(lat, lng, keyword)
         .then(list => {
           if (requestId === requestIdRef.current) setMatches(list);
         })
@@ -136,15 +140,11 @@ export default function PlaceEditSheet({
     }, SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [step, name, placeId]);
+  }, [step, name, lat, lng]);
 
   const choose = useCallback(
     (candidate: PlaceCandidate) => {
-      onSubmit({
-        name: candidate.place_name,
-        category: candidate.category,
-        kakaoPlaceId: candidate.place_id,
-      });
+      onSubmit({name: candidate.place_name, category: candidate.category});
     },
     [onSubmit],
   );

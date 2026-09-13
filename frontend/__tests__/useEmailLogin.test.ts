@@ -26,12 +26,6 @@ function renderHook<T>(hook: () => T) {
   return {result, unmount: () => act(() => renderer.unmount())};
 }
 
-const flush = async () => {
-  await act(async () => {
-    await Promise.resolve();
-  });
-};
-
 const unauthorized = () => ({response: {status: 401}});
 
 /** 입력을 채우고 제출한다 */

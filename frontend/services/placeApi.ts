@@ -19,7 +19,7 @@ export type PlaceCandidate = {
   distance_m: number;
   lat: number;
   lng: number;
-  /** 카카오 place id. 해외(구글)는 형식이 다를 수 있다 */
+  /** 지도 서비스의 장소 id. 지금은 저장하지 않는다 — 서버가 받지 않는다 */
   place_id: string | null;
 };
 
@@ -46,37 +46,45 @@ export async function fetchPlaceCandidates(
 }
 
 /**
- * GET /api/v1/places/{id}/search?q=
- * 같은 좌표에서 이름 부분 일치. 거리순 최대 10개.
- * 응답 키가 후보 조회(`candidates`)와 다르다 — AI 스펙 그대로다.
+ * GET /api/v1/places/search?lat=&lng=&query=
+ * 이름 부분 일치, 거리순 최대 10개.
+ *
+ * 후보 조회와 달리 **place_id가 아니라 좌표를 직접 받는다** — 서버가 DB를 거치지
+ * 않고 AI로 바로 넘긴다. 응답 키도 `results`로 다르다(AI 스펙 그대로).
  */
 export async function searchPlaceCandidates(
-  placeId: string,
+  lat: number,
+  lng: number,
   query: string,
 ): Promise<PlaceCandidate[]> {
   const {data} = await api.get<{results: PlaceCandidate[]}>(
-    `/api/v1/places/${placeId}/search`,
-    {params: {q: query}},
+    '/api/v1/places/search',
+    {params: {lat, lng, query}},
   );
   return data.results ?? [];
 }
 
 export type UpdatePlaceRequest = {
   name: string;
-  category?: string | null;
-  /** 지도에서 고른 경우에만. 좌표는 보내지 않는다 — 핀은 GPS 중심점을 유지한다 */
-  kakao_place_id?: string | null;
+  /**
+   * 서버가 받은 값을 그대로 덮어쓴다 — **빼먹으면 기존 카테고리가 지워진다.**
+   * 화면은 지금 값을 기본으로 들고 있다가 바뀐 것만 반영한다.
+   */
+  category: string | null;
 };
 
-/** PATCH /api/v1/places/{id} — 서버가 is_corrected를 세운다 */
+/**
+ * PUT /api/v1/places/{id} — 서버가 is_corrected를 세워, 재분석해도 보존된다.
+ * 좌표와 `kakao_place_id`는 받지 않는다(핀은 GPS 중심점을 유지한다).
+ */
 export async function updatePlace(
   placeId: string,
   body: UpdatePlaceRequest,
 ): Promise<void> {
-  await api.patch(`/api/v1/places/${placeId}`, body);
+  await api.put(`/api/v1/places/${placeId}`, body);
 }
 
-/** DELETE /api/v1/places/{id} — 재분석에 되살아나지 않게 하는 건 서버 몫 */
+/** DELETE /api/v1/places/{id} — 소프트 삭제(is_deleted). 서버가 place_count도 줄인다 */
 export async function deletePlace(placeId: string): Promise<void> {
   await api.delete(`/api/v1/places/${placeId}`);
 }

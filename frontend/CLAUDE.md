@@ -327,17 +327,17 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 | 앱 → 백엔드 | 백엔드 → AI | 응답 키 |
 |---|---|---|
 | `GET /api/v1/places/{id}/candidates` | `/api/ai/candidates?lat=&lng=&exclude=` | `candidates` (최대 5) |
-| `GET /api/v1/places/{id}/search?q=` | `/api/ai/search?lat=&lng=&query=` | `results` (최대 10) |
+| `GET /api/v1/places/search?lat=&lng=&query=` | `/api/ai/search?lat=&lng=&query=` | `results` (최대 10) |
 
-두 응답의 키가 다릅니다(`candidates` / `results`) — AI 스펙 그대로라 맞춰뒀습니다.
-좌표와 `exclude`(현재 장소명)는 백엔드가 붙입니다. 앱은 `place_id`만 보냅니다.
+두 응답의 키가 다릅니다(`candidates` / `results`) — AI 스펙 그대로입니다.
+**후보 조회만 `place_id`를 씁니다**(서버가 DB에서 좌표와 `exclude`할 이름을 꺼냅니다).
+키워드 검색은 DB를 안 거쳐서 **앱이 좌표를 직접 보냅니다** — `TimelinePlace.lat/lng`입니다.
 
-> **`services/placeApi.ts`의 엔드포인트는 아직 백엔드에 없습니다**(AI 쪽은 완료).
-> 붙기 전까지 호출하면 404라 시트가 "주변 장소를 불러오지 못했어요"로 떨어집니다.
-> 백엔드에 남은 일: 위 두 중계, `PATCH`/`DELETE /places/{id}`,
-> 수정 시 `is_corrected=True`, **재분석 때 수정본과 같은 시간대의 stay를 건너뛰기**
-> (안 하면 같은 시각에 장소가 두 개 남습니다), 삭제한 장소가 재분석에 되살아나지 않게,
-> `place_count` 재계산.
+| 규칙 | 이유 |
+|---|---|
+| 수정은 `PUT`이다 | `PATCH`가 아닙니다. 그리고 `{name, category}`를 **통째로 덮어씁니다** — `category`를 빼먹으면 서버가 `None`으로 지웁니다. 시트가 지금 값을 기본으로 들고 있다가 그대로 돌려보냅니다 |
+| `place_id`(지도 서비스의 id)는 보내지 않는다 | 서버가 받지 않습니다. 후보를 골라도 이름과 카테고리만 넘어갑니다 |
+| 삭제는 소프트 삭제다 | 서버가 `is_deleted`를 세워 타임라인·캘린더에서 빼고, 재분석 때 그 시간대에 새 장소를 만들지 않습니다. `place_count`도 서버가 줄입니다 |
 
 ### 뒤로가기
 
