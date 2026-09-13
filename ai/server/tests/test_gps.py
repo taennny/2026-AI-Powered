@@ -679,3 +679,74 @@ def test_candidates_overseas_uses_google(monkeypatch):
     assert cands[0]["place_name"] == "에펠탑"  # 가장 가까운 것
     assert cands[0]["category"] == "관광명소"
     assert len(cands) == 2
+
+
+def test_candidates_exclude_current_place(monkeypatch):
+    """exclude로 준 현재 장소명은 후보에서 빠진다."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        if params["category_group_code"] == "CE7":
+            return _FakeResp(
+                [
+                    _cand_doc("스타벅스", "카페", 5, "c1"),
+                    _cand_doc("투썸", "카페", 10, "c2"),
+                ]
+            )
+        return _FakeResp([])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    cands = gps.get_place_candidates(37.5, 127.0, exclude="스타벅스")
+    assert [c["place_name"] for c in cands] == ["투썸"]  # 스타벅스 제외됨
+
+
+# ── 키워드 검색 (직접 입력용) ──────────────
+def test_search_returns_partial_matches_distance_sorted(monkeypatch):
+    """부분일치 이름 검색을 거리순으로. '스타벅' → 스타벅스 …점들."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+
+    def fake_get(url, headers=None, params=None, timeout=None):
+        assert "keyword.json" in url
+        assert params["query"] == "스타벅"
+        return _FakeResp(
+            [
+                _cand_doc("스타벅스 강남점", "음식점 > 카페", 40, "s1"),
+                _cand_doc("스타벅스 광교역점", "음식점 > 카페", 120, "s2"),
+            ]
+        )
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    results = gps.search_places(37.5, 127.0, "스타벅")
+    assert [r["place_name"] for r in results] == [
+        "스타벅스 강남점",
+        "스타벅스 광교역점",
+    ]
+    assert results[0]["distance_m"] == 40
+    assert results[0]["place_id"] == "s1"
+    assert results[0]["category"] == "음식점 > 카페"
+
+
+def test_search_empty_query_no_call(monkeypatch):
+    """빈/공백 쿼리는 검색하지 않는다 (호출도 안 함)."""
+    monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
+    monkeypatch.setattr(
+        gps.requests,
+        "get",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("빈 쿼리는 호출 금지")),
+    )
+    assert gps.search_places(37.5, 127.0, "   ") == []
+
+
+def test_search_overseas_uses_google_textsearch(monkeypatch):
+    """해외는 구글 Text Search로 부분일치 검색."""
+    monkeypatch.setattr(settings, "GOOGLE_MAPS_API_KEY", "gkey")
+
+    def fake_get(url, params=None, timeout=None, **kw):
+        assert "textsearch" in url
+        assert params["query"] == "starbucks"
+        return _FakeGoogleResp([_gplace("Starbucks Louvre", ["cafe"], 48.8606, 2.3376)])
+
+    monkeypatch.setattr(gps.requests, "get", fake_get)
+    results = gps.search_places(48.8606, 2.3376, "starbucks")
+    assert results[0]["place_name"] == "Starbucks Louvre"
+    assert results[0]["category"] == "카페"
