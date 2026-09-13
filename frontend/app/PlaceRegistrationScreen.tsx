@@ -1,5 +1,6 @@
 
 import React, {useEffect, useRef, useState} from 'react';
+import * as Location from 'expo-location';
 import {
   ActivityIndicator,
   Alert,
@@ -67,30 +68,30 @@ export default function PlaceRegistrationScreen() {
     return () => clearTimeout(timer);
   }, [screen]);
 
-  useEffect(() => {
-  const fetchFrequentPlaces = async () => {
-    try {
-      const response = await api.get('/api/v1/places/frequent');
+    useEffect(() => {
+    const fetchFrequentPlaces = async () => {
+      try {
+        const response = await api.get('/api/v1/places/frequent');
 
-      const fetchedPlaces: Place[] = response.data.places.map(
-        (place: any) => ({
-          id: place.place_id,
-          type: 'frequent',
-          name: place.name,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-        }),
-      );
+        const fetchedPlaces: Place[] = response.data.places.map(
+          (place: any) => ({
+            id: place.place_id,
+            type: 'frequent',
+            name: place.name,
+            address: place.address,
+            latitude: place.latitude,
+            longitude: place.longitude,
+          }),
+        );
 
-      setPlaces(fetchedPlaces);
-    } catch (error) {
-      console.error('자주 가는 장소 조회 실패:', error);
-    }
-  };
+        setPlaces(fetchedPlaces);
+      } catch (error) {
+        console.error('자주 가는 장소 조회 실패:', error);
+      }
+    };
 
-  fetchFrequentPlaces();
-}, []);
+    fetchFrequentPlaces();
+  }, []);
 
   /*
    * 검색 화면 열기
@@ -182,17 +183,64 @@ export default function PlaceRegistrationScreen() {
    *
    * 추후 expo-location + 주소 변환 API 연결 가능
    */
-  const handleCurrentLocation = () => {
-    const currentLocationPlace: Place = {
-  id: `current-${Date.now()}`,
-  type: selectedPlaceType,
-  name: '',
-  address: '현재 위치의 주소',
-  latitude: 0,
-  longitude: 0,
-};
+    /*
+   * 현재 위치
+   */
+  const handleCurrentLocation = async () => {
+    try {
+      const {status} =
+        await Location.requestForegroundPermissionsAsync();
 
-    animateToNaming(currentLocationPlace);
+      if (status !== 'granted') {
+        Alert.alert(
+          '위치 권한 필요',
+          '현재 위치를 사용하려면 위치 권한을 허용해주세요.',
+        );
+        return;
+      }
+
+      const location =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+      const {latitude, longitude} = location.coords;
+
+      console.log('현재 위치:', latitude, longitude);
+
+      const response = await api.get(
+        '/api/v1/places/frequent/reverse-geocode',
+        {
+          params: {
+            latitude,
+            longitude,
+          },
+        },
+      );
+
+      const address = response.data.address;
+
+      console.log('현재 위치 주소:', address);
+
+      const currentLocationPlace: Place = {
+        id: `current-${Date.now()}`,
+        type: selectedPlaceType,
+        name: '',
+        address,
+        latitude,
+        longitude,
+      };
+
+      animateToNaming(currentLocationPlace);
+    } catch (error: any) {
+      console.error('현재 위치 조회 실패:', error);
+
+      const message =
+        error?.response?.data?.detail ??
+        '현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.';
+
+      Alert.alert('현재 위치 조회 실패', message);
+    }
   };
 
   /*
@@ -1059,4 +1107,4 @@ useEffect(() => {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-}
+  }
