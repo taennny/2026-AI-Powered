@@ -28,7 +28,10 @@ export function shouldOpen(dx: number, vx: number, width: number): boolean {
 let closeOpenRow: (() => void) | null = null;
 
 type Props = {
-  /** 드러날 버튼들. 오른쪽에 이 너비만큼 자리를 잡는다 */
+  /**
+   * 드러날 버튼들. 오른쪽에 이 너비만큼, 행 높이 전체로 자리를 잡는다.
+   * 자식에 아래 여백이 있으면 버튼에도 같은 값을 줘야 끝선이 맞는다.
+   */
   actions: React.ReactNode;
   actionsWidth: number;
   children: React.ReactNode;
@@ -109,7 +112,7 @@ export default function SwipeableRow({actions, actionsWidth, children}: Props) {
           position: 'absolute',
           right: 0,
           top: 0,
-          bottom: 10,
+          bottom: 0,
           width: actionsWidth,
           flexDirection: 'row',
           opacity: actionsOpacity,

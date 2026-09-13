@@ -21,7 +21,6 @@ import {
   parseIsNewUser,
 } from '@/constants/kakao';
 import {emptyConsents, type ConsentState} from '@/constants/consent';
-import {deleteAccount} from '@/services/authApi';
 import {useAuthStore} from '@/store/authStore';
 import {logError} from '@/utils/logError';
 import {removeTokens, saveTokens} from '@/utils/tokenStorage';
@@ -95,23 +94,21 @@ export function useKakaoLogin({onError}: Options) {
   }, [setAuthenticated]);
 
   /**
-   * 계정은 이미 만들어졌다. 그냥 시트만 닫으면 **동의 없이 가입된 계정**이 남으므로
-   * 되돌린다 — 탈퇴가 실패하면 로그인시키지 않고 다시 시도하게 둔다.
+   * 토큰만 버리고 로그인 화면에 남는다.
+   *
+   * **`deleteAccount()`를 부르지 않는다.** 그건 '가입 취소'가 아니라 회원 탈퇴라,
+   * 장소·사진·글·GPS 로그를 전부 하드 삭제한다(`backend/app/services/auth.py`의
+   * `withdraw_user`). 사용자에게는 가입 전으로 보이지만 서버에는 이미 계정이 있어서,
+   * 시트를 잘못 닫은 것만으로 기존 데이터가 날아갈 수 있다.
+   *
+   * 대신 **동의하지 않은 계정이 서버에 남는다.** 그 계정으로 다시 들어오면
+   * `isNewUser`가 false라 시트가 다시 뜨지 않는다 — 서버가 동의 여부를 상태로
+   * 들고 있어야 풀리는 문제다(백엔드에 `has_consented` 요청해 둠).
    */
   const cancel = useCallback(async () => {
     setIsConsentOpen(false);
-
-    try {
-      await deleteAccount();
-    } catch (error) {
-      logError('kakao consent cancel', error);
-      onError(
-        '가입을 취소하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.',
-      );
-    } finally {
-      await removeTokens();
-    }
-  }, [onError]);
+    await removeTokens();
+  }, []);
 
   return {isConsentOpen, consents, setConsents, start, agree, cancel};
 }

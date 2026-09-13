@@ -26,10 +26,10 @@ export default function KakaoConsentSheet({
   return (
     <BottomActionSheet
       visible={visible}
-      // 배경 탭·안드로이드 뒤로가기로 닫아도 '동의 안 함'이다 — 계정이 남으면 안 된다
+      // 배경 탭·안드로이드 뒤로가기도 '동의 안 함'이다 — 토큰만 버리고 로그인 화면에 남는다
       onClose={onCancel}
       title="가입을 마치려면 동의가 필요해요"
-      description="처음 오셨네요. 아래 항목을 확인해주세요. 동의하지 않으면 만들어진 계정은 삭제됩니다."
+      description="처음 오셨네요. 아래 항목을 확인해주세요. 동의하지 않으면 로그인되지 않습니다."
       heightRatio={2 / 3}
     >
       {/* 남는 높이를 다 쓰고, 넘치면 스크롤한다 */}
