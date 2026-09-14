@@ -212,19 +212,21 @@ def _merge_adjacent(segments: list) -> list:
 # 카카오 장소 매칭
 # ──────────────────────────────────────────
 # 라이프로그 장소 카테고리를 단계(tier)로 나눈다(순서 아닌 tier).
-#   랜드마크: 관광명소·문화시설 같은 "큰 명소" — 그 안에 있으면 옆 카페·마트보다
+#   랜드마크: 관광명소(테마파크 등 대형 부지) — 그 안에 있으면 옆 카페·마트보다
 #             명소 자체를 잡는다(롯데월드 안에서 롯데마트로 뜨는 문제 방지).
+#             ※ 문화시설(미술관 등)은 독립 건물이라 여기 두면 옆 카페를 뺏으므로
+#               Tier1에 두고 거리로 경쟁시킨다.
 #   Tier1(체험형): 실제로 "가서 시간을 보낸" 목적지 — 그다음.
 #   Tier2(기능형): 편의점·은행처럼 옆에 있으면 중심을 뺏어가는 노이즈 — 폴백.
 # 이렇게 나눠야 밀집 지역에서 "옆 편의점/은행"이 식당·카페를, 또 "몰 안 마트"가
 # 명소를 이기지 않는다. (각 tier는 tier 안에서만 거리 최소 우선 → _nearest_place)
 KAKAO_LANDMARK = [
-    "AT4",  # 관광명소 (테마파크·명소)
-    "CT1",  # 문화시설 (박물관·공연장 등)
+    "AT4",  # 관광명소 (테마파크 등 대형 부지 — 그 안이면 옆 상호보다 우선)
 ]
 KAKAO_STAY_TIER1 = [
     "FD6",  # 음식점
     "CE7",  # 카페
+    "CT1",  # 문화시설 (박물관·미술관·공연장 — 독립 건물이라 거리로 경쟁)
     "AD5",  # 숙박
     "MT1",  # 대형마트
 ]
@@ -415,14 +417,42 @@ def _google_item(lat: float, lng: float, r: dict) -> dict | None:
     }
 
 
-def get_place_info(lat: float, lng: float) -> dict:
+SAVED_PLACE_RADIUS_M = 100  # 저장 장소(집·회사) 반경 — 이 안이면 그 이름으로 치환
+
+
+def _match_saved_place(lat: float, lng: float, saved_places) -> dict | None:
+    """체류가 사용자 저장 장소(집·회사) 반경 안이면 그 장소를 반환. 없으면 None.
+
+    백엔드가 /analyze 요청에 실어 보낸 saved_places([{name, lat, lng}, ...])와
+    거리를 재, 반경(SAVED_PLACE_RADIUS_M) 안에서 가장 가까운 곳의 이름으로 치환한다.
+    주택가처럼 카카오 POI가 없어 근처 상호로 오매칭되던 것을 사용자 지정으로 해결.
+    """
+    best = None  # (distance_m, name)
+    for p in saved_places or []:
+        name = (p.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            plat, plng = float(p["lat"]), float(p["lng"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        dist = geodesic((lat, lng), (plat, plng)).meters
+        if dist <= SAVED_PLACE_RADIUS_M and (best is None or dist < best[0]):
+            best = (dist, name)
+    if best is None:
+        return None
+    return {"place_name": best[1], "category": "내 장소"}
+
+
+def get_place_info(lat: float, lng: float, saved_places=None) -> dict:
     """좌표에 가장 가까운 장소를 반환한다. 실패 시 기본값.
 
     국내/해외 하이브리드:
       - 국내(bbox 안): 카카오 로컬 (아래 흐름)
       - 해외(bbox 밖): 구글 Places (카카오는 국내 전용이라 결과 없음)
 
-    국내 카카오 흐름 — 카테고리 순서가 아니라 tier + 실제 거리로 선택한다:
+    매칭 순서 — 사용자 지정 > tier + 실제 거리:
+      0) 저장 장소(집·회사) 반경 안 → 그 이름 (카카오 조회 스킵, 최우선)
       1) 랜드마크(관광명소·문화시설) — 그 명소 위(≤150m)면 옆 카페·마트보다 우선
       2) 체험형(Tier1) 최단거리 (좁은 반경 → 없으면 넓혀서)
       3) 캠퍼스 건물(학교부속시설) — 학교 안이면 옆 은행보다 강의동을 우선
@@ -430,6 +460,11 @@ def get_place_info(lat: float, lng: float) -> dict:
       5) 그래도 없으면 이동 지점(지하철 등)까지 포함
       6) 그래도 없으면 좌표→주소 역지오코딩으로 대략적 위치(동네)
     """
+    # 0) 사용자 저장 장소(집·회사) 최우선 — 반경 안이면 카카오/구글 안 거치고 그 이름
+    saved = _match_saved_place(lat, lng, saved_places)
+    if saved is not None:
+        return saved
+
     if not _in_korea(lat, lng):
         return _google_place_info(lat, lng) or dict(_UNKNOWN_PLACE)
 
@@ -754,12 +789,28 @@ gps_log_model = ns.model(
     },
 )
 
+saved_place_model = ns.model(
+    "SavedPlace",
+    {
+        "name": fields.String(
+            required=True, description="유저 지정 장소명 (예: 집·회사)"
+        ),
+        "lat": fields.Float(required=True, description="위도"),
+        "lng": fields.Float(required=True, description="경도"),
+    },
+)
+
 analyze_input = ns.model(
     "AnalyzeInput",
     {
         "user_id": fields.String(required=True, description="유저 ID"),
         "gps_logs": fields.List(
             fields.Nested(gps_log_model), required=True, description="GPS 로그 목록"
+        ),
+        "saved_places": fields.List(
+            fields.Nested(saved_place_model),
+            required=False,
+            description="자주 가는 곳(집·회사). 체류가 반경 안이면 그 이름으로 매칭",
         ),
     },
 )
@@ -818,13 +869,14 @@ class Analyze(Resource):
             data = request.json or {}
             user_id = data.get("user_id", "")
             gps_logs = data.get("gps_logs", [])
+            saved_places = data.get("saved_places", [])  # 자주 가는 곳(집·회사)
 
             if len(gps_logs) < 2:
                 return {"error": "gps_logs는 최소 2개 이상 필요합니다."}, 400
 
             stays = []
             for stay in detect_stays(gps_logs):
-                info = get_place_info(stay["lat"], stay["lng"])
+                info = get_place_info(stay["lat"], stay["lng"], saved_places)
                 duration_min = int(
                     (stay["end_time"] - stay["start_time"]).total_seconds() // 60
                 )

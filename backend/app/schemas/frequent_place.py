@@ -1,6 +1,6 @@
-# app/schemas/frequent_place.py
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -8,6 +8,7 @@ from pydantic import BaseModel
 # 자주가는곳 등록 요청
 class FrequentPlaceCreateRequest(BaseModel):
     name: str
+    place_type: Literal["frequent", "home", "workSchool"] = "frequent"
     address: str
     latitude: float
     longitude: float
@@ -17,6 +18,7 @@ class FrequentPlaceCreateRequest(BaseModel):
 class FrequentPlaceResponse(BaseModel):
     place_id: uuid.UUID
     name: str
+    place_type: str
     address: str
     latitude: float
     longitude: float
@@ -39,6 +41,7 @@ class PlaceSearchResult(BaseModel):
 # 주소 검색 응답
 class FrequentPlaceSearchResponse(BaseModel):
     results: list[PlaceSearchResult]
+
 
 # 현재 위치 → 주소 변환 응답
 class ReverseGeocodeResponse(BaseModel):

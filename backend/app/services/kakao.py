@@ -68,6 +68,7 @@ async def search_kakao_places(query: str) -> list[dict]:
         for doc in data.get("documents", [])
     ]
 
+
 async def coord_to_address(latitude: float, longitude: float) -> dict:
     """좌표 → 주소 변환 (카카오 로컬 좌표-주소 변환)"""
     async with httpx.AsyncClient() as client:
