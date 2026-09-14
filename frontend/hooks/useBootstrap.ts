@@ -2,10 +2,14 @@ import {useEffect, useState} from 'react';
 
 import {useAuthStore} from '@/store/authStore';
 import {useSettingsStore} from '@/store/settingsStore';
-import {isOnboardingDone} from '@/utils/onboardingStorage';
+import {
+  isOnboardingDone,
+  isPlaceRegistrationDone,
+} from '@/utils/onboardingStorage';
 
 export type BootstrapRoute =
   | '/(main)/(tabs)/home'
+  | '/PlaceRegistrationScreen'
   | '/onboarding'
   | '/(auth)/login';
 
@@ -31,10 +35,18 @@ export function useBootstrap(): BootstrapRoute | null {
 
       // GPS 시작은 (main) 진입 시 권한 확보 후 usePermissions가 맡는다.
       // 여기서 부르면 권한 요청 전이라 항상 조용히 실패한다.
-      const onboardingDone = await isOnboardingDone();
-      if (isActive) {
-        setRoute(onboardingDone ? '/(main)/(tabs)/home' : '/onboarding');
-      }
+      const placeRegistrationDone = await isPlaceRegistrationDone();
+
+if (!placeRegistrationDone) {
+  if (isActive) setRoute('/PlaceRegistrationScreen');
+  return;
+}
+
+const onboardingDone = await isOnboardingDone();
+
+if (isActive) {
+  setRoute(onboardingDone ? '/(main)/(tabs)/home' : '/onboarding');
+}
     };
 
     bootstrap();
