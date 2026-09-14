@@ -441,7 +441,8 @@ def _match_saved_place(lat: float, lng: float, saved_places) -> dict | None:
             best = (dist, name)
     if best is None:
         return None
-    return {"place_name": best[1], "category": "내 장소"}
+    # category는 비워둔다 — 블로그에 "장소: 집 (내 장소)"가 아니라 "장소: 집"으로 깔끔하게
+    return {"place_name": best[1], "category": ""}
 
 
 def get_place_info(lat: float, lng: float, saved_places=None) -> dict:
