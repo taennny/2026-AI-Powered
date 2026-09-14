@@ -1,4 +1,3 @@
-# app/models/frequent_place.py
 import uuid
 from datetime import datetime, timezone
 
@@ -20,6 +19,10 @@ class FrequentPlace(Base):
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(50), nullable=False)
+    # frequent(자주가는곳, 여러 개) / home(집, 1개) / workSchool(회사·학교, 1개)
+    place_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default="frequent"
+    )
     address: Mapped[str] = mapped_column(String(500), nullable=False)
     location: Mapped[object] = mapped_column(
         Geometry("POINT", srid=4326), nullable=False
