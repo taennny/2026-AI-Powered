@@ -76,7 +76,7 @@ export default function PlaceRegistrationScreen() {
         const fetchedPlaces: Place[] = response.data.places.map(
           (place: any) => ({
             id: place.place_id,
-            type: 'frequent',
+            type: place.place_type,
             name: place.name,
             address: place.address,
             latitude: place.latitude,
@@ -320,20 +320,12 @@ export default function PlaceRegistrationScreen() {
     return;
   }
 
-  // 현재 백엔드에서는 자주 가는 장소 등록 API만 제공됨
-  if (selectedPlaceType !== 'frequent') {
-    Alert.alert(
-      '준비 중',
-      '집 / 회사·학교 장소 등록 API는 아직 준비되지 않았습니다.',
-    );
-    return;
-  }
-
   setIsSubmitting(true);
 
   try {
     const response = await api.post('/api/v1/places/frequent', {
       name: trimmedName,
+      place_type: selectedPlaceType,
       address: selectedPlace.address,
       latitude: selectedPlace.latitude,
       longitude: selectedPlace.longitude,
@@ -341,17 +333,23 @@ export default function PlaceRegistrationScreen() {
 
     const registeredPlace: Place = {
       id: response.data.place_id,
-      type: 'frequent',
+      type: response.data.place_type,
       name: response.data.name,
       address: response.data.address,
       latitude: response.data.latitude,
       longitude: response.data.longitude,
     };
 
-    setPlaces(currentPlaces => [
-      ...currentPlaces,
-      registeredPlace,
-    ]);
+    setPlaces(currentPlaces => {
+  if (selectedPlaceType === 'frequent') {
+    return [...currentPlaces, registeredPlace];
+  }
+
+  return [
+    ...currentPlaces.filter(place => place.type !== selectedPlaceType),
+    registeredPlace,
+  ];
+});
 
     await markPlaceRegistrationDone();
 
