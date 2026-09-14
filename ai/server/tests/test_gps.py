@@ -371,7 +371,7 @@ def test_saved_place_matched_skips_kakao(monkeypatch):
     saved = [{"name": "집", "lat": 37.5, "lng": 127.0}]
     info = gps.get_place_info(37.5, 127.0, saved)
     assert info["place_name"] == "집"
-    assert info["category"] == "내 장소"
+    assert info["category"] == ""  # 저장 장소는 category 비움("장소: 집"으로 깔끔)
 
 
 def test_saved_place_beats_kakao_poi(monkeypatch):

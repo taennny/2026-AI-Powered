@@ -56,6 +56,26 @@ def test_serialize_multi_day_has_day_headers():
     assert "도쿄 카페" in out
 
 
+def test_serialize_empty_category_no_parens():
+    """category가 비면 '장소: 집 ()'가 아니라 '장소: 집'으로 (집·회사 저장 장소)."""
+    data = {
+        "date": "2026-08-05",
+        "user": {"nickname": "태윤", "taste_tags": []},
+        "blocks": [_block(1, place="집", category="")],
+    }
+    data["blocks"][0]["address"] = ""  # 저장 장소는 주소도 없을 수 있음
+    out = blog.serialize(data)
+    assert "장소: 집" in out
+    assert "장소: 집 ()" not in out
+    assert "()" not in out
+
+
+def test_serialize_keeps_category_when_present():
+    """category가 있으면 그대로 '(카페)'로 붙는다."""
+    out = blog.serialize(SINGLE)
+    assert "스타벅스 (카페)" in out
+
+
 def test_serialize_omits_empty_expense_and_photos():
     """소비·사진이 없으면 '소비: 없음'/'사진: 0장'을 넣지 않는다 (부정 서술 방지)."""
     data = {
@@ -120,8 +140,12 @@ def test_compose_injects_style_examples_with_guard():
 
 
 def test_compose_empty_style_examples_ignored():
-    assert "[문체 참고]" not in blog.compose_user_prompt(SINGLE, "casual", style_examples=[])
-    assert "[문체 참고]" not in blog.compose_user_prompt(SINGLE, "casual", style_examples=None)
+    assert "[문체 참고]" not in blog.compose_user_prompt(
+        SINGLE, "casual", style_examples=[]
+    )
+    assert "[문체 참고]" not in blog.compose_user_prompt(
+        SINGLE, "casual", style_examples=None
+    )
 
 
 def test_style_examples_count_and_truncation():

@@ -112,7 +112,13 @@ def _has_blocks(data: dict) -> bool:
 def _serialize_block(block: dict) -> list[str]:
     lines = [f"[블록 {block['seq']}] {block['start']}~{block['end']}"]
     address_head = " ".join(block.get("address", "").split()[:3])
-    lines.append(f"장소: {block['place']} ({block['category']}) / {address_head}")
+    # 카테고리·주소가 비면 괄호/슬래시를 붙이지 않는다 (집처럼 "장소: 집"으로 깔끔하게)
+    place_line = f"장소: {block['place']}"
+    if block.get("category"):
+        place_line += f" ({block['category']})"
+    if address_head:
+        place_line += f" / {address_head}"
+    lines.append(place_line)
     expense = block.get("expense")
     if expense:
         lines.append(f"소비: {expense['item']} {expense['amount']:,}원")
@@ -240,7 +246,7 @@ def _clean_title(title: str) -> str:
         t = t.strip().strip("#").strip("\"'“”").strip()
         for prefix in _TITLE_PREFIXES:
             if t.lower().startswith(prefix):
-                t = t[len(prefix):].strip()
+                t = t[len(prefix) :].strip()
         t = t.rstrip("。.").strip()
     return t
 
@@ -318,7 +324,9 @@ class Generate(Resource):
             if not _has_blocks(daily_record):
                 return {"error": "daily_record에 blocks가 없습니다."}, 400
             if style not in PROMPTS:
-                return {"error": "style은 casual, emotional, info 중 하나여야 합니다."}, 400
+                return {
+                    "error": "style은 casual, emotional, info 중 하나여야 합니다."
+                }, 400
             if not settings.OPENAI_API_KEY:
                 return {"error": "OPENAI_API_KEY가 설정되지 않았습니다."}, 500
 
