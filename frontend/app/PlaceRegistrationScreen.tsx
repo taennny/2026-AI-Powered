@@ -732,21 +732,43 @@ useEffect(() => {
             </View>
           </View>
 
-          <Pressable
-            onPress={handleSkip}
-            style={{
-              paddingVertical: 24,
-              alignItems: 'center',
-            }}>
-            <Text
-              style={{
-                fontSize: 13,
-                color: '#8B95A1',
-                textDecorationLine: 'underline',
-              }}>
-              나중에 설정할게요
-            </Text>
-          </Pressable>
+          {places.length > 0 ? (
+  <Pressable
+    onPress={handleSkip}
+    style={{
+      paddingVertical: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#191F28',
+      borderRadius: 16,
+      marginBottom: 24,
+    }}>
+    <Text
+      style={{
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#FFFFFF',
+      }}>
+      완료하기
+    </Text>
+  </Pressable>
+) : (
+  <Pressable
+    onPress={handleSkip}
+    style={{
+      paddingVertical: 24,
+      alignItems: 'center',
+    }}>
+    <Text
+      style={{
+        fontSize: 13,
+        color: '#8B95A1',
+        textDecorationLine: 'underline',
+      }}>
+      나중에 설정할게요
+    </Text>
+  </Pressable>
+)}
         </View>
       </SafeAreaView>
     );

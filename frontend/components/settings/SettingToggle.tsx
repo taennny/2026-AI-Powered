@@ -23,7 +23,7 @@ export default function SettingToggle({
   const tc = useThemeColors();
 
   return (
-    <View className="gap-y-2">
+    <View className="gap-y-5">
       <View className="flex-row items-center justify-between pr-[34%]">
         <Text className="text-[15px] text-primary">{label}</Text>
         <Switch
