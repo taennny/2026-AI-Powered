@@ -59,6 +59,14 @@ export default function RecordsSettingsScreen() {
             >
               <Text className="text-[15px] text-primary">온보딩 다시 보기</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+                onPress={() => router.push('/PlaceRegistrationScreen')}
+                activeOpacity={0.6}
+                className="pr-[34%]"
+              >
+                <Text className="text-[15px] text-primary">주소 설정 다시 보기</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
