@@ -94,6 +94,33 @@ async def get_monthly_calendar(
     return {"year": year, "month": month, "days": days}
 
 
+def select_place_photos(place, all_photos, deleted_taken_at) -> list:
+    """카드에 보일 사진을 고른다. 규칙 순서가 곧 우선순위다.
+
+    1. 사용자가 직접 붙인 사진(place_id)이 있으면 그것만 쓴다 — 억제도 받지 않는다
+    2. "앞으로 사진 안 붙이기"를 고른 카드는 자동 첨부를 하지 않는다
+    3. 지운 사진과 촬영시각이 같으면 재설치 후 다시 올라온 같은 사진이라 되살리지 않는다
+    4. 남은 것 중 체류 시간대에 들어오는 사진을 붙인다 (기존 동작)
+    """
+    bound = [p for p in all_photos if p.place_id == place.id]
+    if bound:
+        return bound
+
+    if place.photo_blocked:
+        return []
+
+    return [
+        p
+        for p in all_photos
+        if p.place_id is None
+        and p.taken_at
+        and p.taken_at not in deleted_taken_at
+        and place.arrived_at
+        and place.left_at
+        and place.arrived_at <= p.taken_at <= place.left_at
+    ]
+
+
 async def get_timeline(
     user_id: str, target_date: date, db: AsyncSession
 ) -> dict | None:
@@ -163,29 +190,11 @@ async def get_timeline(
     )
     deleted_taken_at = {row[0] for row in deleted_result.all()}
 
-    # 억제는 자동 첨부에만 건다 — 사용자가 직접 고른 사진은 지웠던 것이라도 다시 붙는다
-    all_photos = [
-        p
-        for p in photos_result.scalars().all()
-        if p.place_id is not None or p.taken_at not in deleted_taken_at
-    ]
+    all_photos = list(photos_result.scalars().all())
 
     place_list = []
     for place in places:
-        # 사용자가 직접 붙인 사진이 있으면 그것만 쓴다
-        bound = [p for p in all_photos if p.place_id == place.id]
-        # "다시 붙이지 않기"를 고른 카드는 자동 첨부를 건너뛴다 (직접 고른 건 그대로 쓴다)
-        auto_allowed = not place.photo_blocked
-        place_photos = bound or [
-            p
-            for p in all_photos
-            if auto_allowed
-            and p.place_id is None
-            and p.taken_at
-            and place.arrived_at
-            and place.left_at
-            and place.arrived_at <= p.taken_at <= place.left_at
-        ]
+        place_photos = select_place_photos(place, all_photos, deleted_taken_at)
 
         # 프론트는 카드당 첫 장만 쓰므로 나머지는 presigned URL 만들지 않는다.
         photo_urls = []
