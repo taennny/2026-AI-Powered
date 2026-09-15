@@ -227,10 +227,12 @@ export default function BottomSheet({
           </Animated.View>
         )}
 
+        {/* 수정 시트가 Modal이어도 React 트리상 자식이라, 여기가 'never'면 시트 안 칩이 안 눌린다 */}
         <ScrollView
           style={{flex: 1}}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{paddingBottom: 32}}
+          keyboardShouldPersistTaps="handled"
         >
           {!hasPlaces ? (
             <View

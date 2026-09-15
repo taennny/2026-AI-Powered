@@ -8,6 +8,7 @@
 import {useEffect, useRef} from 'react';
 import {
   Animated,
+  Easing,
   Keyboard,
   Modal,
   Platform,
@@ -15,6 +16,9 @@ import {
   Text,
   View,
 } from 'react-native';
+
+/** iOS 키보드 곡선 근사 — 기본 easing은 대칭이라 지속시간이 같아도 중간에서 어긋난다 */
+const KEYBOARD_EASING = Easing.bezier(0.17, 0.59, 0.4, 1.0);
 
 type Props = {
   visible: boolean;
@@ -52,6 +56,7 @@ export default function BottomActionSheet({
       Animated.timing(translateY, {
         toValue: to,
         duration: duration || 250,
+        easing: KEYBOARD_EASING,
         useNativeDriver: true,
       }).start();
 
