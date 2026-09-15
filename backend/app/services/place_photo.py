@@ -12,13 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.photos import Photo
 from app.models.place import Place
-from app.services.photos import (
-    HEIC_TYPES,
-    _convert_heic_to_jpeg,
-    _make_thumbnail,
-    _parse_exif,
-)
-from app.services.storage import delete_file, get_presigned_url, upload_file
+from app.services.photos import prepare_photo, store_photo
+from app.services.storage import delete_file, get_presigned_url
 
 logger = logging.getLogger(__name__)
 
@@ -91,25 +86,13 @@ async def replace_place_photo(
     """기존 사진을 지우고 고른 사진으로 갈아 끼운다. @returns (photo, 원본 url, 썸네일 url)"""
     place = await _get_place_or_raise(db, place_id, user_id)
 
-    if content_type in HEIC_TYPES:
-        file_bytes, exif_bytes = _convert_heic_to_jpeg(file_bytes)
-        content_type = "image/jpeg"
-        exif = _parse_exif(exif_bytes) if exif_bytes else {"taken_at": None}
-    else:
-        exif = _parse_exif(file_bytes)
+    file_bytes, content_type, taken_at = prepare_photo(file_bytes, content_type)
 
     await _tombstone(await _current_photos(db, place, user_id))
 
-    photo_id = uuid.uuid4()
-    ext = "jpg" if "jpeg" in content_type else "png"
-    storage_key = f"photos/{user_id}/{photo_id}.{ext}"
-    await upload_file(storage_key, file_bytes, content_type)
-
-    thumbnail_key: str | None = None
-    thumbnail_bytes = _make_thumbnail(file_bytes)
-    if thumbnail_bytes is not None:
-        thumbnail_key = f"photos/{user_id}/{photo_id}_thumb.jpg"
-        await upload_file(thumbnail_key, thumbnail_bytes, "image/jpeg")
+    photo_id, storage_key, thumbnail_key = await store_photo(
+        file_bytes, content_type, user_id
+    )
 
     photo = Photo(
         id=photo_id,
@@ -119,7 +102,7 @@ async def replace_place_photo(
         storage_key=storage_key,
         thumbnail_key=thumbnail_key,
         # EXIF가 없어도 받는다 — 장소는 place_id로 정해지므로 촬영시각이 필요 없다
-        taken_at=exif["taken_at"],
+        taken_at=taken_at,
     )
     db.add(photo)
     # 재분석이 이 Place를 지우면 FK가 깨지고 사진 연결도 풀린다 (ai.py의 보존 규칙에 편입)

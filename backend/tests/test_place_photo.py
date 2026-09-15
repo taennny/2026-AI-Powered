@@ -147,7 +147,7 @@ def test_bound_photo_does_not_leak_into_another_place():
 def storage():
     """S3는 테스트에서 안 띄운다 — 호출됐는지만 본다"""
     with (
-        patch("app.services.place_photo.upload_file", new=AsyncMock()) as upload,
+        patch("app.services.photos.upload_file", new=AsyncMock()) as upload,
         patch("app.services.place_photo.delete_file", new=AsyncMock()) as delete,
         patch(
             "app.services.place_photo.get_presigned_url",
