@@ -1,12 +1,3 @@
-/**
- * 장소 수정 시트. 두 단계다.
- *
- *   후보 고르기 → (없어요) → 이름 입력 (치는 동안 그 키워드로 다시 검색)
- *
- * 후보에는 카테고리가 딸려오므로, 고르면 카테고리를 따로 묻지 않는다.
- * 검색해도 안 나오는 장소(친구 집, 회의실)일 때만 칩으로 받는다.
- */
-
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,

@@ -2,6 +2,7 @@ import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 
 import {uploadGpsLogs} from '@/services/gpsApi';
+import {useTimelineStore} from '@/store/timelineStore';
 import {analyzePeriodically} from '@/utils/analyzeSchedule';
 import {getCurrentUserId} from '@/utils/currentUser';
 import {queueAndUploadGpsLogs} from '@/utils/gpsQueue';
@@ -29,6 +30,9 @@ TaskManager.defineTask(
     if (!(await queueAndUploadGpsLogs(ownerId, logs, uploadGpsLogs))) return;
 
     // 1시간에 한 번 — 그 날짜 전체를 다시 계산하는 무거운 호출이다
-    await analyzePeriodically();
+    // 분석이 실제로 돌았을 때만 갱신한다 — 배치마다 부르면 30초마다 전체 재조회가 된다
+    if (await analyzePeriodically()) {
+      useTimelineStore.getState().requestRefresh();
+    }
   },
 );

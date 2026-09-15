@@ -109,10 +109,13 @@ async function analyzeRolledOverDate(today: string): Promise<void> {
   }
 }
 
-/** 백그라운드(GPS 배치)용. @param now 테스트용 주입점 */
-export async function analyzePeriodically(now = Date.now()): Promise<void> {
-  if (now < nextRetryAt) return;
-  if (now - lastAnalyzedAt < BACKGROUND_INTERVAL_MS) return;
+/**
+ * 백그라운드(GPS 배치)용. @param now 테스트용 주입점
+ * @returns 분석이 돌았으면 true — 호출부가 화면 갱신 여부를 판단한다
+ */
+export async function analyzePeriodically(now = Date.now()): Promise<boolean> {
+  if (now < nextRetryAt) return false;
+  if (now - lastAnalyzedAt < BACKGROUND_INTERVAL_MS) return false;
   lastAnalyzedAt = now;
 
   const today = toLogicalDateKey(new Date(now));
@@ -124,9 +127,11 @@ export async function analyzePeriodically(now = Date.now()): Promise<void> {
 
   if (succeeded) {
     await writeLastAnalyzedDate(today);
-  } else {
-    lastAnalyzedAt = 0; // 주기를 소진시키지 않는다 — 재시도 시점은 백오프가 정한다
+    return true;
   }
+
+  lastAnalyzedAt = 0;
+  return false;
 }
 
 /** @returns 분석이 돌았으면 true (호출부가 화면 갱신 여부를 판단한다) */
@@ -151,12 +156,6 @@ export async function analyzeOnForeground(now = Date.now()): Promise<boolean> {
   return false;
 }
 
-/**
- * 새로고침 버튼용 — 가드를 무시하고 지금 분석한다.
- * 사용자가 직접 누른 것이라 "아직 주기가 안 됐다"로 무시하면 안 된다.
- * **백오프도 무시한다** — 기다리라고 막으면 버튼이 죽은 것처럼 보인다.
- * 다만 결과는 재시도 상태에 반영해, 성공하면 자동 경로도 함께 풀린다.
- */
 export async function analyzeNow(now = Date.now()): Promise<void> {
   lastAnalyzedAt = now;
 
@@ -167,7 +166,6 @@ export async function analyzeNow(now = Date.now()): Promise<void> {
   try {
     await analyzeGpsLogs(today);
   } catch (error) {
-    // 자동 경로와 달리 원인을 숨기지 않는다 — 호출부가 문구로 바꾼다
     lastAnalyzedAt = 0;
     recordResult(false, now);
     throw error;

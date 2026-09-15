@@ -37,6 +37,10 @@ class Place(Base):
     )
     is_corrected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 사용자가 "다시 붙이지 않기"를 고른 카드 — 자동 첨부를 영구히 막는다
+    photo_blocked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

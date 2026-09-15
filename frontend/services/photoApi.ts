@@ -55,3 +55,48 @@ export async function uploadPhoto(
   );
   return data;
 }
+
+export type PlacePhotoResult = {
+  photo_id: string;
+  photo_url: string;
+  thumbnail_url: string;
+};
+
+/**
+ * PUT /api/v1/places/{id}/photo — 카드 사진 교체.
+ * 기존 사진은 서버가 파일까지 지운다. 장소는 place_id로 정해지므로 EXIF가 없어도 된다.
+ */
+export async function replacePlacePhoto(
+  placeId: string,
+  uri: string,
+  fileName: string,
+  mimeType?: string,
+): Promise<PlacePhotoResult> {
+  const form = new FormData();
+  form.append('photo', {
+    uri,
+    name: fileName,
+    type: mimeType ?? mimeTypeOf(fileName),
+  } as unknown as Blob);
+
+  const {data} = await api.put<PlacePhotoResult>(
+    `/api/v1/places/${placeId}/photo`,
+    form,
+    {
+      headers: {'Content-Type': 'multipart/form-data'},
+      timeout: UPLOAD_TIMEOUT_MS,
+    },
+  );
+  return data;
+}
+
+/**
+ * DELETE /api/v1/places/{id}/photo — 지운 사진은 다시 올라와도 되살아나지 않는다.
+ * @param block 앞으로 **어떤** 사진도 이 카드에 자동으로 붙지 않게 한다
+ */
+export async function deletePlacePhoto(
+  placeId: string,
+  block = false,
+): Promise<void> {
+  await api.delete(`/api/v1/places/${placeId}/photo`, {params: {block}});
+}
