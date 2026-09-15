@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {router} from 'expo-router';
+import {router, useLocalSearchParams} from 'expo-router';
 import {api} from '@/utils/api';
 import {markPlaceRegistrationDone} from '@/utils/onboardingStorage';
 
@@ -52,6 +52,9 @@ export default function PlaceRegistrationScreen() {
   const namingTranslateY = useRef(new Animated.Value(15)).current;
 
   const nicknameInputRef = useRef<TextInput>(null);
+
+  const {from} = useLocalSearchParams<{from?: string}>();
+  const isFromSettings = from === 'settings';
 
   /*
    * 장소 이름 입력 화면 진입 시 자동 포커스
@@ -310,6 +313,26 @@ export default function PlaceRegistrationScreen() {
     setSearchText('');
   };
 
+  const handleDeletePlace = async (place: Place) => {
+  Alert.alert(
+    '장소 삭제',
+    `"${place.name}"을(를) 삭제할까요?`,
+    [
+      {
+        text: '취소',
+        style: 'cancel',
+      },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          // 여기에서 백엔드 DELETE API 호출
+        },
+      },
+    ],
+  );
+};
+
   /*
    * 장소 등록
    */
@@ -353,12 +376,17 @@ export default function PlaceRegistrationScreen() {
 
     await markPlaceRegistrationDone();
 
-    setSelectedPlace(null);
-    setPlaceName('');
-    setSearchText('');
-    setSearchResults([]);
+setSelectedPlace(null);
+setPlaceName('');
+setSearchText('');
+setSearchResults([]);
 
-    setScreen('intro');
+if (isFromSettings) {
+  router.back();
+  return;
+}
+
+setScreen('intro');
 
     titleOpacity.setValue(1);
 
@@ -566,46 +594,62 @@ useEffect(() => {
 
                 {/* 등록된 자주 가는 장소 */}
                 {frequentPlaces.map(place => (
-                  <View
-                    key={place.id}
-                    style={{
-                      marginTop: 8,
-                      minHeight: 58,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      borderWidth: 1,
-                      borderColor: '#E5E8EB',
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: 12,
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                    }}>
-                    <View
-                      style={{
-                        flex: 1,
-                        paddingRight: 10,
-                      }}>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: '600',
-                          color: '#191F28',
-                        }}>
-                        📍 {place.name}
-                      </Text>
+  <View
+    key={place.id}
+    style={{
+      marginTop: 8,
+      minHeight: 58,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: '#E5E8EB',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    }}>
+    <View
+      style={{
+        flex: 1,
+        paddingRight: 10,
+      }}>
+      <Text
+        style={{
+          fontSize: 14,
+          fontWeight: '600',
+          color: '#191F28',
+        }}>
+        📍 {place.name}
+      </Text>
 
-                      <Text
-                        style={{
-                          marginTop: 3,
-                          fontSize: 11,
-                          color: '#8B95A1',
-                        }}>
-                        {place.address}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+      <Text
+        style={{
+          marginTop: 3,
+          fontSize: 11,
+          color: '#8B95A1',
+        }}>
+        {place.address}
+      </Text>
+    </View>
+
+    <Pressable
+      onPress={() => handleDeletePlace(place)}
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+      }}>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '600',
+          color: '#FF4D4F',
+        }}>
+        삭제
+      </Text>
+    </Pressable>
+  </View>
+))}
               </View>
 
               {/* 집 */}
@@ -664,7 +708,7 @@ useEffect(() => {
                         ? '#8B95A1'
                         : '#191F28',
                     }}>
-                    {homePlace ? '등록됨' : '등록'}
+                    {homePlace ? '변경' : '등록'}
                   </Text>
                 </View>
               </Pressable>
@@ -725,7 +769,7 @@ useEffect(() => {
                         ? '#8B95A1'
                         : '#191F28',
                     }}>
-                    {workSchoolPlace ? '등록됨' : '등록'}
+                    {workSchoolPlace ? '변경' : '등록'}
                   </Text>
                 </View>
               </Pressable>
@@ -784,8 +828,9 @@ useEffect(() => {
         backgroundColor: '#FFFFFF',
       }}>
       <KeyboardAvoidingView
-        style={{flex: 1}}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+  style={{flex: 1}}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+>
         <View style={{flex: 1}}>
           {/* 상단 뒤로가기 */}
           <View
@@ -992,15 +1037,16 @@ useEffect(() => {
 
             {/* NAMING */}
             <Animated.View
-              pointerEvents={screen === 'naming' ? 'auto' : 'none'}
-              style={{
-                flex: 1,
-                paddingTop: 112,
-                opacity: namingOpacity,
-                transform: [
-                  {translateY: namingTranslateY},
-                ],
-              }}>
+  pointerEvents={screen === 'naming' ? 'auto' : 'none'}
+  style={{
+    flex: 1,
+    paddingTop: 112,
+    paddingBottom: 60,
+    opacity: namingOpacity,
+    transform: [
+      {translateY: namingTranslateY},
+    ],
+  }}>
               <View
                 style={{
                   flexDirection: 'row',
@@ -1080,12 +1126,11 @@ useEffect(() => {
 
           {/* 확인 버튼 */}
           <View
-            style={{
-              paddingHorizontal: 24,
-              paddingTop: 16,
-              paddingBottom:
-                Platform.OS === 'ios' ? 34 : 24,
-            }}>
+  style={{
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: Platform.OS === 'ios' ? 12 : 12,
+  }}>
             <Pressable
               onPress={handleConfirm}
               disabled={
