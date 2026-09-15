@@ -148,18 +148,37 @@ async def get_timeline(
             and_(
                 Photo.user_id == user_id,
                 Photo.daily_record_id == record.id,
+                Photo.is_deleted.is_(False),
             )
         )
         .order_by(Photo.id)
     )
-    all_photos = photos_result.scalars().all()
+
+    # 지운 사진과 촬영시각이 같으면 재설치 후 다시 올라온 같은 사진이다 — 되살리지 않는다
+    deleted_result = await db.execute(
+        select(Photo.taken_at)
+        .where(Photo.user_id == user_id)
+        .where(Photo.is_deleted.is_(True))
+        .where(Photo.taken_at.isnot(None))
+    )
+    deleted_taken_at = {row[0] for row in deleted_result.all()}
+
+    # 억제는 자동 첨부에만 건다 — 사용자가 직접 고른 사진은 지웠던 것이라도 다시 붙는다
+    all_photos = [
+        p
+        for p in photos_result.scalars().all()
+        if p.place_id is not None or p.taken_at not in deleted_taken_at
+    ]
 
     place_list = []
     for place in places:
-        place_photos = [
+        # 사용자가 직접 붙인 사진이 있으면 그것만 쓴다
+        bound = [p for p in all_photos if p.place_id == place.id]
+        place_photos = bound or [
             p
             for p in all_photos
-            if p.taken_at
+            if p.place_id is None
+            and p.taken_at
             and place.arrived_at
             and place.left_at
             and place.arrived_at <= p.taken_at <= place.left_at
