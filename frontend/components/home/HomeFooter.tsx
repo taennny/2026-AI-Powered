@@ -1,8 +1,11 @@
-import {View, Text, TouchableOpacity} from 'react-native';
+import {useState} from 'react';
+import {ActivityIndicator, View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
 import {useTimelineStore} from '@/store/timelineStore';
+import {analyzeNow} from '@/utils/analyzeSchedule';
+import {logicalToday, toDateKey} from '@/utils/formatDate';
 import {
   canGenerate,
   isSelecting,
@@ -15,6 +18,9 @@ export default function HomeFooter() {
   const dailyRecordId = useTimelineStore(s => s.dailyRecordId);
   const selectedDateKey = useTimelineStore(s => s.selectedDateKey);
   const hasJournal = useTimelineStore(s => s.hasJournal);
+  const requestRefresh = useTimelineStore(s => s.requestRefresh);
+
+  const [isPreparing, setIsPreparing] = useState(false);
 
   const selected = useDateSelectionStore(s => s.selected);
   const clearSelection = useDateSelectionStore(s => s.clear);
@@ -27,13 +33,20 @@ export default function HomeFooter() {
     ? canGenerate(selected)
     : placesCount > 0 && !!dailyRecordId;
 
-  const handleWrite = () => {
+  const handleWrite = async () => {
     if (selecting) {
       router.push({
         pathname: '/(main)/write',
         params: {dates: dateKeys.join(',')},
       });
       return;
+    }
+
+    if (selectedDateKey === toDateKey(logicalToday())) {
+      setIsPreparing(true);
+      await analyzeNow().catch(() => {});
+      requestRefresh();
+      setIsPreparing(false);
     }
 
     router.push({
@@ -88,12 +101,16 @@ export default function HomeFooter() {
 
           <TouchableOpacity
             onPress={handleWrite}
-            disabled={!canWrite}
+            disabled={!canWrite || isPreparing}
             className={`px-5 py-[10px] rounded-[20px] ${canWrite ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
           >
-            <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
-              글쓰기
-            </Text>
+            {isPreparing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
+                글쓰기
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
