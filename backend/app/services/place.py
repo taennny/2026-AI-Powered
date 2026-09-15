@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models.daily_record import DailyRecord
 from app.models.place import Place
+from app.services.place_photo import tombstone_bound_photos
 
 
 async def get_place_or_raise(
@@ -43,6 +44,9 @@ async def delete_place(
 ) -> None:
     place = await get_place_or_raise(db, place_id, user_id)
     place.is_deleted = True
+
+    # 이 카드에만 존재하던 사진은 어디에도 안 보이게 되므로 같이 정리한다
+    await tombstone_bound_photos(db, place.id, user_id)
 
     if place.daily_record_id:
         dr_result = await db.execute(

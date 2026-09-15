@@ -44,6 +44,21 @@ def _to_char(value, fmt):
     )
 
 
+def _as_ewkb(value):
+    """저장된 WKT 원문을 GeoAlchemy2가 읽을 수 있는 WKB로. 못 읽으면 None."""
+    if value is None:
+        return None
+    text = value.decode() if isinstance(value, bytes) else str(value)
+    if text.upper().startswith("SRID="):
+        text = text.split(";", 1)[1]
+    try:
+        from shapely import wkt as shapely_wkt
+
+        return shapely_wkt.loads(text).wkb_hex
+    except Exception:
+        return None
+
+
 def _register_spatialite_stubs(dbapi_conn, connection_record):
     """SQLite에서 GeoAlchemy2가 호출하는 SpatiaLite 함수들의 dummy 등록."""
     dbapi_conn.create_function("RecoverGeometryColumn", -1, lambda *args: 1)
@@ -53,6 +68,8 @@ def _register_spatialite_stubs(dbapi_conn, connection_record):
     dbapi_conn.create_function("CheckSpatialIndex", -1, lambda *args: 1)
     # 장소 INSERT에 쓰인다. 블로그 생성은 좌표를 읽지 않으므로 원문을 그대로 저장한다.
     dbapi_conn.create_function("GeomFromEWKT", 1, lambda wkt: wkt)
+    # Place를 통째로 SELECT할 때 붙는다. GeomFromEWKT가 WKT 원문을 저장하므로 되돌려 준다.
+    dbapi_conn.create_function("AsEWKB", 1, _as_ewkb)
     # Postgres 전용 함수라 SQLite엔 없다 (저널 날짜 검색에서 사용)
     dbapi_conn.create_function("to_char", 2, _to_char)
 
