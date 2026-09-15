@@ -388,7 +388,7 @@ def test_saved_place_nearest_wins(monkeypatch):
     """저장 장소가 여러 개 반경에 겹치면 가장 가까운 것."""
     monkeypatch.setattr(settings, "KAKAO_API_KEY", "dummy")
     saved = [
-        {"name": "회사", "lat": 37.5005, "lng": 127.0},  # ~55m
+        {"name": "회사", "lat": 37.5002, "lng": 127.0},  # ~22m (반경 40m 안)
         {"name": "집", "lat": 37.5, "lng": 127.0},  # 0m
     ]
     assert gps.get_place_info(37.5, 127.0, saved)["place_name"] == "집"
