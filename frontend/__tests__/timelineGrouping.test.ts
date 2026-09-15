@@ -1,3 +1,9 @@
+// groupPlaces는 순수 함수지만 BottomSheet에 있어, 카드가 끌고 오는 네이티브 모듈까지 딸려온다
+jest.mock('expo-task-manager', () => ({defineTask: jest.fn()}));
+jest.mock('expo-location', () => ({
+  Accuracy: {High: 4, Balanced: 3},
+}));
+
 import {groupPlaces} from '@/components/bottomsheet/BottomSheet';
 import {type TimelinePlace} from '@/services/calendarApi';
 
