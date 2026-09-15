@@ -51,7 +51,7 @@ export default function RecordsSettingsScreen() {
           />
 
           {/* 온보딩이 "위치 기록으로 하루를 남긴다"를 설명하는 내용이라 이 화면에 둔다 */}
-          <View className="gap-y-2">
+          <View className="gap-y-5">
             <TouchableOpacity
               onPress={() => router.push('/onboarding')}
               activeOpacity={0.6}
@@ -61,7 +61,12 @@ export default function RecordsSettingsScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-                onPress={() => router.push('/PlaceRegistrationScreen')}
+                onPress={() =>
+  router.push({
+    pathname: '/PlaceRegistrationScreen',
+    params: {from: 'settings'},
+  })
+}
                 activeOpacity={0.6}
                 className="pr-[34%]"
               >
