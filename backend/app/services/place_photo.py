@@ -4,6 +4,7 @@
 직접 고른 사진이라 촬영시각이 그 장소 시간대 밖일 수 있어, `place_id`로 직접 묶는다.
 """
 
+import logging
 import uuid
 
 from sqlalchemy import or_, select
@@ -18,6 +19,8 @@ from app.services.photos import (
     _parse_exif,
 )
 from app.services.storage import delete_file, get_presigned_url, upload_file
+
+logger = logging.getLogger(__name__)
 
 
 async def _get_place_or_raise(
@@ -55,9 +58,27 @@ async def _tombstone(photos: list[Photo]) -> None:
     """실제 파일만 지우고 row는 묘비로 남긴다 — 재업로드로 되살아나는 것을 막는다."""
     for photo in photos:
         photo.is_deleted = True
-        await delete_file(photo.storage_key)
-        if photo.thumbnail_key:
-            await delete_file(photo.thumbnail_key)
+        for key in (photo.storage_key, photo.thumbnail_key):
+            if not key:
+                continue
+            try:
+                await delete_file(key)
+            except Exception:
+                # 파일 삭제 실패로 요청 전체를 되돌리면 묘비도 안 남아 사진이 되살아난다
+                logger.warning("사진 파일 삭제 실패 (묘비는 남김): %s", key)
+
+
+async def tombstone_bound_photos(
+    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    """장소 삭제 시 그 카드 전용 사진만 정리한다 — 자동 첨부분은 그날 사진이라 건드리지 않는다"""
+    result = await db.execute(
+        select(Photo)
+        .where(Photo.user_id == user_id)
+        .where(Photo.place_id == place_id)
+        .where(Photo.is_deleted.is_(False))
+    )
+    await _tombstone(list(result.scalars().all()))
 
 
 async def replace_place_photo(
@@ -103,6 +124,8 @@ async def replace_place_photo(
     db.add(photo)
     # 재분석이 이 Place를 지우면 FK가 깨지고 사진 연결도 풀린다 (ai.py의 보존 규칙에 편입)
     place.is_corrected = True
+    # 직접 골라 넣었으니 "다시 붙이지 않기"는 해제한다
+    place.photo_blocked = False
     await db.commit()
     await db.refresh(photo)
 
@@ -114,8 +137,15 @@ async def replace_place_photo(
 
 
 async def delete_place_photo(
-    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
+    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID, block: bool = False
 ) -> None:
+    """@param block 앞으로 이 카드에 사진을 자동으로 붙이지 않는다"""
     place = await _get_place_or_raise(db, place_id, user_id)
     await _tombstone(await _current_photos(db, place, user_id))
+
+    if block:
+        place.photo_blocked = True
+        # 재분석이 Place를 지우고 다시 만들면 이 플래그도 사라진다
+        place.is_corrected = True
+
     await db.commit()

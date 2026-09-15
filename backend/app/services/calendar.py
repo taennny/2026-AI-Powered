@@ -174,10 +174,13 @@ async def get_timeline(
     for place in places:
         # 사용자가 직접 붙인 사진이 있으면 그것만 쓴다
         bound = [p for p in all_photos if p.place_id == place.id]
+        # "다시 붙이지 않기"를 고른 카드는 자동 첨부를 건너뛴다 (직접 고른 건 그대로 쓴다)
+        auto_allowed = not place.photo_blocked
         place_photos = bound or [
             p
             for p in all_photos
-            if p.place_id is None
+            if auto_allowed
+            and p.place_id is None
             and p.taken_at
             and place.arrived_at
             and place.left_at

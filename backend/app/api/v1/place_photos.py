@@ -44,11 +44,12 @@ async def replace_place_photo_api(
 @router.delete("/{place_id}/photo", status_code=204)
 async def delete_place_photo_api(
     place_id: uuid.UUID,
+    block: bool = False,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """카드 사진 삭제 — 다시 올려도 되살아나지 않는다"""
+    """카드 사진 삭제 — block=true면 앞으로 어떤 사진도 자동으로 붙지 않는다"""
     try:
-        await delete_place_photo(db, place_id, current_user.id)
+        await delete_place_photo(db, place_id, current_user.id, block)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
