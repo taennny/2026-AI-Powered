@@ -417,7 +417,8 @@ def _google_item(lat: float, lng: float, r: dict) -> dict | None:
     }
 
 
-SAVED_PLACE_RADIUS_M = 100  # 저장 장소(집·회사) 반경 — 이 안이면 그 이름으로 치환
+SAVED_PLACE_RADIUS_M = 40  # 저장 장소(집·회사) 반경 — 이 안이면 그 이름으로 치환.
+# 너무 넓으면(예: 100m) 집 옆 60m 장소까지 집으로 먹으므로 좁게 둔다(등록 좌표 정확 전제).
 
 
 def _match_saved_place(lat: float, lng: float, saved_places) -> dict | None:
