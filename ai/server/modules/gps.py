@@ -39,7 +39,11 @@ STAY_RADIUS_M = 50  # 이 거리 이내면 같은 장소로 판단
 MIN_STAY_MINUTES = 15  # 최소 체류(분). 미만은 잠깐 멈춘 것으로 보고 버린다
 # 수집 간격이 불규칙(백그라운드 스로틀 등)해도 같은 자리면 이어붙이도록 여유를 둔다.
 # 이 값 이하 끊김은 하나의 체류로 잇고, 초과 시엔 경계로 본다.
-GAP_BRIDGE_MINUTES = 5
+# 이 앱은 백그라운드 수집이 메인 — iOS는 정지 시 위치 업데이트를 크게 스로틀해
+# 간격이 10~20분까지 벌어진다. 좁으면(예: 5분) 정지 중 뜸한 점들이 각각 단독
+# 구간이 되어 버려지고 체류가 통째로 사라지므로 넉넉히 30분으로 둔다.
+# (거리 조건 ≤STAY_RADIUS 와 AND라, 같은 자리일 때만 병합돼 부작용이 적다)
+GAP_BRIDGE_MINUTES = 30
 # 실내 GPS는 정확도가 나빠(오차 ~150m) 임계값을 넉넉히 둔다. 너무 낮으면
 # 카페·식당 같은 실내 체류의 점이 통째로 걸러져 체류가 사라진다.
 ACCURACY_MAX_M = 200  # 이보다 나쁜(값 큰) 점만 노이즈로 제외
@@ -107,7 +111,7 @@ def detect_stays(gps_logs: list) -> list:
     df = df.sort_values("time").reset_index(drop=True)
     span_min = (df["time"].iloc[-1] - df["time"].iloc[0]).total_seconds() / 60
 
-    # 1) 앵커 기반 원시 군집화 (gap ≤ 3분 + 같은 자리 → 이어붙임)
+    # 1) 앵커 기반 원시 군집화 (gap ≤ GAP_BRIDGE_MINUTES + 같은 자리 → 이어붙임)
     segments = []
     current = None
     for _, row in df.iterrows():
@@ -131,7 +135,7 @@ def detect_stays(gps_logs: list) -> list:
     segments = [s for s in segments if len(s["lats"]) >= 2]
     n_multi = len(segments)
 
-    # 3) 같은 자리 + 짧은 간격(≤3분)으로 나뉜 체류 병합 (튐·앱 종료 복원)
+    # 3) 같은 자리 + 짧은 간격(≤GAP_BRIDGE_MINUTES)으로 나뉜 체류 병합 (튐·앱 종료 복원)
     segments = _merge_adjacent(segments)
 
     # 4) 최소 체류시간 필터 + 중심점 확정

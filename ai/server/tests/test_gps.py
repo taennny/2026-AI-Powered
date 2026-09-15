@@ -71,7 +71,7 @@ def _stay_run(base, start_min, end_min, lat=37.5, lng=127.0, step=1):
 
 
 def test_bridges_short_gap_same_location():
-    """앱이 잠깐 죽어 GPS가 ≤5분 끊겨도, 같은 자리면 한 체류로 이어붙인다."""
+    """앱이 잠깐 죽어 GPS가 ≤GAP_BRIDGE 끊겨도, 같은 자리면 한 체류로 이어붙인다."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
     # 0,1,2분 → 3분 끊김 → 5분부터 1분 간격으로 MIN_STAY+5분까지 (한 체류로 이어짐)
     logs = [
@@ -91,12 +91,26 @@ def test_bridges_short_gap_same_location():
 def test_long_gap_splits():
     """GAP_BRIDGE_MINUTES 초과 끊김은 경계로 봐서 나눈다 (그동안 뭘 했는지 모르므로)."""
     base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
-    # 각 구간 ≥MIN_STAY + 사이 공백(>5분)
+    # 각 구간 ≥MIN_STAY + 사이 공백 > GAP_BRIDGE (값 바뀌어도 항상 초과하게 상대값)
+    gap = gps.GAP_BRIDGE_MINUTES + 10
     logs = _stay_run(base, 0, _STAY_LEN) + _stay_run(
-        base, _STAY_LEN + 15, 2 * _STAY_LEN + 15
+        base, _STAY_LEN + gap, 2 * _STAY_LEN + gap
     )
     stays = gps.detect_stays(logs)
     assert len(stays) == 2
+
+
+def test_sparse_stationary_bridged():
+    """백그라운드 스로틀로 점이 뜸해도(10분 간격) 같은 자리면 한 체류로.
+
+    예전(GAP_BRIDGE 5분)이면 10분 간격 점이 각각 단독 구간이 되어 전부 버려지고
+    정지 체류가 통째로 사라졌다. GAP_BRIDGE를 넉넉히 둬 이 문제를 막는다.
+    """
+    base = datetime(2026, 8, 5, 9, 0, tzinfo=timezone.utc)
+    n = gps.MIN_STAY_MINUTES // 10 + 3  # 10분 간격으로 MIN_STAY 넉넉히 넘김
+    logs = [_log(base + timedelta(minutes=10 * i), 37.5, 127.0) for i in range(n)]
+    stays = gps.detect_stays(logs)
+    assert len(stays) == 1  # 뜸한 점도 한 체류로 (예전엔 0개였음)
 
 
 def test_jitter_outlier_does_not_split():
