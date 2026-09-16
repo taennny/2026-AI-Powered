@@ -52,6 +52,22 @@ async def get_frequent_places(
     return list(result.scalars().all())
 
 
+async def delete_frequent_place(
+    db: AsyncSession, place_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    result = await db.execute(
+        select(FrequentPlace)
+        .where(FrequentPlace.id == place_id)
+        .where(FrequentPlace.user_id == user_id)
+    )
+    place = result.scalar_one_or_none()
+    if not place:
+        raise ValueError("장소를 찾을 수 없습니다")
+
+    await db.delete(place)
+    await db.commit()
+
+
 def to_response_dict(place: FrequentPlace) -> dict:
     """Geometry → lat/lng 변환해서 응답용 dict로"""
     point = to_shape(place.location)
