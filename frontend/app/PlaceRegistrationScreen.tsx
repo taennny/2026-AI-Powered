@@ -19,6 +19,8 @@ import {logError} from '@/utils/logError';
 import {describePlaceError} from '@/utils/placeError';
 import {markPlaceRegistrationDone} from '@/utils/onboardingStorage';
 
+const LAST_KNOWN_MAX_AGE_MS = 5 * 60 * 1000;
+
 type Screen = 'intro' | 'search' | 'naming';
 
 type PlaceType = 'frequent' | 'home' | 'workSchool';
@@ -64,6 +66,7 @@ export default function PlaceRegistrationScreen() {
   const [selectedPlaceType, setSelectedPlaceType] =
     useState<PlaceType>('frequent');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const titleOpacity = useRef(new Animated.Value(1)).current;
 
@@ -214,6 +217,12 @@ export default function PlaceRegistrationScreen() {
    * 현재 위치
    */
   const handleCurrentLocation = async () => {
+    if (isLocating) {
+      return;
+    }
+
+    setIsLocating(true);
+
     try {
       const {status} =
         await Location.requestForegroundPermissionsAsync();
@@ -226,10 +235,14 @@ export default function PlaceRegistrationScreen() {
         return;
       }
 
+      // 백그라운드 GPS가 남겨둔 좌표가 있으면 새로 측위하지 않는다
       const location =
-        await Location.getCurrentPositionAsync({
+        (await Location.getLastKnownPositionAsync({
+          maxAge: LAST_KNOWN_MAX_AGE_MS,
+        })) ??
+        (await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
-        });
+        }));
 
       const {latitude, longitude} = location.coords;
 
@@ -259,6 +272,8 @@ export default function PlaceRegistrationScreen() {
       logError('current location', error);
       const {message} = describePlaceError(error, '조회');
       Alert.alert('현재 위치를 가져오지 못했어요', message);
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -969,6 +984,7 @@ useEffect(() => {
               {searchText.trim().length === 0 ? (
                 <Pressable
                   onPress={handleCurrentLocation}
+                  disabled={isLocating}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -988,13 +1004,17 @@ useEffect(() => {
                       justifyContent: 'center',
                       marginRight: 14,
                     }}>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        color: '#4995FF',
-                      }}>
-                      ⌖
-                    </Text>
+                    {isLocating ? (
+                      <ActivityIndicator size="small" color="#4995FF" />
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          color: '#4995FF',
+                        }}>
+                        ⌖
+                      </Text>
+                    )}
                   </View>
 
                   <Text
@@ -1003,7 +1023,7 @@ useEffect(() => {
                       fontWeight: '600',
                       color: '#4995FF',
                     }}>
-                    현재 위치로 찾기
+                    {isLocating ? '위치를 확인하는 중…' : '현재 위치로 찾기'}
                   </Text>
                 </Pressable>
               ) : (
