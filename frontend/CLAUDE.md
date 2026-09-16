@@ -16,7 +16,7 @@ npm run android           # Android 에뮬레이터 실행
 npm run lint              # ESLint 검사
 npm run lint:fix          # ESLint 자동 수정
 npm run format            # Prettier 포맷팅
-npm test                  # Jest (jest-expo). tz는 jest.setup.js에서 Asia/Seoul 고정
+npm test                  # Jest (jest-expo). tz는 스크립트가 TZ=Asia/Seoul로 고정
 
 # iOS 네이티브 모듈 변경 후 필수
 cd ios && bundle exec pod install && cd ..
@@ -597,9 +597,10 @@ components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(ho
 `jest-expo` 프리셋. 화면 렌더링은 테스트하지 않고 **순수 로직만** 다룹니다.
 
 ```bash
-npm test              # 전체
+npm test              # 전체 (TZ=Asia/Seoul 고정)
 npm run test:watch    # 변경 감지
-npx jest gpsTask      # 파일 하나
+npx jest gpsTask      # 파일 하나 — 기기 tz로 도니 시각 테스트는 TZ=Asia/Seoul을 앞에
+TZ=America/New_York npx jest   # 해외 tz에서 뭐가 깨지는지 보기
 ```
 
 | 파일 | 대상 | 핵심 |
@@ -630,12 +631,16 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/useEmailLogin.test.ts` | `useEmailLogin` | 성공 시 인증 플래그, 빈 입력은 요청 안 함, **401 5회면 잠금**, 네트워크 오류는 횟수에 안 넣음(비행기 모드로 잠기면 안 됨), isLoading |
 | `__tests__/useJournalList.test.ts` | `useJournalList` | 타이핑만으로 요청하지 않음, `appliedQuery`는 응답과 함께 바뀜, 더 불러오기가 목록의 검색어를 씀, 늦게 온 응답 무시, 페이지 이어붙이기, 실패 시 기존 목록 유지, 날짜 필터(캐시 안 씀·더 불러오기 승계·검색하면 풀림) |
 
-`jest.setup.js`가 두 가지를 합니다:
+**tz는 `package.json`의 `test` 스크립트가 `TZ=Asia/Seoul`로 박습니다.**
+`formatDate`·`formatTimeFromISO`·`groupPlaces`가 기기 로컬 시간에 의존해서, 안 박으면
+CI(UTC)에서 14개가 9시간씩 밀려 깨집니다. 스크립트가 값을 덮어쓰므로 **해외 지원 작업은
+`npm test` 대신 `TZ=America/New_York npx jest`로 돌립니다** — 어디가 깨지는지 바로 나옵니다.
 
-- **`process.env.TZ = 'Asia/Seoul'` 고정** — `formatDate`·`formatTimeFromISO`가 기기 로컬 시간에
-  의존해서, tz를 안 박으면 CI(UTC)에서 그냥 깨집니다. 반대로 **해외 지원 작업에 들어갈 때
-  이 값을 `America/New_York` 등으로 바꿔 돌리면 어디가 깨지는지 바로 나옵니다.**
-- AsyncStorage를 인메모리 목으로 교체 (네이티브 모듈이라 JS 환경에 없음)
+> `jest.setup.js` 안에서 `process.env.TZ`에 대입하면 **먹지 않습니다.** `setupFiles`는
+> Node가 이미 뜬 뒤에 실행돼서 그때는 타임존이 이미 잡혀 있습니다. 한동안 그렇게 적혀
+> 있었는데, 개발 기기가 전부 KST라 로컬에서는 티가 안 나다가 CI를 붙이고서야 드러났습니다.
+
+`jest.setup.js`는 네이티브 모듈을 인메모리 목으로 교체합니다 (AsyncStorage, SecureStore).
 
 새 테스트를 쓸 때: 네이티브 모듈에 의존하는 모듈은 `jest.mock`으로 잘라내고
 (`expo-task-manager`는 `defineTask`에 등록된 핸들러를 붙잡아 직접 호출),
