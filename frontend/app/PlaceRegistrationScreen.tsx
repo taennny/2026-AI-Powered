@@ -312,8 +312,7 @@ export default function PlaceRegistrationScreen() {
     setScreen('intro');
     setSearchText('');
   };
-
-  const handleDeletePlace = async (place: Place) => {
+const handleDeletePlace = async (place: Place) => {
   Alert.alert(
     '장소 삭제',
     `"${place.name}"을(를) 삭제할까요?`,
@@ -326,7 +325,21 @@ export default function PlaceRegistrationScreen() {
         text: '삭제',
         style: 'destructive',
         onPress: async () => {
-          // 여기에서 백엔드 DELETE API 호출
+          try {
+            await api.delete(`/api/v1/places/${place.id}`);
+
+            setPlaces(currentPlaces =>
+              currentPlaces.filter(item => item.id !== place.id),
+            );
+          } catch (error: any) {
+            console.error('장소 삭제 실패:', error);
+
+            const message =
+              error?.response?.data?.detail ??
+              '장소 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.';
+
+            Alert.alert('장소 삭제 실패', message);
+          }
         },
       },
     ],
