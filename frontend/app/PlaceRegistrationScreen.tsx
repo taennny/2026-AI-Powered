@@ -270,8 +270,10 @@ export default function PlaceRegistrationScreen() {
       animateToNaming(currentLocationPlace);
     } catch (error) {
       logError('current location', error);
-      const {message} = describePlaceError(error, '조회');
-      Alert.alert('현재 위치를 가져오지 못했어요', message);
+      Alert.alert(
+        '현재 위치를 가져오지 못했어요',
+        '위치 서비스가 켜져 있는지 확인하고 다시 시도해주세요.',
+      );
     } finally {
       setIsLocating(false);
     }
@@ -1086,11 +1088,11 @@ useEffect(() => {
     position: 'absolute',
     left: 24,
     right: 24,
-    top: 0,
+    top: 112,
     bottom: 0,
-    paddingTop: 112,
     paddingBottom: 12,
     justifyContent: 'flex-end',
+    backgroundColor: '#FFFFFF',
     opacity: namingOpacity,
     transform: [
       {translateY: namingTranslateY},
