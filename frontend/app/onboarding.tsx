@@ -17,22 +17,22 @@ const SWIPE_DISTANCE = 50;
 const SWIPE_VELOCITY = 0.3;
 
 const IMAGES = [
-  require('../assets/onboarding/onboarding1.png'),
-  require('../assets/onboarding/onboarding2.png'),
-  require('../assets/onboarding/onboarding3.png'),
-  require('../assets/onboarding/onboarding4.png'),
-  require('../assets/onboarding/onboarding5.png'),
-  require('../assets/onboarding/onboarding6.png'),
-  require('../assets/onboarding/onboarding7.png'),
-  require('../assets/onboarding/onboarding8.png'),
-  require('../assets/onboarding/onboarding9.png'),
-  require('../assets/onboarding/onboarding10.png'),
-  require('../assets/onboarding/onboarding11.png'),
-  require('../assets/onboarding/onboarding12.png'),
-  require('../assets/onboarding/onboarding13.png'),
-  require('../assets/onboarding/onboarding14.png'),
-  require('../assets/onboarding/onboarding15.png'),
-  require('../assets/onboarding/onboarding16.png'),
+  require('../assets/onboarding/onboarding1.jpeg'),
+  require('../assets/onboarding/onboarding2.jpeg'),
+  require('../assets/onboarding/onboarding3.jpeg'),
+  require('../assets/onboarding/onboarding4.jpeg'),
+  require('../assets/onboarding/onboarding5.jpeg'),
+  require('../assets/onboarding/onboarding6.jpeg'),
+  require('../assets/onboarding/onboarding7.jpeg'),
+  require('../assets/onboarding/onboarding8.jpeg'),
+  require('../assets/onboarding/onboarding9.jpeg'),
+  require('../assets/onboarding/onboarding10.jpeg'),
+  require('../assets/onboarding/onboarding11.jpeg'),
+  require('../assets/onboarding/onboarding12.jpeg'),
+  require('../assets/onboarding/onboarding13.jpeg'),
+  require('../assets/onboarding/onboarding14.jpeg'),
+  require('../assets/onboarding/onboarding15.jpeg'),
+  require('../assets/onboarding/onboarding16.jpeg'),
 ];
 
 export default function OnboardingScreen() {
@@ -42,11 +42,17 @@ export default function OnboardingScreen() {
   const indexRef = useRef(0);
   indexRef.current = currentIndex;
 
+  const isLeavingRef = useRef(false);
+
   const goNext = async () => {
     if (indexRef.current < IMAGES.length - 1) {
       setCurrentIndex(indexRef.current + 1);
       return;
     }
+    // 마지막 장에서 탭·스와이프가 겹치면 router.replace가 두 번 불린다
+    if (isLeavingRef.current) return;
+    isLeavingRef.current = true;
+
     await markOnboardingDone();
     router.replace('/(main)/(tabs)/home');
   };
@@ -61,10 +67,12 @@ export default function OnboardingScreen() {
       onMoveShouldSetPanResponder: (_, {dx, dy}) =>
         Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > CLAIM_THRESHOLD,
       onPanResponderRelease: (_, {dx, vx}) => {
-        // 짧게 튕기는 동작이 흔해서 거리만 보면 안 잡힌다
-        const passed =
-          Math.abs(dx) > SWIPE_DISTANCE || Math.abs(vx) > SWIPE_VELOCITY;
-        if (!passed) return;
+        // 짧게 튕기는 동작이 흔해서 거리만 보면 안 잡힌다.
+        // 속도는 방향이 같을 때만 본다 — 끌다가 반대로 튕기면 의도와 거꾸로 간다
+        const far = Math.abs(dx) > SWIPE_DISTANCE;
+        const flicked =
+          Math.abs(vx) > SWIPE_VELOCITY && Math.sign(vx) === Math.sign(dx);
+        if (!far && !flicked) return;
 
         if (dx < 0) void goNext();
         else goBack();
