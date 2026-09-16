@@ -16,6 +16,7 @@ import {
 import {router, useLocalSearchParams} from 'expo-router';
 import {api} from '@/utils/api';
 import {logError} from '@/utils/logError';
+import {describePlaceError} from '@/utils/placeError';
 import {markPlaceRegistrationDone} from '@/utils/onboardingStorage';
 
 type Screen = 'intro' | 'search' | 'naming';
@@ -89,8 +90,10 @@ export default function PlaceRegistrationScreen() {
         );
 
         setPlaces(fetchedPlaces);
-      } catch {
-        setPlaces([]);
+      } catch (error) {
+        logError('frequent place list', error);
+        const {title, message} = describePlaceError(error, '조회');
+        Alert.alert(title, message);
       }
     };
 
@@ -232,12 +235,10 @@ export default function PlaceRegistrationScreen() {
       };
 
       animateToNaming(currentLocationPlace);
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.detail ??
-        '현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.';
-
-      Alert.alert('현재 위치 조회 실패', message);
+    } catch (error) {
+      logError('current location', error);
+      const {message} = describePlaceError(error, '조회');
+      Alert.alert('현재 위치를 가져오지 못했어요', message);
     }
   };
 
@@ -326,12 +327,10 @@ const handleDeletePlace = async (place: Place) => {
             setPlaces(currentPlaces =>
               currentPlaces.filter(item => item.id !== place.id),
             );
-          } catch (error: any) {
-            const message =
-              error?.response?.data?.detail ??
-              '장소 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.';
-
-            Alert.alert('장소 삭제 실패', message);
+          } catch (error) {
+            logError('frequent place delete', error);
+            const {title, message} = describePlaceError(error, '삭제');
+            Alert.alert(title, message);
           }
         },
       },
@@ -401,12 +400,11 @@ setScreen('intro');
 
     namingOpacity.setValue(0);
     namingTranslateY.setValue(15);
-  } catch (error: any) {
-    const message =
-      error?.response?.data?.detail ??
-      '장소 등록에 실패했습니다. 잠시 후 다시 시도해주세요.';
+  } catch (error) {
+    logError('frequent place create', error);
+    const {title, message} = describePlaceError(error, '등록');
 
-    Alert.alert('장소 등록 실패', message);
+    Alert.alert(title, message);
   } finally {
     setIsSubmitting(false);
   }
