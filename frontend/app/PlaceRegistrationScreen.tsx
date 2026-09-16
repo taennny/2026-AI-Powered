@@ -1063,9 +1063,14 @@ useEffect(() => {
             <Animated.View
   pointerEvents={screen === 'naming' ? 'auto' : 'none'}
   style={{
-    flex: 1,
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: 0,
+    bottom: 0,
     paddingTop: 112,
-    paddingBottom: 60,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
     opacity: namingOpacity,
     transform: [
       {translateY: namingTranslateY},
