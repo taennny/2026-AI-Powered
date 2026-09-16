@@ -15,7 +15,11 @@ import {
 } from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {api} from '@/utils/api';
+import {logError} from '@/utils/logError';
+import {describePlaceError} from '@/utils/placeError';
 import {markPlaceRegistrationDone} from '@/utils/onboardingStorage';
+
+const LAST_KNOWN_MAX_AGE_MS = 5 * 60 * 1000;
 
 type Screen = 'intro' | 'search' | 'naming';
 
@@ -31,6 +35,26 @@ type Place = {
 };
 
 
+function DeleteButton({onPress}: {onPress: () => void}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+      }}>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '600',
+          color: '#FF4D4F',
+        }}>
+        삭제
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function PlaceRegistrationScreen() {
   const [screen, setScreen] = useState<Screen>('intro');
 
@@ -42,6 +66,7 @@ export default function PlaceRegistrationScreen() {
   const [selectedPlaceType, setSelectedPlaceType] =
     useState<PlaceType>('frequent');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
   const titleOpacity = useRef(new Animated.Value(1)).current;
 
@@ -89,7 +114,9 @@ export default function PlaceRegistrationScreen() {
 
         setPlaces(fetchedPlaces);
       } catch (error) {
-        console.error('자주 가는 장소 조회 실패:', error);
+        logError('frequent place list', error);
+        const {title, message} = describePlaceError(error, '조회');
+        Alert.alert(title, message);
       }
     };
 
@@ -190,6 +217,12 @@ export default function PlaceRegistrationScreen() {
    * 현재 위치
    */
   const handleCurrentLocation = async () => {
+    if (isLocating) {
+      return;
+    }
+
+    setIsLocating(true);
+
     try {
       const {status} =
         await Location.requestForegroundPermissionsAsync();
@@ -202,14 +235,16 @@ export default function PlaceRegistrationScreen() {
         return;
       }
 
+      // 백그라운드 GPS가 남겨둔 좌표가 있으면 새로 측위하지 않는다
       const location =
-        await Location.getCurrentPositionAsync({
+        (await Location.getLastKnownPositionAsync({
+          maxAge: LAST_KNOWN_MAX_AGE_MS,
+        })) ??
+        (await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
-        });
+        }));
 
       const {latitude, longitude} = location.coords;
-
-      console.log('현재 위치:', latitude, longitude);
 
       const response = await api.get(
         '/api/v1/places/frequent/reverse-geocode',
@@ -223,8 +258,6 @@ export default function PlaceRegistrationScreen() {
 
       const address = response.data.address;
 
-      console.log('현재 위치 주소:', address);
-
       const currentLocationPlace: Place = {
         id: `current-${Date.now()}`,
         type: selectedPlaceType,
@@ -235,14 +268,14 @@ export default function PlaceRegistrationScreen() {
       };
 
       animateToNaming(currentLocationPlace);
-    } catch (error: any) {
-      console.error('현재 위치 조회 실패:', error);
-
-      const message =
-        error?.response?.data?.detail ??
-        '현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.';
-
-      Alert.alert('현재 위치 조회 실패', message);
+    } catch (error) {
+      logError('current location', error);
+      Alert.alert(
+        '현재 위치를 가져오지 못했어요',
+        '위치 서비스가 켜져 있는지 확인하고 다시 시도해주세요.',
+      );
+    } finally {
+      setIsLocating(false);
     }
   };
 
@@ -312,6 +345,35 @@ export default function PlaceRegistrationScreen() {
     setScreen('intro');
     setSearchText('');
   };
+const handleDeletePlace = async (place: Place) => {
+  Alert.alert(
+    '장소 삭제',
+    `"${place.name}"을(를) 삭제할까요?`,
+    [
+      {
+        text: '취소',
+        style: 'cancel',
+      },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.delete(`/api/v1/places/frequent/${place.id}`);
+
+            setPlaces(currentPlaces =>
+              currentPlaces.filter(item => item.id !== place.id),
+            );
+          } catch (error) {
+            logError('frequent place delete', error);
+            const {title, message} = describePlaceError(error, '삭제');
+            Alert.alert(title, message);
+          }
+        },
+      },
+    ],
+  );
+};
 
   const handleDeletePlace = async (place: Place) => {
   Alert.alert(
@@ -395,14 +457,11 @@ setScreen('intro');
 
     namingOpacity.setValue(0);
     namingTranslateY.setValue(15);
-  } catch (error: any) {
-    console.error('장소 등록 실패:', error);
+  } catch (error) {
+    logError('frequent place create', error);
+    const {title, message} = describePlaceError(error, '등록');
 
-    const message =
-      error?.response?.data?.detail ??
-      '장소 등록에 실패했습니다. 잠시 후 다시 시도해주세요.';
-
-    Alert.alert('장소 등록 실패', message);
+    Alert.alert(title, message);
   } finally {
     setIsSubmitting(false);
   }
@@ -444,14 +503,10 @@ useEffect(() => {
       );
 
       setSearchResults(results);
-    }   catch (error: any) {
-  console.log('검색 실패 상태:', error?.response?.status);
-  console.log('검색 실패 내용:', error?.response?.data);
-  console.log('검색 요청 URL:', error?.config?.url);
-  console.log('검색 요청 파라미터:', error?.config?.params);
-
-  setSearchResults([]);
-}
+    } catch (error) {
+      logError('frequent place search', error);
+      setSearchResults([]);
+    }
   }, 300);
 
   return () => clearTimeout(timer);
@@ -633,21 +688,7 @@ useEffect(() => {
       </Text>
     </View>
 
-    <Pressable
-      onPress={() => handleDeletePlace(place)}
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-      }}>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '600',
-          color: '#FF4D4F',
-        }}>
-        삭제
-      </Text>
-    </Pressable>
+    <DeleteButton onPress={() => handleDeletePlace(place)} />
   </View>
 ))}
               </View>
@@ -695,21 +736,31 @@ useEffect(() => {
 
                 <View
                   style={{
-                    borderRadius: 7,
-                    backgroundColor: '#F2F4F6',
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}>
-                  <Text
+                  <View
                     style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: homePlace
-                        ? '#8B95A1'
-                        : '#191F28',
+                      borderRadius: 7,
+                      backgroundColor: '#F2F4F6',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
                     }}>
-                    {homePlace ? '변경' : '등록'}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '600',
+                        color: homePlace ? '#8B95A1' : '#191F28',
+                      }}>
+                      {homePlace ? '변경' : '등록'}
+                    </Text>
+                  </View>
+
+                  {homePlace && (
+                    <DeleteButton
+                      onPress={() => handleDeletePlace(homePlace)}
+                    />
+                  )}
                 </View>
               </Pressable>
 
@@ -756,21 +807,31 @@ useEffect(() => {
 
                 <View
                   style={{
-                    borderRadius: 7,
-                    backgroundColor: '#F2F4F6',
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}>
-                  <Text
+                  <View
                     style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: workSchoolPlace
-                        ? '#8B95A1'
-                        : '#191F28',
+                      borderRadius: 7,
+                      backgroundColor: '#F2F4F6',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
                     }}>
-                    {workSchoolPlace ? '변경' : '등록'}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '600',
+                        color: workSchoolPlace ? '#8B95A1' : '#191F28',
+                      }}>
+                      {workSchoolPlace ? '변경' : '등록'}
+                    </Text>
+                  </View>
+
+                  {workSchoolPlace && (
+                    <DeleteButton
+                      onPress={() => handleDeletePlace(workSchoolPlace)}
+                    />
+                  )}
                 </View>
               </Pressable>
             </View>
@@ -945,6 +1006,7 @@ useEffect(() => {
               {searchText.trim().length === 0 ? (
                 <Pressable
                   onPress={handleCurrentLocation}
+                  disabled={isLocating}
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
@@ -964,13 +1026,17 @@ useEffect(() => {
                       justifyContent: 'center',
                       marginRight: 14,
                     }}>
-                    <Text
-                      style={{
-                        fontSize: 18,
-                        color: '#4995FF',
-                      }}>
-                      ⌖
-                    </Text>
+                    {isLocating ? (
+                      <ActivityIndicator size="small" color="#4995FF" />
+                    ) : (
+                      <Text
+                        style={{
+                          fontSize: 18,
+                          color: '#4995FF',
+                        }}>
+                        ⌖
+                      </Text>
+                    )}
                   </View>
 
                   <Text
@@ -979,7 +1045,7 @@ useEffect(() => {
                       fontWeight: '600',
                       color: '#4995FF',
                     }}>
-                    현재 위치로 찾기
+                    {isLocating ? '위치를 확인하는 중…' : '현재 위치로 찾기'}
                   </Text>
                 </Pressable>
               ) : (
@@ -1039,9 +1105,14 @@ useEffect(() => {
             <Animated.View
   pointerEvents={screen === 'naming' ? 'auto' : 'none'}
   style={{
-    flex: 1,
-    paddingTop: 112,
-    paddingBottom: 60,
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: 112,
+    bottom: 0,
+    paddingBottom: 12,
+    justifyContent: 'flex-end',
+    backgroundColor: '#FFFFFF',
     opacity: namingOpacity,
     transform: [
       {translateY: namingTranslateY},

@@ -1,7 +1,7 @@
 # app/services/calendar.py
 
 import calendar
-from datetime import date
+from datetime import date, datetime
 
 from geoalchemy2.shape import to_shape
 from sqlalchemy import Text, and_, cast, exists, or_, select
@@ -94,7 +94,9 @@ async def get_monthly_calendar(
     return {"year": year, "month": month, "days": days}
 
 
-def select_place_photos(place, all_photos, deleted_taken_at) -> list:
+def select_place_photos(
+    place: Place, all_photos: list[Photo], deleted_taken_at: set[datetime]
+) -> list[Photo]:
     """카드에 보일 사진을 고른다. 규칙 순서가 곧 우선순위다.
 
     1. 사용자가 직접 붙인 사진(place_id)이 있으면 그것만 쓴다 — 억제도 받지 않는다

@@ -15,7 +15,7 @@ function statusOf(error: unknown): number | undefined {
 
 export function describePlaceError(
   error: unknown,
-  action: '수정' | '삭제',
+  action: '수정' | '삭제' | '등록' | '조회',
 ): PlaceErrorInfo {
   const status = statusOf(error);
 
