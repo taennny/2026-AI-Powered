@@ -40,9 +40,10 @@ jobs:
       - name: 타입 검사
         run: npx tsc --noEmit
 
-      # EXPO_PUBLIC_* 없이도 통과한다(테스트가 직접 주입) — 시크릿 등록 불필요
+      # npm test 를 그대로 쓴다 — tz(Asia/Seoul)가 그 스크립트에 박혀 있다.
+      # EXPO_PUBLIC_* 없이도 통과하므로(테스트가 직접 주입) 시크릿 등록은 불필요.
       - name: Jest 실행
-        run: npx jest --ci
+        run: npm test -- --ci
 
       - name: ESLint 검사
         run: npx eslint .
