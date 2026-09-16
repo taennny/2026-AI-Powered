@@ -1,4 +1,6 @@
 # app/api/v1/frequent_place.py
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +15,7 @@ from app.schemas.frequent_place import (
 )
 from app.services.frequent_place import (
     create_frequent_place,
+    delete_frequent_place,
     get_frequent_places,
     to_response_dict,
 )
@@ -43,6 +46,19 @@ async def list_frequent_places(
     """자주가는곳 목록 조회"""
     places = await get_frequent_places(db, current_user.id)
     return FrequentPlaceListResponse(places=[to_response_dict(p) for p in places])
+
+
+@router.delete("/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_frequent_place_api(
+    place_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """자주가는곳 삭제"""
+    try:
+        await delete_frequent_place(db, place_id, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/search", response_model=FrequentPlaceSearchResponse)
