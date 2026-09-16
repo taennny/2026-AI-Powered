@@ -143,6 +143,8 @@ API 요청 시 토큰은 인터셉터가 `tokenStorage`에서 직접 꺼내므�
 | `GET /api/v1/subscriptions/me` | `fetchSubscription` | `settings/subscription`, `settings/theme` |
 | `PUT /api/v1/subscriptions/me` | `subscribePremium`, `cancelSubscription` | `settings/subscription` (인앱결제 도입 시 잠길 예정) |
 | `POST /api/v1/photos/upload` | `uploadPhoto` | `utils/photoSync.ts` (타임라인 카드 사진) |
+| `PUT /api/v1/places/{id}/photo` | `replacePlacePhoto` | `hooks/usePlacePhoto.ts` (갤러리에서 고른 사진으로 교체) |
+| `DELETE /api/v1/places/{id}/photo` | `deletePlacePhoto` | `hooks/usePlacePhoto.ts` (`?block=true`면 자동 첨부도 영구 차단) |
 
 백엔드에는 있으나 **프론트가 아직 안 쓰는** 엔드포인트:
 `POST /api/v1/blog/{id}/publish`(발행 — 공개 기능이 생기면 붙일 자리),
@@ -213,9 +215,14 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 
 캘린더·타임라인 fetch는 `hooks/useCalendar.ts`에 모여 있습니다. **자동 폴링은 하지 않습니다.**
 다시 불러오는 시점: 월 변경, 날짜 선택, 저널 탭→홈 탭(리마운트), 글쓰기 후 홈 복귀,
-홈에서 홈 탭 재탭(`timelineStore.requestRefresh()`), 앱 백그라운드→복귀(`AppState`).
+홈에서 홈 탭 재탭(`timelineStore.requestRefresh()`), 앱 백그라운드→복귀(`AppState`),
+장소·사진 수정, **백그라운드 analyze가 실제로 돈 직후**(`tasks/gpsTask.ts`).
 
-홈 화면에 머무는 동안 GPS analyze가 새 장소를 만들어도 화면은 그대로입니다 — 홈 탭을 다시 누르면 반영됩니다.
+마지막 것은 **analyze가 돌았을 때만** 나갑니다(`analyzePeriodically`의 반환값).
+배치마다 부르면 안드로이드는 30초마다 캘린더·타임라인을 통째로 다시 받습니다.
+
+그래도 **타이머는 없습니다.** GPS 배치가 와야 도는 구조라, 움직이지 않으면
+(iOS는 정지 시 위치 이벤트가 거의 없습니다) 화면은 그대로입니다.
 
 **탭 전환 캐시** — 탭 레이아웃이 `Slot`이라 홈↔저널을 오갈 때마다 화면이 언마운트됩니다.
 `useCalendar`·`useJournalList`가 마지막 성공 결과를 모듈에 남겨 리마운트 시 즉시 보여주고,
@@ -237,7 +244,12 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 부르면 기본값 규칙이 두 곳에 흩어집니다.
 
 **analyze 호출 시점**(`utils/analyzeSchedule.ts`): GPS 배치마다가 아니라 **1시간 주기 + 논리 날짜가
-넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드)**. `lastAnalyzedDate`는 성공했을 때만
+넘어갔을 때 전날 확정 + 앱 진입·포그라운드 복귀(1분 가드) + 글쓰기 진입**.
+백그라운드·포그라운드는 `runScheduled()` 하나를 가드 간격만 바꿔 씁니다.
+
+**글쓰기 진입**(`HomeFooter`)은 오늘 날짜일 때만 `analyzeNow()`를 돌립니다 — 서버가 요청 시점의
+places로 글을 만들어서, 그냥 두면 마지막 analyze 이후 기록이 글에서 통째로 빠집니다.
+실패해도 글쓰기를 막지 않습니다. 과거 날짜와 모아쓰기는 건너뜁니다(`analyzeNow`가 '오늘'만 봅니다). `lastAnalyzedDate`는 성공했을 때만
 갱신해 실패한 날짜가 다음 주기에 자동 재시도됩니다.
 연속 실패는 지수 백오프로 간격을 벌립니다(1→2→4분 … 60분 상한, 첫 실패는 즉시 재시도).
 새로고침 버튼은 백오프를 무시합니다 — 사용자가 직접 누른 것입니다.
@@ -294,9 +306,28 @@ className을 못 쓰는 prop(`placeholderTextColor`, Ionicons `color` 등)에는
 > `Blog.target_date == date` 하나라, 8/5~8/9 글은 8/5로만 잡히고 8/7로는 안 나옵니다.
 > `period_end`(연속)와 `target_dates`(불연속)를 같이 봐야 합니다 — 백엔드 요청 대기.
 
-### 장소 수정·삭제
+### 장소 수정·삭제 · 카드 사진
 
 타임라인 카드를 **왼쪽으로 밀면** 수정·삭제가 드러납니다(`components/common/SwipeableRow.tsx`).
+연필을 누르면 바로 수정으로 가지 않고 메뉴가 뜹니다(`components/common/ActionMenu.tsx` —
+iOS는 시스템 액션시트, 안드로이드는 `BottomActionSheet`).
+
+```
+연필 → 장소 수정 / 사진 바꾸기(없으면 '사진 추가') / 사진 삭제
+```
+
+**카드 사진은 한 장뿐입니다** — 백엔드가 매칭된 사진 중 첫 장만 URL로 내려줍니다.
+흐름은 `hooks/usePlacePhoto.ts`가 들고 있고 카드는 부르기만 합니다.
+
+| 규칙 | 이유 |
+|---|---|
+| 사진은 `place_id`로 서버에 묶는다 | 자동 첨부는 `taken_at`이 체류 시간대에 들어올 때만 붙습니다. 갤러리에서 고른 사진은 촬영시각이 그 밖이라 이 경로로는 절대 안 붙습니다 |
+| 형식은 피커의 `mimeType`을 쓴다 | 파일명으로 추측하면 안드로이드에서 `fileName`이 없을 때 HEIC이 jpeg으로 올라가 표시가 깨집니다 |
+| 지운 사진은 묘비(`is_deleted`)로 남긴다 | row까지 지우면 앱 재설치 후 `photoSync`가 같은 사진을 다시 올려 되살아납니다. S3 파일은 실제로 지웁니다 |
+| 억제는 **자동 첨부에만** 건다 | 지운 사진을 사용자가 직접 다시 고르면 붙어야 합니다. 안 그러면 되돌릴 방법이 없습니다 |
+| '앞으로 사진 안 붙이기'는 `places.photo_blocked` | 그 사진만이 아니라 **어떤 사진도** 자동으로 안 붙습니다. 직접 고르면 해제됩니다 |
+| 사진을 붙이면 `Place.is_corrected`가 선다 | 재분석이 Place를 지우고 새 UUID로 다시 만들어서, 안 세우면 FK가 깨져 analyze가 500이 됩니다. **부작용으로 그 장소의 체류 시간이 고정됩니다** (아래 "알려진 문제") |
+| 장소를 지우면 그 카드 전용 사진도 정리한다 | 어디에도 안 보이면서 S3에만 남습니다. 시간대로 자동 매칭된 사진은 그날의 일반 사진이라 건드리지 않습니다 |
 
 | 규칙 | 이유 |
 |---|---|
@@ -460,7 +491,8 @@ HomeFooter 글쓰기 버튼 → /(main)/write (dailyRecordId 전달)
 저널 리스트 카드 탭 → /(main)/write-preview (blogId만) → 해당 화면이 상세 조회
 ```
 
-**포스팅에 사진은 넣지 않기로 했습니다** (회의 결정). `write`·`write-preview`의 사진 첨부
+**포스팅에 사진은 넣지 않기로 했습니다** (회의 결정). 타임라인 카드 사진은 이와 별개로
+살아 있고, 사용자가 바꾸거나 지울 수 있습니다(위 "장소 수정·삭제 · 카드 사진"). `write`·`write-preview`의 사진 첨부
 UI와 `blogApi.ts`의 `uploadPhoto`·`photoUrls`도 제거했습니다.
 `usePermissions.ts`의 `ensureMediaLibraryPermission`만 '사진 모아보기'용으로 남겨뒀습니다.
 GPS 분석용 사진(`photos` 테이블, EXIF 기반 장소 매칭)은 이 결정과 무관하게 그대로입니다.
@@ -503,6 +535,7 @@ hooks/useJournalList.ts   저널 목록 — 서버 검색(제출식) + 날짜 �
                           하이라이트·빈 목록 문구는 appliedQuery를 씁니다
 hooks/useDailyAnalyze.ts  앱 진입·복귀 시 오늘 analyze → 성공 시 requestRefresh()
 hooks/usePhotoSync.ts     앱 진입·복귀 시 오늘 사진 자동 업로드 (과거는 useCalendar가 고른 날짜만)
+hooks/usePlacePhoto.ts    카드 사진 교체·삭제 — 권한·피커·업로드·실패 안내를 한 곳에서
 utils/timezone.ts         getDeviceTimeZone() — 서버로 보낼 IANA tz
 utils/gpsQueue.ts         GPS 좌표 큐 — 실패 시 보관, 주인 표시 (위 "GPS 업로드 큐" 참고)
 utils/currentUser.ts      액세스 토큰(JWT)의 sub — 좌표의 주인. 서명은 검증하지 않습니다
@@ -532,6 +565,7 @@ components/common/BottomActionSheet.tsx  아래에서 올라오는 시트 (배�
                           `heightRatio`를 주면 높이를 고정해 안에서 스크롤합니다
 components/settings/SettingToggle.tsx  설정 스위치 한 줄 + 켬/끔에 따라 바뀌는 설명
 components/auth/KakaoConsentSheet.tsx  가입 동의 시트 — 흐름은 useKakaoLogin이 들고 있습니다
+components/common/ActionMenu.tsx  동작 선택 — iOS는 ActionSheetIOS, 안드로이드는 BottomActionSheet
 components/bottomsheet/PlaceEditSheet.tsx  장소 수정 — 후보 고르기 → 직접 입력
 constants/placeCategories.ts  직접 입력용 카테고리 칩 (전체를 덮지 않습니다)
 components/bottomsheet/BottomSheet.tsx  groupPlaces() — 타임라인을 시(hour)로 묶습니다.
@@ -586,6 +620,7 @@ npx jest gpsTask      # 파일 하나
 | `__tests__/api.interceptor.test.ts` | `utils/api.ts` 401 인터셉터 | 재발급 대기 큐가 반드시 풀리는지 (리프레시 토큰 없음 / 빈 토큰) |
 | `__tests__/swipeableRow.test.ts` | `shouldOpen` + `categoryLeaf` | 거리·속도로 열림 판정, 스치듯 민 건 안 열림, 반대로 튕기면 취소, 버튼이 넓으면 더 밀어야 함 / 계층 카테고리의 마지막 조각 |
 | `__tests__/settingsStore.test.ts` | `settingsStore` | 기본값 켬, 복원, 켜고 끌 때 GPS 시작·정지, 같은 값이면 무동작, 저장 실패 시 세션 반영, 셀룰러 업로드 기본 끔·복원·위치 토글과 독립 |
+| `__tests__/analyzeSchedule.test.ts` 보강 | `analyzePeriodically` 반환값 | 가드에 걸리면 false·분석하면 true·실패하면 false (이 값으로 화면 갱신을 판단합니다) |
 | `__tests__/currentUser.test.ts` | `utils/currentUser.ts` | 토큰의 `sub`를 읽음, 없거나 깨진 토큰은 null(던지지 않음), 토큰이 바뀌면 주인도 바뀜 |
 | `__tests__/timelineGrouping.test.ts` | `groupPlaces` | 같은 시끼리 묶음, **시가 같아도 시간대가 다르면 다른 묶음**, 서버 순서 유지(자정 넘김), 오프셋 없으면 기기 시간대(구버전 서버) |
 | `__tests__/themeStore.test.ts` | `themeStore` | 디스크 저장·복원, 알 수 없는 값 무시, 로그아웃 시 basic 복귀 + 디스크 삭제, reset 후 initialize가 되살리지 않음 |
@@ -701,6 +736,8 @@ EXIF에 `OffsetTimeOriginal`이 있으면 그 tz를 쓰고, **없으면 KST로 �
 |---|---|---|---|
 | AI 생성 폴링이 37.5초에서 끊김 | `blogApi.ts` `waitForBlogGeneration` | 실제로는 성공했는데 "생성 실패"로 표시. 상한을 늘리려면 `__tests__/blogApi.test.ts`도 같이 고쳐야 합니다 | 프론트(글쓰기) |
 | 로깅 설정이 없음 | `backend/app/main.py` | `basicConfig`가 없어 앱 로거의 INFO는 사라지고 ERROR는 포맷 없이 찍힙니다. 장애 때 원인 추적이 어렵습니다 | 백엔드 |
+| 손댄 장소는 체류 시간이 고정된다 | `backend/app/services/ai.py` `_overlaps_preserved` | 이름을 고치거나 사진을 바꾸면 `is_corrected`가 서고, 재분석 때 그 장소와 겹치는 새 stay가 **통째로 버려집니다**. 1시간 머물러도 손댄 시점의 시각(최소 15분)에 멈춥니다. 새 stay를 버리는 대신 이름·카테고리는 지키고 시각만 갱신해야 합니다 | 백엔드 |
+| 방치하면 체류가 짧게 잘린다 | `ai/server/modules/gps.py` `detect_stays` | 같은 자리라도 `GAP_BRIDGE_MINUTES`(5분)나 `STAY_RADIUS_M`(50m)을 벗어나면 구간이 끊기고, 조각이 `MIN_STAY_MINUTES`(15분)를 못 넘겨 버려집니다. 실내 드리프트로 재현됩니다 — `detect_stays` 로그의 `원시구간`/`유효구간`/`체류` 값으로 원인이 갈립니다 | AI |
 
 ## 미구현 / TODO
 
