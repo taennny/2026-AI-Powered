@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import {router, useLocalSearchParams} from 'expo-router';
 import {api} from '@/utils/api';
+import {logError} from '@/utils/logError';
 import {markPlaceRegistrationDone} from '@/utils/onboardingStorage';
 
 type Screen = 'intro' | 'search' | 'naming';
@@ -88,8 +89,8 @@ export default function PlaceRegistrationScreen() {
         );
 
         setPlaces(fetchedPlaces);
-      } catch (error) {
-        console.error('자주 가는 장소 조회 실패:', error);
+      } catch {
+        setPlaces([]);
       }
     };
 
@@ -209,8 +210,6 @@ export default function PlaceRegistrationScreen() {
 
       const {latitude, longitude} = location.coords;
 
-      console.log('현재 위치:', latitude, longitude);
-
       const response = await api.get(
         '/api/v1/places/frequent/reverse-geocode',
         {
@@ -223,8 +222,6 @@ export default function PlaceRegistrationScreen() {
 
       const address = response.data.address;
 
-      console.log('현재 위치 주소:', address);
-
       const currentLocationPlace: Place = {
         id: `current-${Date.now()}`,
         type: selectedPlaceType,
@@ -236,8 +233,6 @@ export default function PlaceRegistrationScreen() {
 
       animateToNaming(currentLocationPlace);
     } catch (error: any) {
-      console.error('현재 위치 조회 실패:', error);
-
       const message =
         error?.response?.data?.detail ??
         '현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.';
@@ -326,14 +321,12 @@ const handleDeletePlace = async (place: Place) => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await api.delete(`/api/v1/places/${place.id}`);
+            await api.delete(`/api/v1/places/frequent/${place.id}`);
 
             setPlaces(currentPlaces =>
               currentPlaces.filter(item => item.id !== place.id),
             );
           } catch (error: any) {
-            console.error('장소 삭제 실패:', error);
-
             const message =
               error?.response?.data?.detail ??
               '장소 삭제에 실패했습니다. 잠시 후 다시 시도해주세요.';
@@ -409,8 +402,6 @@ setScreen('intro');
     namingOpacity.setValue(0);
     namingTranslateY.setValue(15);
   } catch (error: any) {
-    console.error('장소 등록 실패:', error);
-
     const message =
       error?.response?.data?.detail ??
       '장소 등록에 실패했습니다. 잠시 후 다시 시도해주세요.';
@@ -457,14 +448,10 @@ useEffect(() => {
       );
 
       setSearchResults(results);
-    }   catch (error: any) {
-  console.log('검색 실패 상태:', error?.response?.status);
-  console.log('검색 실패 내용:', error?.response?.data);
-  console.log('검색 요청 URL:', error?.config?.url);
-  console.log('검색 요청 파라미터:', error?.config?.params);
-
-  setSearchResults([]);
-}
+    } catch (error) {
+      logError('frequent place search', error);
+      setSearchResults([]);
+    }
   }, 300);
 
   return () => clearTimeout(timer);
