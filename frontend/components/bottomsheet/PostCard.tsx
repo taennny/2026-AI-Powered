@@ -17,7 +17,6 @@ import {
  */
 import {Image} from 'expo-image';
 import {Ionicons} from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 
 import ActionMenu, {type MenuAction} from '@/components/common/ActionMenu';
 import PhotoViewer from '@/components/common/PhotoViewer';
@@ -25,8 +24,7 @@ import SwipeableRow, {closeAnyOpenRow} from '@/components/common/SwipeableRow';
 import PlaceEditSheet from '@/components/bottomsheet/PlaceEditSheet';
 import {type TimelinePlace} from '@/services/calendarApi';
 import {deletePlace, updatePlace} from '@/services/placeApi';
-import {deletePlacePhoto, replacePlacePhoto} from '@/services/photoApi';
-import {ensureMediaLibraryPermission} from '@/hooks/usePermissions';
+import {usePlacePhoto} from '@/hooks/usePlacePhoto';
 import {useThemeColors} from '@/hooks/useThemeColors';
 import {formatTimeFromISO} from '@/utils/formatDate';
 import {logError} from '@/utils/logError';
@@ -109,85 +107,25 @@ export default function PostCard({data, onChanged}: Props) {
   const [isZoomed, setIsZoomed] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isBusy, setIsBusy] = useState(false);
+  const {
+    isBusy,
+    replace: replacePhoto,
+    confirmRemove,
+  } = usePlacePhoto(data.place_id, onChanged);
 
   const handleEditPress = () => {
     closeAnyOpenRow();
     setIsMenuOpen(true);
   };
 
-  const handlePhotoReplace = async () => {
-    if (!(await ensureMediaLibraryPermission())) return;
-
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      // 원본은 3~5MB다. 카드 썸네일과 확대 보기엔 이 정도면 충분하다
-      quality: 0.7,
-    });
-    if (picked.canceled) return;
-
-    const asset = picked.assets[0];
-    setIsBusy(true);
-    try {
-      // 파일명으로 형식을 추측하면 안드로이드에서 HEIC이 jpeg으로 올라가 표시가 깨진다
-      await replacePlacePhoto(
-        data.place_id,
-        asset.uri,
-        asset.fileName ?? 'photo.jpg',
-        asset.mimeType,
-      );
-      onChanged?.();
-    } catch (error) {
-      logError('place photo replace', error);
-      const {title, message} = describePlaceError(error, '수정');
-      Alert.alert(title, message);
-    } finally {
-      setIsBusy(false);
-    }
-  };
-
-  const removePhoto = async (block: boolean) => {
-    setIsBusy(true);
-    try {
-      await deletePlacePhoto(data.place_id, block);
-      onChanged?.();
-    } catch (error) {
-      logError('place photo delete', error);
-      const {title, message} = describePlaceError(error, '삭제');
-      Alert.alert(title, message);
-    } finally {
-      setIsBusy(false);
-    }
-  };
-
-  const handlePhotoDelete = () => {
-    Alert.alert(
-      '사진 삭제',
-      '카드에 붙은 사진을 삭제합니다. 앞으로 이 장소에 사진을 붙이지 않으려면 "앞으로 사진 안 붙이기"를 선택하세요.',
-      [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '이 사진만 삭제',
-          style: 'destructive',
-          onPress: () => removePhoto(false),
-        },
-        {
-          text: '앞으로 사진 안 붙이기',
-          style: 'destructive',
-          onPress: () => removePhoto(true),
-        },
-      ],
-    );
-  };
-
   const menuActions: MenuAction[] = [
     {label: '장소 수정', onPress: () => setIsEditOpen(true)},
     {
       label: firstPhoto ? '사진 바꾸기' : '사진 추가',
-      onPress: handlePhotoReplace,
+      onPress: replacePhoto,
     },
     ...(firstPhoto
-      ? [{label: '사진 삭제', onPress: handlePhotoDelete, destructive: true}]
+      ? [{label: '사진 삭제', onPress: confirmRemove, destructive: true}]
       : []),
   ];
 
@@ -282,7 +220,6 @@ export default function PostCard({data, onChanged}: Props) {
                 />
               </TouchableOpacity>
 
-              {/* 카드는 축소본을 썼으니 여기서 원본을 한 번 받는다 */}
               <PhotoViewer
                 uri={firstPhoto}
                 visible={isZoomed}

@@ -50,6 +50,18 @@ describe('analyzeSchedule', () => {
       expect(mockAnalyze).not.toHaveBeenCalled();
     });
 
+    it('가드에 걸리면 false, 실제로 분석하면 true를 돌려준다', async () => {
+      expect(await analyzePeriodically(T)).toBe(true);
+      expect(await analyzePeriodically(T + 30_000)).toBe(false);
+      expect(await analyzePeriodically(T + BACKGROUND_INTERVAL_MS)).toBe(true);
+    });
+
+    it('분석에 실패하면 false를 돌려준다 — 실패한 값으로 화면을 갈지 않는다', async () => {
+      mockAnalyze.mockRejectedValue(new Error('서버 오류'));
+
+      expect(await analyzePeriodically(T)).toBe(false);
+    });
+
     it('1시간이 지나면 다시 분석한다', async () => {
       await analyzePeriodically(T);
       mockAnalyze.mockClear();

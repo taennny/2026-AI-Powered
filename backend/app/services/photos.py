@@ -75,12 +75,10 @@ def _convert_heic_to_jpeg(file_bytes: bytes) -> tuple[bytes, bytes | None]:
     return buf.getvalue(), exif_bytes
 
 
-async def upload_photo(
-    file_bytes: bytes,
-    content_type: str,
-    user_id: uuid.UUID,
-    db: AsyncSession,
-) -> Photo:
+def prepare_photo(
+    file_bytes: bytes, content_type: str
+) -> tuple[bytes, str, datetime | None]:
+    """HEIC이면 JPEG으로 바꾸고 EXIF 촬영시각을 뽑는다. 저장 전에 부른다."""
     if content_type in HEIC_TYPES:
         file_bytes, exif_bytes = _convert_heic_to_jpeg(file_bytes)
         content_type = "image/jpeg"
@@ -88,10 +86,13 @@ async def upload_photo(
     else:
         exif = _parse_exif(file_bytes)
 
-    if exif["taken_at"] is None:
-        raise ValueError("촬영 시각 정보가 없는 사진입니다")
-    taken_at = exif["taken_at"]
+    return file_bytes, content_type, exif["taken_at"]
 
+
+async def store_photo(
+    file_bytes: bytes, content_type: str, user_id: uuid.UUID
+) -> tuple[uuid.UUID, str, str | None]:
+    """원본과 썸네일을 올린다. 반환: (photo_id, storage_key, thumbnail_key)"""
     photo_id = uuid.uuid4()
     ext = "jpg" if "jpeg" in content_type else "png"
     storage_key = f"photos/{user_id}/{photo_id}.{ext}"
@@ -102,6 +103,25 @@ async def upload_photo(
     if thumbnail_bytes is not None:
         thumbnail_key = f"photos/{user_id}/{photo_id}_thumb.jpg"
         await upload_file(thumbnail_key, thumbnail_bytes, "image/jpeg")
+
+    return photo_id, storage_key, thumbnail_key
+
+
+async def upload_photo(
+    file_bytes: bytes,
+    content_type: str,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> Photo:
+    file_bytes, content_type, taken_at = prepare_photo(file_bytes, content_type)
+
+    # 저장하기 전에 거른다 — 올린 뒤 거르면 아무도 안 쓰는 파일이 S3에 남는다
+    if taken_at is None:
+        raise ValueError("촬영 시각 정보가 없는 사진입니다")
+
+    photo_id, storage_key, thumbnail_key = await store_photo(
+        file_bytes, content_type, user_id
+    )
 
     photo = Photo(
         id=photo_id,

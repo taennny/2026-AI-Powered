@@ -3,6 +3,7 @@ import {ActivityIndicator, View, Text, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {router} from 'expo-router';
 
+import {useThemeColors} from '@/hooks/useThemeColors';
 import {useTimelineStore} from '@/store/timelineStore';
 import {analyzeNow} from '@/utils/analyzeSchedule';
 import {logicalToday, toDateKey} from '@/utils/formatDate';
@@ -14,6 +15,7 @@ import {
 } from '@/store/dateSelectionStore';
 
 export default function HomeFooter() {
+  const tc = useThemeColors();
   const placesCount = useTimelineStore(s => s.placesCount);
   const dailyRecordId = useTimelineStore(s => s.dailyRecordId);
   const selectedDateKey = useTimelineStore(s => s.selectedDateKey);
@@ -105,7 +107,7 @@ export default function HomeFooter() {
             className={`px-5 py-[10px] rounded-[20px] ${canWrite ? 'bg-btn-bg' : 'bg-tertiary opacity-70'}`}
           >
             {isPreparing ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={tc.btnText} />
             ) : (
               <Text className="text-btn-text text-[13px] font-semibold tracking-[0.5px]">
                 글쓰기

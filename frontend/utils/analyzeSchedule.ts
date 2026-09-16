@@ -109,13 +109,12 @@ async function analyzeRolledOverDate(today: string): Promise<void> {
   }
 }
 
-/**
- * 백그라운드(GPS 배치)용. @param now 테스트용 주입점
- * @returns 분석이 돌았으면 true — 호출부가 화면 갱신 여부를 판단한다
- */
-export async function analyzePeriodically(now = Date.now()): Promise<boolean> {
+async function runScheduled(
+  now: number,
+  minInterval: number,
+): Promise<boolean> {
   if (now < nextRetryAt) return false;
-  if (now - lastAnalyzedAt < BACKGROUND_INTERVAL_MS) return false;
+  if (now - lastAnalyzedAt < minInterval) return false;
   lastAnalyzedAt = now;
 
   const today = toLogicalDateKey(new Date(now));
@@ -134,26 +133,12 @@ export async function analyzePeriodically(now = Date.now()): Promise<boolean> {
   return false;
 }
 
-/** @returns 분석이 돌았으면 true (호출부가 화면 갱신 여부를 판단한다) */
-export async function analyzeOnForeground(now = Date.now()): Promise<boolean> {
-  if (now < nextRetryAt) return false;
-  if (now - lastAnalyzedAt < FOREGROUND_MIN_INTERVAL_MS) return false;
-  lastAnalyzedAt = now;
+export function analyzePeriodically(now = Date.now()): Promise<boolean> {
+  return runScheduled(now, BACKGROUND_INTERVAL_MS);
+}
 
-  const today = toLogicalDateKey(new Date(now));
-
-  await analyzeRolledOverDate(today);
-
-  const succeeded = await analyzeDate(today);
-  recordResult(succeeded, now);
-
-  if (succeeded) {
-    await writeLastAnalyzedDate(today);
-    return true;
-  }
-
-  lastAnalyzedAt = 0;
-  return false;
+export function analyzeOnForeground(now = Date.now()): Promise<boolean> {
+  return runScheduled(now, FOREGROUND_MIN_INTERVAL_MS);
 }
 
 export async function analyzeNow(now = Date.now()): Promise<void> {
