@@ -1,0 +1,49 @@
+name: Frontend CI
+
+# frontend(Expo 앱) 전용 검사. backend ci.yml / ai-ci.yml 과 독립이며,
+# frontend 가 바뀐 PR 에서만 실행된다.
+#
+# 타입 검사가 맨 앞인 이유: 머지 충돌을 잘못 풀어 같은 함수가 두 번 선언된 채
+# main 에 들어간 적이 있고(TS2451), 그게 EAS Build 의 Bundle JavaScript 단계에서야
+# 터져 빌드 한 번을 통째로 날렸다. tsc 가 30초 만에 잡는다.
+
+on:
+  pull_request:
+    branches: [develop, main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  workflow_dispatch: {}  # Actions 탭에서 수동 실행 허용
+
+jobs:
+  typecheck-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node 22 세팅
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 의존성 설치
+        run: npm ci
+
+      # EAS Build 가 번들링에서 실패하기 전에 여기서 먼저 걸러낸다
+      - name: 타입 검사
+        run: npx tsc --noEmit
+
+      # npm test 를 그대로 쓴다 — tz(Asia/Seoul)가 그 스크립트에 박혀 있다.
+      # EXPO_PUBLIC_* 없이도 통과하므로(테스트가 직접 주입) 시크릿 등록은 불필요.
+      - name: Jest 실행
+        run: npm test -- --ci
+
+      - name: ESLint 검사
+        run: npx eslint .
