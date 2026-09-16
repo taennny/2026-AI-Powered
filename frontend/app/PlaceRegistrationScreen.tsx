@@ -375,26 +375,6 @@ const handleDeletePlace = async (place: Place) => {
   );
 };
 
-  const handleDeletePlace = async (place: Place) => {
-  Alert.alert(
-    '장소 삭제',
-    `"${place.name}"을(를) 삭제할까요?`,
-    [
-      {
-        text: '취소',
-        style: 'cancel',
-      },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          // 여기에서 백엔드 DELETE API 호출
-        },
-      },
-    ],
-  );
-};
-
   /*
    * 장소 등록
    */
