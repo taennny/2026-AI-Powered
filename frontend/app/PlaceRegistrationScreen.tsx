@@ -33,6 +33,26 @@ type Place = {
 };
 
 
+function DeleteButton({onPress}: {onPress: () => void}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+      }}>
+      <Text
+        style={{
+          fontSize: 12,
+          fontWeight: '600',
+          color: '#FF4D4F',
+        }}>
+        삭제
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function PlaceRegistrationScreen() {
   const [screen, setScreen] = useState<Screen>('intro');
 
@@ -631,21 +651,7 @@ useEffect(() => {
       </Text>
     </View>
 
-    <Pressable
-      onPress={() => handleDeletePlace(place)}
-      style={{
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-      }}>
-      <Text
-        style={{
-          fontSize: 12,
-          fontWeight: '600',
-          color: '#FF4D4F',
-        }}>
-        삭제
-      </Text>
-    </Pressable>
+    <DeleteButton onPress={() => handleDeletePlace(place)} />
   </View>
 ))}
               </View>
@@ -693,21 +699,31 @@ useEffect(() => {
 
                 <View
                   style={{
-                    borderRadius: 7,
-                    backgroundColor: '#F2F4F6',
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}>
-                  <Text
+                  <View
                     style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: homePlace
-                        ? '#8B95A1'
-                        : '#191F28',
+                      borderRadius: 7,
+                      backgroundColor: '#F2F4F6',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
                     }}>
-                    {homePlace ? '변경' : '등록'}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '600',
+                        color: homePlace ? '#8B95A1' : '#191F28',
+                      }}>
+                      {homePlace ? '변경' : '등록'}
+                    </Text>
+                  </View>
+
+                  {homePlace && (
+                    <DeleteButton
+                      onPress={() => handleDeletePlace(homePlace)}
+                    />
+                  )}
                 </View>
               </Pressable>
 
@@ -754,21 +770,31 @@ useEffect(() => {
 
                 <View
                   style={{
-                    borderRadius: 7,
-                    backgroundColor: '#F2F4F6',
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
                   }}>
-                  <Text
+                  <View
                     style={{
-                      fontSize: 11,
-                      fontWeight: '600',
-                      color: workSchoolPlace
-                        ? '#8B95A1'
-                        : '#191F28',
+                      borderRadius: 7,
+                      backgroundColor: '#F2F4F6',
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
                     }}>
-                    {workSchoolPlace ? '변경' : '등록'}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '600',
+                        color: workSchoolPlace ? '#8B95A1' : '#191F28',
+                      }}>
+                      {workSchoolPlace ? '변경' : '등록'}
+                    </Text>
+                  </View>
+
+                  {workSchoolPlace && (
+                    <DeleteButton
+                      onPress={() => handleDeletePlace(workSchoolPlace)}
+                    />
+                  )}
                 </View>
               </Pressable>
             </View>
